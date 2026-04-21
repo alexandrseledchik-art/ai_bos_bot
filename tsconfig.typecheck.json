@@ -2,5 +2,20 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "incremental": false
-  }
+  },
+  "include": [
+    "next-env.d.ts",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
+    "prompts/**/*.ts",
+    "schemas/**/*.ts",
+    "tests/**/*.ts",
+    "types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next"
+  ]
 }
