@@ -16,6 +16,11 @@ export function normalizeTelegramReplyText(
     "",
   );
 
+  normalized = normalized.replace(
+    /^(?:Привет|Здравствуйте|Добрый день|Добрый вечер)(?:[,!.\s]+)+/i,
+    "",
+  );
+
   normalized = normalized.replace(/\n{3,}/g, "\n\n").trim();
 
   return normalized;
