@@ -71,25 +71,40 @@ npm run smoke
 npm run evals
 ```
 
-4. Экспорт текущей памяти в реляционный staging-вид:
+4. Прогон диагностического quality framework:
+
+```bash
+npm run evals:diagnostic
+```
+
+Он меряет не только route/mode/action, а ещё 6 quality-метрик:
+
+- `nextBestQuestion`
+- `causeDepth`
+- `uncertainty`
+- `adviceDiscipline`
+- `promotion`
+- `artifact`
+
+5. Экспорт текущей памяти в реляционный staging-вид:
 
 ```bash
 npm run export:memory -- data/smoke-state.json
 ```
 
-5. Синхронизация локальной памяти в Supabase:
+6. Синхронизация локальной памяти в Supabase:
 
 ```bash
 npm run sync:supabase -- data/smoke-state.json
 ```
 
-6. Запуск Telegram-бота:
+7. Запуск Telegram-бота:
 
 ```bash
 npm start
 ```
 
-7. Регистрация Telegram webhook после деплоя на Vercel:
+8. Регистрация Telegram webhook после деплоя на Vercel:
 
 ```bash
 npm run telegram:webhook
@@ -178,6 +193,7 @@ npm run workspace:membership -- grant --user-id <auth-user-uuid> --workspace-slu
 
 - Пошаговый продуктовый план: [docs/STEP_BY_STEP_PLAN.md](</Users/aleksandrseledcik/Library/Mobile Documents/com~apple~CloudDocs/Проект ТГ Бота/docs/STEP_BY_STEP_PLAN.md>)
 - Golden evals: [evals/golden-cases.json](</Users/aleksandrseledcik/Library/Mobile Documents/com~apple~CloudDocs/Проект ТГ Бота/evals/golden-cases.json>)
+- Diagnostic quality evals: [evals/diagnostic-quality-cases.json](</Users/aleksandrseledcik/Library/Mobile Documents/com~apple~CloudDocs/Проект ТГ Бота/evals/diagnostic-quality-cases.json>)
 - SQL схема памяти: [supabase/migrations/20260421_init_business_diagnostic.sql](</Users/aleksandrseledcik/Library/Mobile Documents/com~apple~CloudDocs/Проект ТГ Бота/supabase/migrations/20260421_init_business_diagnostic.sql>)
 - Проекция state.json в реляционный вид: [state-projector.js](</Users/aleksandrseledcik/Library/Mobile Documents/com~apple~CloudDocs/Проект ТГ Бота/src/infrastructure/storage/state-projector.js>)
 

@@ -543,6 +543,8 @@ export class ConversationService {
       }
 
       let activeCase = currentCase;
+      let promotionApplied = false;
+      let persistedMemory = null;
 
       if (classification.type === "url_only" || classification.type === "url_plus_problem") {
         activeCase = activeCase || ensureCase(
@@ -560,6 +562,7 @@ export class ConversationService {
           "diagnostic_mode",
           "Активный диагностический кейс."
         );
+        promotionApplied = true;
         thread.entryState.promotionReadiness = "promoted";
         thread.updatedAt = nowIso();
       }
@@ -567,7 +570,7 @@ export class ConversationService {
       let artifactPath = "";
 
       if (activeCase) {
-        const persistedMemory = buildPersistedMemory(decision);
+        persistedMemory = buildPersistedMemory(decision);
 
         activeCase.mode = decision.selectedMode;
         activeCase.summary = decision.response.whatIUnderstood;
@@ -735,7 +738,17 @@ export class ConversationService {
         reply: decision.response.responseText,
         decision,
         classification,
-        artifactPath
+        artifactPath,
+        runtime: {
+          threadId: thread.id,
+          activeCaseId: activeCase?.id || "",
+          activeCaseKind: activeCase?.kind || "",
+          promotionApplied,
+          artifactSaved: Boolean(artifactPath),
+          entryStateAfterMerge: thread.entryState,
+          graphPacket,
+          persistedMemory
+        }
       };
     });
   }

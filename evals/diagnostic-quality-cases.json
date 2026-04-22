@@ -1,0 +1,248 @@
+[
+  {
+    "id": "claimed_cause_vs_system_constraint",
+    "turns": [
+      "Заявок много, не успеваем обрабатывать, людей не хватает."
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContain": ["ICP"],
+        "mustNotContain": ["нанять"],
+        "minDiscriminatingSignals": 1,
+        "minCandidateConstraints": 3
+      },
+      "causeDepth": {
+        "requireClaimedCauseNotSelected": true,
+        "minCandidateStates": 2,
+        "minCandidateCauses": 2,
+        "minUniqueLayers": 2,
+        "minGraphConfidence": 0.5
+      },
+      "uncertainty": {
+        "minResponseHypotheses": 2,
+        "minAlternativeHypotheses": 3,
+        "minConflicts": 1,
+        "forbiddenCertaintyPhrases": ["главная причина уже в людях", "решение сейчас в найме"]
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "forbiddenTerms": ["нанять", "расширить отдел"],
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      },
+      "promotion": {
+        "expectPromotion": false,
+        "expectedCaseKind": ""
+      },
+      "artifact": {
+        "expectSaved": false
+      }
+    }
+  },
+  {
+    "id": "owner_bottleneck_vs_people_fix",
+    "turns": [
+      "Продажи не растут, менеджеров наняли, но собственник всё равно влезает во все сделки."
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContain": ["решения", "собственнику"],
+        "mustNotContain": ["нанять", "РОПа"],
+        "minDiscriminatingSignals": 1,
+        "minCandidateConstraints": 3
+      },
+      "causeDepth": {
+        "requireClaimedCauseNotSelected": false,
+        "minCandidateStates": 3,
+        "minCandidateCauses": 3,
+        "minUniqueLayers": 3,
+        "minGraphConfidence": 0.5
+      },
+      "uncertainty": {
+        "minResponseHypotheses": 2,
+        "minAlternativeHypotheses": 3,
+        "minConflicts": 1,
+        "forbiddenCertaintyPhrases": ["точная причина уже понятна", "всё решится наймом"]
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "forbiddenTerms": ["нанять", "сменить менеджеров", "нанять РОПа"],
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      },
+      "promotion": {
+        "expectPromotion": false,
+        "expectedCaseKind": ""
+      },
+      "artifact": {
+        "expectSaved": false
+      }
+    }
+  },
+  {
+    "id": "hard_signal_promotes_and_saves_artifact",
+    "turns": [
+      "Выручка есть, а прибыль почти не остаётся. Маржа упала с 22% до 11% за 3 месяца."
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "answer",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContain": ["unit economics"],
+        "minCandidateConstraints": 3
+      },
+      "causeDepth": {
+        "requireClaimedCauseNotSelected": false,
+        "minCandidateStates": 1,
+        "minCandidateCauses": 1,
+        "minUniqueLayers": 1,
+        "minGraphConfidence": 0.45,
+        "requiredConstraintTerms": ["unit economics"]
+      },
+      "uncertainty": {
+        "minResponseHypotheses": 2,
+        "minAlternativeHypotheses": 3,
+        "minConflicts": 0,
+        "forbiddenCertaintyPhrases": ["это окончательная истина"]
+      },
+      "adviceDiscipline": {
+        "expectedAction": "answer",
+        "forbiddenTerms": ["уточните запрос"],
+        "requireActionWave": true,
+        "requireArtifact": true
+      },
+      "promotion": {
+        "expectPromotion": true,
+        "expectedCaseKind": "diagnostic_case",
+        "expectedReadiness": "ready_for_diagnostic_case"
+      },
+      "artifact": {
+        "expectSaved": true,
+        "requiredSections": [
+          "## Candidate constraints",
+          "## Candidate states",
+          "## Candidate causes",
+          "## Selected constraint",
+          "## Discriminating signals",
+          "## Next step"
+        ],
+        "requiredTerms": ["unit economics"],
+        "minCandidateConstraintBullets": 3,
+        "minCandidateStateBullets": 1,
+        "minCandidateCauseBullets": 1
+      }
+    }
+  },
+  {
+    "id": "weak_problem_stays_in_entry",
+    "turns": [
+      "Продажи есть, но бизнес не растет и все держится на мне."
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContain": ["решения", "собственнику"],
+        "minDiscriminatingSignals": 1,
+        "minCandidateConstraints": 3
+      },
+      "causeDepth": {
+        "requireClaimedCauseNotSelected": false,
+        "minCandidateStates": 3,
+        "minCandidateCauses": 3,
+        "minUniqueLayers": 3,
+        "minGraphConfidence": 0.5
+      },
+      "uncertainty": {
+        "minResponseHypotheses": 2,
+        "minAlternativeHypotheses": 3,
+        "minConflicts": 1,
+        "forbiddenCertaintyPhrases": ["главное ограничение уже доказано"]
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "forbiddenTerms": ["нанять", "внедрите CRM прямо сейчас"],
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      },
+      "promotion": {
+        "expectPromotion": false,
+        "expectedCaseKind": ""
+      },
+      "artifact": {
+        "expectSaved": false
+      }
+    }
+  },
+  {
+    "id": "promotion_happens_on_second_signal",
+    "turns": [
+      "Продажи есть, но бизнес не растет и все держится на мне.",
+      "Маржа по новому каналу упала с 28% до 12%, а собственник всё равно согласует все скидки."
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "answer",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContain": ["решения", "собственнику"],
+        "minCandidateConstraints": 3
+      },
+      "causeDepth": {
+        "requireClaimedCauseNotSelected": false,
+        "minCandidateStates": 1,
+        "minCandidateCauses": 1,
+        "minUniqueLayers": 2,
+        "minGraphConfidence": 0.45,
+        "requiredConstraintTerms": ["unit economics"]
+      },
+      "uncertainty": {
+        "minResponseHypotheses": 2,
+        "minAlternativeHypotheses": 3,
+        "minConflicts": 0,
+        "forbiddenCertaintyPhrases": ["это окончательная истина"]
+      },
+      "adviceDiscipline": {
+        "expectedAction": "answer",
+        "forbiddenTerms": ["нанять", "сменить отдел"],
+        "requireActionWave": true,
+        "requireArtifact": true
+      },
+      "promotion": {
+        "expectPromotion": true,
+        "expectedCaseKind": "diagnostic_case",
+        "expectedReadiness": "ready_for_diagnostic_case",
+        "expectEarlierTurnsWithoutPromotion": true
+      },
+      "artifact": {
+        "expectSaved": true,
+        "requiredSections": [
+          "## Candidate constraints",
+          "## Candidate causes",
+          "## Selected constraint",
+          "## Next step"
+        ],
+        "requiredTerms": ["unit economics"],
+        "minCandidateConstraintBullets": 3
+      }
+    }
+  }
+]
