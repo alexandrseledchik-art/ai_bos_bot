@@ -1,4 +1,5 @@
 import { callOpenAiJson } from "@/lib/ai/openai-json";
+import { normalizeReplyText } from "@/lib/formatting/normalize-reply-text";
 import { parseWithSingleRetry } from "@/lib/validation/parse-with-retry";
 import { RENDERER_PROMPT } from "@/prompts/renderer.prompt";
 import { z } from "zod";
@@ -45,5 +46,5 @@ export async function runRenderer(params: {
       }),
   });
 
-  return result.replyText.trim();
+  return normalizeReplyText(result.replyText);
 }
