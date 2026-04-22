@@ -36,11 +36,18 @@ async function handleTelegramWebhook(request) {
     return json({ ok: true, ignored: true });
   }
 
-  const result = await conversationService.handleUserMessage({
-    telegramChatId: String(payload.chatId),
-    text: payload.text,
-    userMeta: payload.userMeta
-  });
+  const stopTyping = telegramApi.startTyping(payload.chatId);
+  let result;
+
+  try {
+    result = await conversationService.handleUserMessage({
+      telegramChatId: String(payload.chatId),
+      text: payload.text,
+      userMeta: payload.userMeta
+    });
+  } finally {
+    stopTyping();
+  }
 
   if (result?.reply) {
     await telegramApi.sendMessage(payload.chatId, result.reply);

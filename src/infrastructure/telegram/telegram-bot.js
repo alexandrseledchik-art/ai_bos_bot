@@ -39,11 +39,18 @@ export class TelegramBotRunner {
             continue;
           }
 
-          const result = await onMessage({
-            telegramChatId: String(payload.chatId),
-            text: payload.text,
-            userMeta: payload.userMeta
-          });
+          const stopTyping = this.api.startTyping(payload.chatId);
+          let result;
+
+          try {
+            result = await onMessage({
+              telegramChatId: String(payload.chatId),
+              text: payload.text,
+              userMeta: payload.userMeta
+            });
+          } finally {
+            stopTyping();
+          }
 
           if (result?.reply) {
             await this.sendMessage(payload.chatId, result.reply);

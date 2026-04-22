@@ -54,6 +54,51 @@ export class TelegramApiClient {
     });
   }
 
+  async sendChatAction(chatId, action = "typing") {
+    return this.api("sendChatAction", {
+      chat_id: chatId,
+      action
+    });
+  }
+
+  startTyping(chatId, { intervalMs = 4000 } = {}) {
+    let active = true;
+    let timeoutId = null;
+
+    const tick = async () => {
+      if (!active) {
+        return;
+      }
+
+      try {
+        await this.sendChatAction(chatId, "typing");
+      } catch {
+        // Typing indicator should never break the main request flow.
+      }
+
+      if (!active) {
+        return;
+      }
+
+      timeoutId = setTimeout(() => {
+        void tick();
+      }, intervalMs);
+
+      if (typeof timeoutId?.unref === "function") {
+        timeoutId.unref();
+      }
+    };
+
+    void tick();
+
+    return () => {
+      active = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }
+
   async setWebhook({ url, secretToken = "" }) {
     return this.api("setWebhook", {
       url,
