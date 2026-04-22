@@ -138,6 +138,14 @@ SUPABASE_SYNC_TRANSPORT=auto
   - `workspace_id` на корневых сущностях
 - Graph/runtime sync продолжает работать через `SUPABASE_SERVICE_ROLE_KEY`, а клиентский доступ теперь должен идти только через membership policies
 - После миграции новые клиентские пользователи ничего не видят автоматически, пока им не назначен `workspace_members` row
+- Для operational-выдачи доступа есть скрипт:
+
+```bash
+npm run workspace:membership -- list
+npm run workspace:membership -- grant --user-id <auth-user-uuid> --workspace-slug <slug> --role owner
+```
+
+- Если в legacy flow появятся `cases.user_id` или `conversations.user_id`, migration [20260426_workspace_membership_sync.sql](</Users/aleksandrseledcik/Library/Mobile Documents/com~apple~CloudDocs/Проект ТГ Бота/supabase/migrations/20260426_workspace_membership_sync.sql>) автоматически синхронизирует `workspace_members`
 
 ## Что хранится
 

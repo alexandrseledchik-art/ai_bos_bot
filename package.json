@@ -9,6 +9,7 @@
     "evals": "node src/scripts/run-evals.js",
     "export:memory": "node src/scripts/export-relational-state.js",
     "sync:supabase": "node src/scripts/sync-supabase.js",
-    "telegram:webhook": "node src/scripts/register-telegram-webhook.js"
+    "telegram:webhook": "node src/scripts/register-telegram-webhook.js",
+    "workspace:membership": "node src/scripts/workspace-membership.js"
   }
 }
