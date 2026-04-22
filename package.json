@@ -1,0 +1,14 @@
+{
+  "name": "telegram-business-diagnostic-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "smoke": "node src/scripts/smoke-test.js",
+    "evals": "node src/scripts/run-evals.js",
+    "export:memory": "node src/scripts/export-relational-state.js",
+    "sync:supabase": "node src/scripts/sync-supabase.js",
+    "telegram:webhook": "node src/scripts/register-telegram-webhook.js"
+  }
+}
