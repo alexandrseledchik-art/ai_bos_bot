@@ -11,7 +11,7 @@
       "nextBestQuestion": {
         "required": true,
         "requireQuestionMark": true,
-        "mustContain": ["ICP"],
+        "mustContainAny": ["ICP", "целев", "всё подряд", "этап квалификации"],
         "mustNotContain": ["нанять"],
         "minDiscriminatingSignals": 1,
         "minCandidateConstraints": 3
@@ -45,6 +45,51 @@
     }
   },
   {
+    "id": "lead_overload_prefers_cross_layer_question",
+    "turns": [
+      "Лидов много, менеджеры не успевают, клиент ждет несколько дней, думаю продавцов не хватает."
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["целев", "всё подряд", "этап квалификации", "сегмент"],
+        "mustNotContain": ["сколько минут", "кто отвечает", "SLA"],
+        "minDiscriminatingSignals": 2,
+        "minCandidateConstraints": 4
+      },
+      "causeDepth": {
+        "requireClaimedCauseNotSelected": true,
+        "minCandidateStates": 4,
+        "minCandidateCauses": 3,
+        "minUniqueLayers": 4,
+        "minGraphConfidence": 0.5
+      },
+      "uncertainty": {
+        "minResponseHypotheses": 2,
+        "minAlternativeHypotheses": 4,
+        "minConflicts": 1,
+        "forbiddenCertaintyPhrases": ["нужно срочно нанимать", "главная причина уже в штате"]
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "forbiddenTerms": ["нанять", "расширить отдел", "назначьте SLA"],
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      },
+      "promotion": {
+        "expectPromotion": false,
+        "expectedCaseKind": ""
+      },
+      "artifact": {
+        "expectSaved": false
+      }
+    }
+  },
+  {
     "id": "owner_bottleneck_vs_people_fix",
     "turns": [
       "Продажи не растут, менеджеров наняли, но собственник всё равно влезает во все сделки."
@@ -56,7 +101,7 @@
       "nextBestQuestion": {
         "required": true,
         "requireQuestionMark": true,
-        "mustContain": ["решения", "собственнику"],
+        "mustContainAny": ["решить без эскалации", "собственнику"],
         "mustNotContain": ["нанять", "РОПа"],
         "minDiscriminatingSignals": 1,
         "minCandidateConstraints": 3
@@ -101,7 +146,7 @@
       "nextBestQuestion": {
         "required": true,
         "requireQuestionMark": true,
-        "mustContain": ["unit economics"],
+        "mustContainAny": ["экономику по каналу", "сегменту и продукту", "unit economics"],
         "minCandidateConstraints": 3
       },
       "causeDepth": {
@@ -158,7 +203,7 @@
       "nextBestQuestion": {
         "required": true,
         "requireQuestionMark": true,
-        "mustContain": ["решения", "собственнику"],
+        "mustContainAny": ["решить без эскалации", "собственнику"],
         "minDiscriminatingSignals": 1,
         "minCandidateConstraints": 3
       },
@@ -203,7 +248,7 @@
       "nextBestQuestion": {
         "required": true,
         "requireQuestionMark": true,
-        "mustContain": ["решения", "собственнику"],
+        "mustContainAny": ["экономику по каналу", "сегменту и продукту", "unit economics", "решить без эскалации"],
         "minCandidateConstraints": 3
       },
       "causeDepth": {

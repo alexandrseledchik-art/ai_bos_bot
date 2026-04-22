@@ -81,6 +81,12 @@ function extractClaimedCause(text) {
   if (/люд[а-я]* не хватает/i.test(normalized)) {
     return "не хватает людей";
   }
+  if (/продавц[а-я]*\s+не\s+хватает/i.test(normalized)) {
+    return "не хватает продавцов";
+  }
+  if (/менеджер[а-я]*\s+не\s+хватает/i.test(normalized)) {
+    return "не хватает менеджеров";
+  }
   if (/не успева[а-я]* обработ/i.test(normalized)) {
     return "команда не успевает обрабатывать входящий поток";
   }
@@ -231,9 +237,44 @@ function constraintsFromGraphPacket(graphPacket) {
   return uniqueConstraints([...stateConstraints, ...causeConstraints], 5);
 }
 
-function pickGraphQuestion(graphPacket) {
+function isOpeningMessage(context) {
+  const normalized = normalizeText(context.userText).toLowerCase();
+  const historyLength = Array.isArray(context.history) ? context.history.length : 0;
+  return historyLength === 0 && /^\/start$|^(привет|здравствуй|здравствуйте|добрый день|добрый вечер)$/i.test(normalized);
+}
+
+function isLeadOverloadScenario(text, graphPacket) {
+  const normalized = normalizeText(text).toLowerCase();
+  const observedSignals = graphPacket?.observedSignals || [];
+  return observedSignals.includes("lead_overload") ||
+    observedSignals.includes("slow_first_response") ||
+    (/заяв|лид|входящ/.test(normalized) && /не усп|люд|ответ|очеред|обработ|перегруж/.test(normalized));
+}
+
+function questionLooksUpstream(question) {
+  return /icp|сегмент|целев|приоритет|квалификац|канал|рынк|обещан|неразобран|стратег/i.test(question);
+}
+
+function claimedCauseLooksLocal(text) {
+  const normalized = normalizeText(text).toLowerCase();
+  return /не хватает|люд|продавц|перегруж|ответ|очеред|sla|звон/.test(normalized);
+}
+
+function pickGraphQuestion(graphPacket, text = "") {
+  const discriminatingSignals = Array.isArray(graphPacket?.discriminatingSignals)
+    ? graphPacket.discriminatingSignals
+    : [];
+  const leadOverload = isLeadOverloadScenario(text, graphPacket);
+
+  if (leadOverload && claimedCauseLooksLocal(text)) {
+    const upstreamSignal = discriminatingSignals.find((item) => questionLooksUpstream(item?.question || ""));
+    if (upstreamSignal) {
+      return normalizeText(upstreamSignal.question);
+    }
+  }
+
   return normalizeText(
-    graphPacket?.suggestedQuestion || graphPacket?.discriminatingSignals?.[0]?.question
+    graphPacket?.suggestedQuestion || discriminatingSignals[0]?.question
   );
 }
 
@@ -341,8 +382,15 @@ function genericConstraintsByFocus(focus, text) {
         "Если окажется, что почти все последние лиды были целевыми и достойными быстрого ответа."
       ),
       buildConstraint(
+        "ICP, сегменты и правила приоритета не переведены в реальную обработку входящего потока",
+        "strategy",
+        0.59,
+        "Когда стратегия и ICP не превращены в правила квалификации и приоритета, команда захлёбывается не тем потоком.",
+        "Если целевой сегмент формально и операционно определён, а лучшие лиды уже идут по отдельной логике."
+      ),
+      buildConstraint(
         "Нет маршрутизации и отдельной роли первого ответа на входящие",
-        "management",
+        "operations",
         0.58,
         "Хорошие лиды теряются, когда первый ответ лежит в общей очереди и без владельца.",
         "Если входящие уже распределяются по роли, SLA соблюдается, а очередь всё равно растёт."
@@ -353,13 +401,6 @@ function genericConstraintsByFocus(focus, text) {
         0.54,
         "Если лиды целевые и поток уже организован, то ограничение действительно может быть в capacity команды.",
         "Если значимая часть перегруза уходит после квалификации или смены маршрутизации."
-      ),
-      buildConstraint(
-        "Не описан ICP и нет жёстких критериев, кому отвечать как приоритетному лиду",
-        "strategy",
-        0.52,
-        "Без явного ICP команда тратит время на лиды, которые никогда не должны были попасть в быструю обработку.",
-        "Если ICP и критерии приоритета уже описаны, а лучшие лиды всё равно лежат в общей очереди."
       )
     ];
   }
@@ -440,7 +481,7 @@ function inferSystemLayers(text, focus, candidateConstraints, existingLayers = [
 
 function buildNextQuestion(focus, text, candidateConstraints, graphPacket) {
   const normalized = normalizeText(text).toLowerCase();
-  const graphQuestion = pickGraphQuestion(graphPacket);
+  const graphQuestion = pickGraphQuestion(graphPacket, text);
 
   if (graphQuestion) {
     return graphQuestion;
@@ -476,9 +517,9 @@ function buildEntryState(context, focus, signalSufficiency, selectedConstraint =
   const claimedCause = extractClaimedCause(text) || normalizeText(previous.claimedCause);
   const graphConstraints = constraintsFromGraphPacket(context.graphPacket);
   const candidateConstraints = uniqueConstraints([
-    ...(previous.candidateConstraints || []),
     ...graphConstraints,
-    ...genericConstraintsByFocus(focus, text)
+    ...genericConstraintsByFocus(focus, text),
+    ...(previous.candidateConstraints || [])
   ]);
   const nextBestQuestion = buildNextQuestion(focus, text, candidateConstraints, context.graphPacket);
 
@@ -493,7 +534,10 @@ function buildEntryState(context, focus, signalSufficiency, selectedConstraint =
   ], 8);
 
   return {
-    claimedProblem: normalizeText(previous.claimedProblem || text),
+    claimedProblem:
+      context.classification?.type === "free_text_problem" || context.classification?.type === "url_plus_problem"
+        ? text
+        : normalizeText(previous.claimedProblem || text),
     claimedCause,
     knownFacts,
     symptoms,
@@ -644,6 +688,9 @@ function buildWebsiteDecision(context, linkedProblem = false) {
 
 function buildClarificationDecision(context, focus, claimedProblemText) {
   const entryState = buildEntryState(context, focus, "weak", "", "keep_in_entry");
+  const greeting = isOpeningMessage(context)
+    ? `Привет${context.userMeta?.firstName ? `, ${context.userMeta.firstName}` : ""}. `
+    : "";
   const options = {
     profit: "Тебе сейчас важнее прибыль, понять где теряется маржа или увидеть, почему выручка не превращается в результат?",
     growth: "Тебе сейчас важнее найти, где ломается рост: качество входа, продажи или управляемость коммерческого контура?",
@@ -662,13 +709,13 @@ function buildClarificationDecision(context, focus, claimedProblemText) {
     },
     response: {
       whatIUnderstood:
-        "Похоже, тебе нужен не просто общий разговор про бизнес, а быстрый выход к системному ограничению, которое держит результат.",
+        `${greeting}Похоже, тебе нужен не просто общий разговор про бизнес, а быстрый выход к системному ограничению, которое держит результат.`,
       hypotheses: [
         "Сейчас ограничение может сидеть в прибыли и экономике.",
         "Либо в росте и управляемости, а не в нехватке идей."
       ],
       whyItMatters:
-        "Пока запрос широкий, любой диагноз будет искусственно уверенным. Сначала нужно выбрать контур, где ограничение вероятнее всего живёт.",
+        "Пока запрос широкий, любой диагноз будет звучать умно, но останется случайным. Сначала нужно выбрать контур, где ограничение вероятнее всего живёт.",
       nextStep: options[focus] || options.general,
       responseText: ""
     },
@@ -775,8 +822,8 @@ function buildProblemDecision(context) {
   const entryState = {
     ...buildEntryState(context, focus, hardSignal ? "enough" : "partial", primaryConstraint, promotionReadiness),
     candidateConstraints: uniqueConstraints([
-      ...(context.entryState?.candidateConstraints || []),
-      ...candidateConstraints
+      ...candidateConstraints,
+      ...(context.entryState?.candidateConstraints || [])
     ])
   };
 

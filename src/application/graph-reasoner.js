@@ -64,6 +64,114 @@ function buildQuestionObject(question, separates, whyUseful, informationGain) {
   };
 }
 
+function layerPriority(layer) {
+  const order = {
+    strategy: 1,
+    commercial: 0.92,
+    finance: 0.9,
+    operations: 0.76,
+    management: 0.72,
+    people: 0.68
+  };
+
+  return order[layer] || 0.65;
+}
+
+function isLeadFlowScenario(observedSignals, extracted) {
+  const text = normalizeText(extracted?.claimedProblem || extracted?.observations?.[0]?.evidence || "");
+  return observedSignals.includes("lead_overload") ||
+    observedSignals.includes("slow_first_response") ||
+    (/лид|заяв|входящ|продаж/.test(text) && /не усп|долго|ответ|очеред|перегруж|не хватает/.test(text));
+}
+
+function claimedCauseLooksLocal(extracted) {
+  const claimedCause = normalizeText(extracted?.claimedCause).toLowerCase();
+  return /не хватает|люд|продавц|перегруж|ответ|звон|sla|очеред|обработ/.test(claimedCause);
+}
+
+function questionLooksUpstream(question) {
+  return /icp|сегмент|целев|приоритет|квалификац|канал|рынк|обещан|неразобран|стратег/i.test(question);
+}
+
+function questionLooksLocal(question) {
+  return /sla|владелец|кто отвечает|минут|час|перв[ао]й|очеред|срок|звон/i.test(question);
+}
+
+function buildQuestionCandidates({ candidateStates, candidateCauses, observedSignals, extracted }) {
+  const leadFlowScenario = isLeadFlowScenario(observedSignals, extracted);
+  const localClaimedCause = claimedCauseLooksLocal(extracted);
+  const candidates = [];
+
+  const pushQuestion = (item, type, index, separates) => {
+    const question = nodeById.get(item.id)?.relatedQuestions?.[0];
+    if (!question) {
+      return;
+    }
+
+    let priority = Number(item.score || 0) + layerPriority(item.layer) * 0.08;
+
+    if (type === "cause") {
+      priority += 0.08;
+    }
+    if (index === 0) {
+      priority += 0.04;
+    }
+    if (leadFlowScenario && questionLooksUpstream(question)) {
+      priority += 0.18;
+    }
+    if (leadFlowScenario && localClaimedCause && (item.layer === "strategy" || item.layer === "commercial")) {
+      priority += 0.1;
+    }
+    if (leadFlowScenario && questionLooksLocal(question)) {
+      priority -= 0.08;
+    }
+
+    candidates.push({
+      question,
+      type,
+      layer: item.layer,
+      nodeId: item.id,
+      label: item.label,
+      priority,
+      separates,
+      whyUseful:
+        type === "cause"
+          ? "Этот вопрос проверяет более верхний слой причины и не даёт слишком рано застрять в локальной версии."
+          : "Этот вопрос отделяет ближайшие состояния системы и помогает не спутать перегруз с конструкцией."
+    });
+  };
+
+  candidateStates.slice(0, 3).forEach((item, index) => {
+    pushQuestion(
+      item,
+      "state",
+      index,
+      [item.label, candidateStates[index + 1]?.label || candidateCauses[0]?.label].filter(Boolean)
+    );
+  });
+
+  candidateCauses.slice(0, 3).forEach((item, index) => {
+    pushQuestion(
+      item,
+      "cause",
+      index,
+      [item.label, candidateCauses[index + 1]?.label || candidateStates[0]?.label].filter(Boolean)
+    );
+  });
+
+  return candidates
+    .sort((left, right) => right.priority - left.priority)
+    .slice(0, 4)
+    .map((item) =>
+      buildQuestionObject(
+        item.question,
+        item.separates,
+        item.whyUseful,
+        item.priority
+      )
+    );
+}
+
 export function analyzeWithGraph({ extracted, entryState, memorySummary }) {
   const observedSignals = uniqueStrings([
     ...(extracted?.observedSignals || []),
@@ -147,35 +255,12 @@ export function analyzeWithGraph({ extracted, entryState, memorySummary }) {
   const secondState = candidateStates[1];
   const topCause = candidateCauses[0];
   const secondCause = candidateCauses[1];
-  const discriminatingSignals = [];
-
-  if (topState?.id && secondState?.id) {
-    const firstQuestion = nodeById.get(topState.id)?.relatedQuestions?.[0];
-    if (firstQuestion) {
-      discriminatingSignals.push(
-        buildQuestionObject(
-          firstQuestion,
-          [topState.label, secondState.label],
-          "Этот вопрос лучше всего отделяет две ближайшие версии состояния системы.",
-          0.77
-        )
-      );
-    }
-  }
-
-  if (topCause?.id && secondCause?.id) {
-    const secondQuestion = nodeById.get(topCause.id)?.relatedQuestions?.[0];
-    if (secondQuestion) {
-      discriminatingSignals.push(
-        buildQuestionObject(
-          secondQuestion,
-          [topCause.label, secondCause.label],
-          "Этот вопрос снижает неопределённость между двумя ближайшими корневыми причинами.",
-          0.74
-        )
-      );
-    }
-  }
+  const discriminatingSignals = buildQuestionCandidates({
+    candidateStates,
+    candidateCauses,
+    observedSignals,
+    extracted
+  });
 
   const fallbackQuestion = candidateStates[0]
     ? nodeById.get(candidateStates[0].id)?.relatedQuestions?.[0]

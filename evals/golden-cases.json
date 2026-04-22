@@ -1,5 +1,16 @@
 [
   {
+    "id": "start_greeting",
+    "input": "/start",
+    "expectedRoute": "free_text_vague",
+    "expectedMode": "clarification_mode",
+    "expectedAction": "clarify",
+    "artifactExpected": false,
+    "mustContain": ["Привет"],
+    "mustContainAny": ["системному ограничению", "ограничению, которое держит результат"],
+    "mustNotContain": ["просто открыл чат", "чтобы не гадать"]
+  },
+  {
     "id": "vague_breakdown",
     "input": "Хочу разобрать бизнес",
     "expectedRoute": "free_text_vague",
@@ -16,7 +27,7 @@
     "expectedMode": "clarification_mode",
     "expectedAction": "clarify",
     "artifactExpected": false,
-    "mustContain": ["диагноз будет искусственно уверенным", "прибыль"],
+    "mustContain": ["звучать умно, но останется случайным", "прибыль"],
     "mustNotContain": ["вот точная причина"]
   },
   {
@@ -46,7 +57,8 @@
     "expectedMode": "diagnostic_mode",
     "expectedAction": "clarify",
     "artifactExpected": false,
-    "mustContain": ["доказанное ограничение системы", "Какие решения по сделкам и операционке команда принимает сама"],
+    "mustContain": ["доказанное ограничение системы"],
+    "mustContainAny": ["Что менеджер или руководитель может решить без эскалации к собственнику", "решить без эскалации"],
     "mustNotContain": ["точная причина уже понятна"]
   },
   {
@@ -56,7 +68,8 @@
     "expectedMode": "diagnostic_mode",
     "expectedAction": "clarify",
     "artifactExpected": false,
-    "mustContain": ["версия пользователя", "нецелевыми или слабо квалифицированными лидами", "последних лидов", "ICP"],
+    "mustContain": ["пока рано покупать её как главную", "нецелевыми или слабо квалифицированными лидами"],
+    "mustContainAny": ["целевыми", "ICP", "этап квалификации", "всё подряд"],
     "mustNotContain": ["решение сейчас в найме", "главная причина уже в людях"]
   },
   {

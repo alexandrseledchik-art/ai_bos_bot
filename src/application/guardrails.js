@@ -189,6 +189,10 @@ function humanizeConstraintLabel(value) {
     return "";
   }
 
+  if (/^[A-ZА-Я]{2,}/.test(normalized)) {
+    return normalized;
+  }
+
   return normalized.charAt(0).toLowerCase() + normalized.slice(1);
 }
 
@@ -220,6 +224,134 @@ function looksMechanicalResponse(text) {
   return patterns.some((pattern) => pattern.test(normalized));
 }
 
+function polishSurfaceText(text) {
+  return ensureString(text)
+    .replace(/чтобы не гадать/gi, "чтобы не перепутать симптом с конструкцией")
+    .replace(/похоже,\s*ты\s*просто\s*открыл\s*чат\./gi, "Привет. Давай сразу зацепимся за реальный бизнес-сигнал.")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function isOpeningMessageContext(context) {
+  const text = ensureString(context.userText).toLowerCase();
+  const historyLength = Array.isArray(context.history) ? context.history.length : 0;
+  return historyLength === 0 && /^\/start$|^(привет|здравствуй|здравствуйте|добрый день|добрый вечер)$/i.test(text);
+}
+
+function isLeadFlowScenarioContext(context, entryState) {
+  const text = ensureString(context.userText).toLowerCase();
+  const observedSignals = ensureArray([
+    ...(entryState?.observedSignals || []),
+    ...(context.graphPacket?.observedSignals || [])
+  ], 12);
+
+  return observedSignals.includes("lead_overload") ||
+    observedSignals.includes("slow_first_response") ||
+    (/заяв|лид|входящ/.test(text) && /не усп|люд|ответ|очеред|обработ|перегруж/.test(text));
+}
+
+function questionLooksUpstream(question) {
+  return /icp|сегмент|целев|приоритет|квалификац|канал|рынк|обещан|неразобран|стратег/i.test(question);
+}
+
+function questionLooksLocal(question) {
+  return /sla|владелец|кто отвечает|минут|час|перв[ао]й|очеред|срок|звон/i.test(question);
+}
+
+function questionLooksFieldSeparating(question) {
+  return /целев|квалификац|всё подряд|неразобран|этап квалификац|сегмент|приоритет/i.test(question);
+}
+
+function questionLooksDirectFlowSplit(question) {
+  return /все входящие|всё подряд|этап квалификац|неразобран|целевыми/i.test(question);
+}
+
+function buildLeadScenarioSpread() {
+  return [
+    {
+      label: "Входящий поток смешивает целевых и нецелевых лидов, поэтому продавцы тонут не в спросе, а в шуме",
+      layer: "commercial",
+      confidence: 0.62,
+      whyPossible: "Большой поток может быть проблемой качества и фильтрации, а не только объёма.",
+      whatWouldDisprove: "Если почти все последние лиды реально целевые и достойны быстрого ответа."
+    },
+    {
+      label: "ICP, сегменты и правила приоритета не переведены из стратегии в живую коммерческую работу",
+      layer: "strategy",
+      confidence: 0.6,
+      whyPossible: "Когда стратегия не превращена в ICP, квалификацию и маршрутизацию, продавцы забирают в работу всё подряд.",
+      whatWouldDisprove: "Если сегменты и критерии приоритета уже жёстко работают в маркетинге, квалификации и handoff."
+    },
+    {
+      label: "Первый отклик и ownership не держатся как устойчивая операционная конструкция",
+      layer: "operations",
+      confidence: 0.58,
+      whyPossible: "Даже хороший поток ломается, если первый контакт не закреплён, не разделён по приоритетам или живёт в общей очереди.",
+      whatWouldDisprove: "Если ownership, SLA и маршрутизация уже работают стабильно по приоритетным лидам."
+    },
+    {
+      label: "Реально не хватает мощности на обработку уже качественного и правильно приоритизированного потока",
+      layer: "people",
+      confidence: 0.54,
+      whyPossible: "Найм становится рабочей версией только после проверки качества входа, маршрутизации и квалификации.",
+      whatWouldDisprove: "Если перегруз уходит после фильтрации, маршрутизации или разделения потока."
+    }
+  ];
+}
+
+function ensureMultiLayerSpread(candidateConstraints, context, entryState) {
+  let constraints = normalizeCandidateConstraints(candidateConstraints, 5);
+  const uniqueLayers = new Set(constraints.map((item) => item.layer));
+
+  if (isLeadFlowScenarioContext(context, entryState)) {
+    constraints = normalizeCandidateConstraints([...constraints, ...buildLeadScenarioSpread()], 5);
+  } else if (uniqueLayers.size < 3 && context.classification.type === "free_text_problem") {
+    constraints = normalizeCandidateConstraints([...constraints, ...inferGenericConstraints(context)], 5);
+  }
+
+  return constraints;
+}
+
+function pickBestNextQuestion(context, entryState, graphAnalysis) {
+  const current = ensureString(entryState.nextBestQuestion);
+  const candidates = normalizeDiscriminatingSignals([
+    ...(entryState.discriminatingSignals || []),
+    ...(graphAnalysis?.discriminatingSignals || []),
+    ...(context.graphPacket?.discriminatingSignals || [])
+  ], 4);
+
+  if (isLeadFlowScenarioContext(context, entryState)) {
+    const directFlowSplitQuestion = candidates.find((item) => questionLooksDirectFlowSplit(item.question));
+    if (directFlowSplitQuestion) {
+      return directFlowSplitQuestion.question;
+    }
+
+    const fieldSeparatingQuestion = candidates.find((item) => questionLooksFieldSeparating(item.question));
+    if (fieldSeparatingQuestion) {
+      return fieldSeparatingQuestion.question;
+    }
+
+    const upstreamQuestion = candidates.find((item) => questionLooksUpstream(item.question));
+    if (upstreamQuestion) {
+      return upstreamQuestion.question;
+    }
+
+    const localQuestion = candidates.find((item) => !questionLooksLocal(item.question));
+    if (localQuestion) {
+      return localQuestion.question;
+    }
+  }
+
+  return current || candidates[0]?.question || ensureString(context.graphPacket?.suggestedQuestion);
+}
+
+function summarizeConstraintSpread(constraints, maxItems = 3) {
+  return (constraints || [])
+    .slice(0, maxItems)
+    .map((item) => humanizeConstraintLabel(item?.label))
+    .filter(Boolean);
+}
+
 function buildWebsiteSurfaceResponse(response) {
   return joinParagraphs([
     `${ensureSentence(response.whatIUnderstood)} ${ensureSentence(response.whyItMatters)}`,
@@ -227,9 +359,16 @@ function buildWebsiteSurfaceResponse(response) {
   ]);
 }
 
-function buildVagueSurfaceResponse(response) {
+function buildVagueSurfaceResponse(response, context) {
+  const understood = ensureSentence(response.whatIUnderstood);
+  const opening = isOpeningMessageContext(context)
+    ? (understood.toLowerCase().startsWith("привет")
+        ? ""
+        : `Привет${context.userMeta?.firstName ? `, ${ensureString(context.userMeta.firstName)}` : ""}. `)
+    : "";
+
   return joinParagraphs([
-    `${ensureSentence(response.whatIUnderstood)} ${ensureSentence(response.whyItMatters)}`,
+    `${opening}${understood} ${ensureSentence(response.whyItMatters)}`,
     ensureString(response.nextStep)
   ]);
 }
@@ -239,6 +378,16 @@ function buildDiagnosticClarifySurfaceResponse(response, entryState, context) {
   const constraints = Array.isArray(entryState.candidateConstraints) ? entryState.candidateConstraints.slice(0, 5) : [];
   const strongestAlternative = humanizeConstraintLabel(constraints[0]?.label);
   const secondAlternative = humanizeConstraintLabel(constraints[1]?.label);
+  const thirdAlternative = humanizeConstraintLabel(constraints[2]?.label);
+  const spread = summarizeConstraintSpread(constraints, 3);
+
+  if (userLikelyClaimedCause(context, entryState) && claimedCause && spread.length >= 3) {
+    return joinParagraphs([
+      `Версия про то, что ${claimedCause}, возможна, но пока рано покупать её как главную.`,
+      `Пока поле выглядит шире: ${spread[0]}; ${spread[1]}; ${spread[2]}.`,
+      `${ensureSentence(response.whyItMatters)} ${ensureString(response.nextStep)}`
+    ]);
+  }
 
   if (userLikelyClaimedCause(context, entryState) && claimedCause) {
     const alternatives = [strongestAlternative, secondAlternative].filter(Boolean);
@@ -253,9 +402,16 @@ function buildDiagnosticClarifySurfaceResponse(response, entryState, context) {
     ]);
   }
 
+  if (spread.length >= 3) {
+    return joinParagraphs([
+      `${ensureSentence(response.whatIUnderstood)} Пока поле выглядит так: ${spread[0]}; ${spread[1]}; ${spread[2]}.`,
+      `${ensureSentence(response.whyItMatters)} ${ensureString(response.nextStep)}`
+    ]);
+  }
+
   if (strongestAlternative && secondAlternative) {
     return joinParagraphs([
-      `${ensureSentence(response.whatIUnderstood)} Пока сильнее всего выглядят версии, что ${strongestAlternative} или что ${secondAlternative}.`,
+      `${ensureSentence(response.whatIUnderstood)} Пока сильнее всего выглядят версии, что ${strongestAlternative} или что ${secondAlternative}${thirdAlternative ? `, а рядом остаётся и версия, что ${thirdAlternative}` : ""}.`,
       `${ensureSentence(response.whyItMatters)} ${ensureString(response.nextStep)}`
     ]);
   }
@@ -278,14 +434,31 @@ function buildAnswerSurfaceResponse(response, entryState) {
   ]);
 }
 
+function visibleResponseMissesDepth(visibleResponse, entryState, context) {
+  if (!visibleResponse || !entryState?.nextBestQuestion) {
+    return false;
+  }
+
+  if (!isLeadFlowScenarioContext(context, entryState)) {
+    return false;
+  }
+
+  const nextQuestion = ensureString(entryState.nextBestQuestion);
+  if (!questionLooksUpstream(nextQuestion)) {
+    return false;
+  }
+
+  return !questionLooksUpstream(visibleResponse);
+}
+
 function buildSurfaceResponse(decision, context) {
   const response = decision.response || {};
   const entryState = decision.entryState || emptyEntryState();
   const routeType = context.classification.type;
   const action = ensureString(decision.decision?.action);
-  const visibleResponse = stripVisibleTemplateLabels(response.responseText);
+  const visibleResponse = polishSurfaceText(stripVisibleTemplateLabels(response.responseText));
 
-  if (visibleResponse && !looksMechanicalResponse(visibleResponse)) {
+  if (visibleResponse && !looksMechanicalResponse(visibleResponse) && !visibleResponseMissesDepth(visibleResponse, entryState, context)) {
     return visibleResponse;
   }
 
@@ -301,7 +474,7 @@ function buildSurfaceResponse(decision, context) {
     return buildDiagnosticClarifySurfaceResponse(response, entryState, context);
   }
 
-  return buildVagueSurfaceResponse(response);
+  return buildVagueSurfaceResponse(response, context);
 }
 
 function inferGenericConstraints(context) {
@@ -444,6 +617,7 @@ function normalizeEntryState(rawEntryState, context, decision) {
   if (!entryState.hypothesisConflicts.length) {
     entryState.hypothesisConflicts = ensureArray(context.graphPacket?.hypothesisConflicts, 6);
   }
+  entryState.candidateConstraints = ensureMultiLayerSpread(entryState.candidateConstraints, context, entryState);
   entryState.signalSufficiency = ensureString(
     entryState.signalSufficiency,
     ensureString(decision.decision?.signalSufficiency, fallback.signalSufficiency)
@@ -455,6 +629,10 @@ function normalizeEntryState(rawEntryState, context, decision) {
       entryState.discriminatingSignals[0]?.question
     );
   }
+  entryState.nextBestQuestion = ensureString(
+    pickBestNextQuestion(context, entryState, decision.graphAnalysis),
+    entryState.nextBestQuestion
+  );
   entryState.nextBestStep = ensureString(entryState.nextBestStep, decision.response?.nextStep);
   entryState.whyThisStep = ensureString(
     entryState.whyThisStep,
@@ -776,6 +954,10 @@ export function applyGuardrails(rawDecision, context) {
   ) {
     decision.decision.action = "clarify";
     decision.response.nextStep = ensureString(decision.entryState.nextBestQuestion, decision.response.nextStep);
+  }
+
+  if (decision.decision.action === "clarify" && routeType === "free_text_problem" && decision.entryState.nextBestQuestion) {
+    decision.response.nextStep = decision.entryState.nextBestQuestion;
   }
 
   decision.response.responseText = buildSurfaceResponse(decision, context);

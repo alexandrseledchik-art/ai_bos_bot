@@ -39,6 +39,12 @@ function detectClaimedCause(text) {
   if (/люд[а-я]*\s+не\s+хватает/i.test(normalized)) {
     return "не хватает людей";
   }
+  if (/продавц[а-я]*\s+не\s+хватает/i.test(normalized)) {
+    return "не хватает продавцов";
+  }
+  if (/менеджер[а-я]*\s+не\s+хватает/i.test(normalized)) {
+    return "не хватает менеджеров";
+  }
   if (/лиды?\s+плох/i.test(normalized)) {
     return "лиды плохого качества";
   }
@@ -88,11 +94,15 @@ export function extractObservations({ userText, classification, entryState, memo
   const claimedCause = detectClaimedCause(text) || normalizeText(entryState?.claimedCause);
   const normalizedObservations = uniqueBy(observations, (item) => item.signalId);
   const observedSignals = normalizedObservations.map((item) => item.signalId);
+  const currentClaimedProblem = normalizeText(classification.cleanText || text);
+  const claimedProblem = classification.type === "free_text_problem" || classification.type === "url_plus_problem"
+    ? currentClaimedProblem
+    : normalizeText(entryState?.claimedProblem || currentClaimedProblem);
 
   return {
     observations: normalizedObservations,
     observedSignals,
-    claimedProblem: normalizeText(entryState?.claimedProblem || classification.cleanText || text),
+    claimedProblem,
     claimedCause,
     memorySymptoms: Array.isArray(memorySummary?.symptoms) ? memorySummary.symptoms : []
   };

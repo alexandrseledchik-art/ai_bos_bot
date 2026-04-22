@@ -151,6 +151,9 @@ function scoreNextBestQuestion(run, spec = {}) {
   if ((spec.mustContain || []).length) {
     addCheck(checks, includesAll(question, spec.mustContain), "nextBestQuestion missed required phrase(s)");
   }
+  if ((spec.mustContainAny || []).length) {
+    addCheck(checks, includesAny(question, spec.mustContainAny), "nextBestQuestion missed any allowed target phrase");
+  }
   if ((spec.mustNotContain || []).length) {
     addCheck(checks, !includesAny(question, spec.mustNotContain), "nextBestQuestion included forbidden phrase");
   }

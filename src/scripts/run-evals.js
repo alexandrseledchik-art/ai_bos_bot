@@ -46,6 +46,11 @@ function includesAll(reply, needles) {
   return needles.every((needle) => haystack.includes(normalizeText(needle)));
 }
 
+function includesAny(reply, needles) {
+  const haystack = normalizeText(reply);
+  return needles.some((needle) => haystack.includes(normalizeText(needle)));
+}
+
 function includesAnyForbidden(reply, needles) {
   const haystack = normalizeText(reply);
   return needles.some((needle) => haystack.includes(normalizeText(needle)));
@@ -66,9 +71,15 @@ async function loadCases(cwd) {
 }
 
 async function createService(cwd) {
+  const filePath = path.join(cwd, "data", "eval-state.json");
+  const artifactDir = path.join(cwd, "data", "eval-artifacts");
+
+  await fs.rm(filePath, { force: true });
+  await fs.rm(artifactDir, { recursive: true, force: true });
+
   const store = new FileMemoryStore({
-    filePath: path.join(cwd, "data", "eval-state.json"),
-    artifactDir: path.join(cwd, "data", "eval-artifacts")
+    filePath,
+    artifactDir
   });
   const reasoner = new ReasoningClient({
     apiKey: "",
@@ -130,6 +141,10 @@ async function run() {
 
     if (!includesAll(run.reply, testCase.mustContain || [])) {
       issues.push("reply missed one or more required phrases");
+    }
+
+    if ((testCase.mustContainAny || []).length && !includesAny(run.reply, testCase.mustContainAny || [])) {
+      issues.push("reply missed any of the allowed target phrases");
     }
 
     if (includesAnyForbidden(run.reply, testCase.mustNotContain || [])) {

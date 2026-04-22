@@ -483,6 +483,7 @@ export class ConversationService {
       const context = {
         routeHint: classification.type,
         userText: text,
+        userMeta,
         classification,
         screening,
         company: {
