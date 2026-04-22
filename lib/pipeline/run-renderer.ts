@@ -4,9 +4,27 @@ import { parseWithSingleRetry } from "@/lib/validation/parse-with-retry";
 import { RENDERER_PROMPT } from "@/prompts/renderer.prompt";
 import { z } from "zod";
 
-const rendererReplySchema = z.object({
-  replyText: z.string().trim().min(1),
-});
+const FORBIDDEN_REPLY_PATTERNS = [
+  /^\s*вы хотите\b/i,
+  /^\s*чтобы помочь\b/i,
+  /^\s*для того чтобы помочь\b/i,
+  /^\s*уточните, пожалуйста\b/i,
+];
+
+const rendererReplySchema = z
+  .object({
+    replyText: z.string().trim().min(1),
+  })
+  .superRefine((value, ctx) => {
+    if (FORBIDDEN_REPLY_PATTERNS.some((pattern) => pattern.test(value.replyText))) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "replyText sounds like a formal corporate assistant and starts with a forbidden bureaucratic pattern",
+        path: ["replyText"],
+      });
+    }
+  });
 
 export async function runRenderer(params: {
   routerDecision: unknown;

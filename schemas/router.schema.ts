@@ -26,9 +26,7 @@ export const routerDecisionSchema = z.object({
   mode: modeSchema,
   nextAction: nextActionSchema,
   confidence: z.enum(["low", "medium", "high"]),
-  understanding: z.string().trim().min(1),
-  workingHypotheses: z.array(z.string().trim().min(1)).min(1).max(2),
-  whyImportant: z.string().trim().min(1),
+  insight: z.string().trim().min(1).nullable(),
   signalAssessment: z.object({
     enoughForDiagnosis: z.boolean(),
     missing: z.array(z.string().trim().min(1)).max(4),

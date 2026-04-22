@@ -130,7 +130,7 @@ export async function runTelegramDecisionEngine(params: {
     conversationId: conversation.id,
     caseId: null,
     stage: "router",
-    promptVersion: "router_v1",
+    promptVersion: "router_v2",
     inputJson: {
       inputType,
       normalizedText,
@@ -182,7 +182,7 @@ export async function runTelegramDecisionEngine(params: {
     conversationId: conversation.id,
     caseId: null,
     stage: "renderer",
-    promptVersion: "renderer_v1",
+    promptVersion: "renderer_v2",
     inputJson: {
       routerDecision,
       analysisResult,
@@ -207,7 +207,7 @@ export async function runTelegramDecisionEngine(params: {
   const caseRecord = await getOrCreateOpenCase({
     userId: user.id,
     conversationId: conversation.id,
-    title: routerDecision.understanding,
+    title: routerDecision.insight ?? normalizedInput.text ?? null,
   });
 
   const finalResponse: FinalResponse = {
@@ -215,9 +215,7 @@ export async function runTelegramDecisionEngine(params: {
     mode: routerDecision.mode,
     nextAction: routerDecision.nextAction,
     confidence: routerDecision.confidence,
-    understanding: routerDecision.understanding,
-    workingHypotheses: routerDecision.workingHypotheses,
-    whyImportant: routerDecision.whyImportant,
+    insight: routerDecision.insight,
     replyText,
     question: routerDecision.question,
     preliminaryScreening: analysisResult.preliminaryScreening,

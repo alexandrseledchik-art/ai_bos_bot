@@ -17,9 +17,7 @@ export async function runRouter(params: {
       mode: { type: "string", enum: ["clarification_mode", "website_screening_mode", "diagnostic_mode"] },
       nextAction: { type: "string", enum: ["clarify", "screen", "diagnose", "answer"] },
       confidence: { type: "string", enum: ["low", "medium", "high"] },
-      understanding: { type: "string" },
-      workingHypotheses: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 2 },
-      whyImportant: { type: "string" },
+      insight: { anyOf: [{ type: "string" }, { type: "null" }] },
       signalAssessment: {
         type: "object",
         additionalProperties: false,
@@ -32,7 +30,7 @@ export async function runRouter(params: {
       routerReason: { type: "string" },
       question: { anyOf: [{ type: "string" }, { type: "null" }] }
     },
-    required: ["inputType", "mode", "nextAction", "confidence", "understanding", "workingHypotheses", "whyImportant", "signalAssessment", "routerReason", "question"]
+    required: ["inputType", "mode", "nextAction", "confidence", "insight", "signalAssessment", "routerReason", "question"]
   } as const;
 
   return parseWithSingleRetry({
