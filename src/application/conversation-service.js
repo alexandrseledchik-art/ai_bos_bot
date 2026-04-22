@@ -186,6 +186,46 @@ function ensureCompany(state, thread, userMeta) {
   return company;
 }
 
+function lastAssistantAskedQuestion(history = []) {
+  const lastAssistant = [...history].reverse().find((item) => item.role === "assistant");
+  return Boolean(lastAssistant?.text && /\?\s*$/.test(String(lastAssistant.text).trim()));
+}
+
+function contextualizeClassification(classification, thread, history) {
+  if (classification.type !== "free_text_vague" && classification.type !== "unknown") {
+    return classification;
+  }
+
+  const hasDiagnosticContext =
+    Boolean(thread?.entryState?.claimedProblem) &&
+    ((thread?.entryState?.symptoms || []).length > 0 || (thread?.entryState?.candidateConstraints || []).length > 0);
+
+  if (!hasDiagnosticContext) {
+    return classification;
+  }
+
+  const cleanText = String(classification.cleanText || "").trim().toLowerCase();
+  const looksFreshGreeting = /^\/start$|^(привет|здравствуй|здравствуйте|добрый день|добрый вечер)$/i.test(cleanText);
+  if (looksFreshGreeting) {
+    return classification;
+  }
+
+  const hasOngoingDiagnosticThread =
+    Boolean(thread?.activeCaseId) ||
+    thread?.entryState?.promotionReadiness === "promoted" ||
+    thread?.entryState?.promotionReadiness === "ready_for_diagnostic_case";
+
+  if (!lastAssistantAskedQuestion(history) && !(hasOngoingDiagnosticThread && classification.wordCount <= 4)) {
+    return classification;
+  }
+
+  return {
+    ...classification,
+    type: "free_text_problem",
+    inferredFollowUp: true
+  };
+}
+
 function findCase(state, caseId) {
   if (!caseId) {
     return null;
@@ -314,7 +354,8 @@ function shouldPromoteToDiagnosticCase(decision, activeCase, classification) {
 
   return (
     decision.selectedMode === "diagnostic_mode" &&
-    (decision.entryState?.promotionReadiness === "ready_for_diagnostic_case" ||
+    ((decision.entryState?.promotionReadiness === "ready_for_diagnostic_case" &&
+      decision.decision.action !== "clarify") ||
       decision.decision.signalSufficiency === "enough" ||
       decision.decision.action === "answer" ||
       decision.decision.action === "diagnose")
@@ -468,17 +509,17 @@ export class ConversationService {
   }
 
   async handleUserMessage({ telegramChatId, text, userMeta = {} }) {
-    const classification = classifyInput(text);
-    const screening = [];
-
-    for (const url of classification.urls) {
-      screening.push(await this.screener.screen(url));
-    }
-
     return this.store.update(async (state) => {
       const thread = ensureThread(state, telegramChatId);
       const company = ensureCompany(state, thread, userMeta);
+      const history = recentHistory(state, thread.id, this.maxHistoryMessages);
+      const classification = contextualizeClassification(classifyInput(text), thread, history);
       const currentCase = selectRelevantCase(state, thread, classification);
+      const screening = [];
+
+      for (const url of classification.urls) {
+        screening.push(await this.screener.screen(url));
+      }
 
       const context = {
         routeHint: classification.type,
@@ -499,7 +540,7 @@ export class ConversationService {
           : null,
         memorySummary: summarizeCaseMemory(state, currentCase?.id || ""),
         entryState: thread.entryState || emptyEntryState(),
-        history: recentHistory(state, thread.id, this.maxHistoryMessages)
+        history
       };
 
       const extracted = extractObservations({

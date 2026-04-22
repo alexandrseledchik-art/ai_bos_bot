@@ -433,7 +433,7 @@ async function runCase(testCase, service, store) {
   }
 
   const run = turnRuns[turnRuns.length - 1];
-  const classification = classifyInput(testCase.turns[testCase.turns.length - 1]);
+  const classification = run.classification || classifyInput(testCase.turns[testCase.turns.length - 1]);
   const artifactBody = run.artifactPath && await fileExists(run.artifactPath)
     ? await fs.readFile(run.artifactPath, "utf8")
     : "";

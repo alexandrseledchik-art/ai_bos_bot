@@ -60,10 +60,23 @@ export const CAUSAL_GRAPH_NODES = [
     description: "Компания долго отвечает на новые заявки.",
     domains: ["sales", "ops"],
     layer: "operations",
-    evidencePatterns: [/долго\s+отвеча/i, /перв[ыо]й\s+ответ.*долго/i, /очеред/i, /жд[её]т\s+несколько\s+дн/i, /перезвон/i],
+    evidencePatterns: [/долго\s+отвеча/i, /перв[ыо]й\s+ответ.*долго/i, /очеред/i, /жд[её]т\s+несколько\s+дн/i, /перезвон/i, /до\s+первого\s+контакт/i, /перв[ао]е?\s+касани/i],
     contradictionPatterns: [],
     relatedQuestions: [
       "Задержка в первом отклике есть даже по самым целевым лидам, или быстрее теряются только смешанные и низкоприоритетные обращения?"
+    ]
+  },
+  {
+    id: "warm_inbound_demand",
+    type: "symptom",
+    label: "Поток выглядит тёплым или входящим",
+    description: "Лиды приходят как входящий интерес, но это ещё не доказывает их соответствие ICP.",
+    domains: ["growth", "sales", "strategy"],
+    layer: "commercial",
+    evidencePatterns: [/т[её]пл/i, /входящ/i],
+    contradictionPatterns: [],
+    relatedQuestions: [
+      "Тёплый не значит целевой: до продавца у вас есть слой квалификации и приоритета, который отделяет ICP-лид от просто входящего интереса?"
     ]
   },
   {
@@ -551,6 +564,10 @@ export const CAUSAL_GRAPH_EDGES = [
   { from: "slow_first_response", to: "unclear_role_boundaries", relation: "supports", weight: 0.61, confidence: "medium", domainCross: ["sales", "people"] },
   { from: "slow_first_response", to: "ownership_of_first_contact_blurred", relation: "supports", weight: 0.78, confidence: "high", domainCross: ["sales", "ops"] },
   { from: "slow_first_response", to: "capacity_model_missing", relation: "supports", weight: 0.63, confidence: "medium", domainCross: ["people", "ops"] },
+  { from: "warm_inbound_demand", to: "weak_lead_qualification", relation: "suggests", weight: 0.63, confidence: "medium", domainCross: ["sales", "growth"] },
+  { from: "warm_inbound_demand", to: "no_prequalification_layer", relation: "suggests", weight: 0.72, confidence: "high", domainCross: ["sales", "sale_prep"] },
+  { from: "warm_inbound_demand", to: "uniform_sla_for_mixed_leads", relation: "suggests", weight: 0.69, confidence: "medium", domainCross: ["sales", "growth"] },
+  { from: "warm_inbound_demand", to: "inbound_noise_mixed_with_target_demand", relation: "suggests", weight: 0.55, confidence: "medium", domainCross: ["growth", "strategy"] },
   { from: "hiring_without_relief", to: "unclear_role_boundaries", relation: "suggests", weight: 0.73, confidence: "medium", domainCross: ["people", "ops"] },
   { from: "hiring_without_relief", to: "no_sales_operating_model", relation: "suggests", weight: 0.66, confidence: "medium", domainCross: ["sales", "ops"] },
   { from: "hiring_without_relief", to: "capacity_model_missing", relation: "suggests", weight: 0.69, confidence: "medium", domainCross: ["people", "ops"] },

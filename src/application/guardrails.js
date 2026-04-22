@@ -247,7 +247,7 @@ function isLeadFlowScenarioContext(context, entryState) {
 
   return observedSignals.includes("lead_overload") ||
     observedSignals.includes("slow_first_response") ||
-    (/заяв|лид|входящ/.test(text) && /не усп|люд|ответ|очеред|обработ|перегруж/.test(text));
+    (/заяв|лид|входящ/.test(text) && /не усп|люд|ответ|очеред|обработ|перегруж|продавц|менеджер|штат/.test(text));
 }
 
 function questionLooksUpstream(question) {
@@ -264,6 +264,54 @@ function questionLooksFieldSeparating(question) {
 
 function questionLooksDirectFlowSplit(question) {
   return /все входящие|всё подряд|этап квалификац|неразобран|целевыми/i.test(question);
+}
+
+function isGenericPlaceholderConstraint(label) {
+  return /пользователь видит локальную боль|слой, который пока не назван прямо|нет системной модели продаж и понятных стадий воронки/i.test(
+    ensureString(label).toLowerCase()
+  );
+}
+
+function latestTextSuggestsWarmInbound(context) {
+  const text = ensureString(context.userText).toLowerCase();
+  return /т[её]пл|входящ/i.test(text);
+}
+
+function latestTextSuggestsEarlyFunnelStage(context) {
+  const text = ensureString(context.userText).toLowerCase();
+  return /до\s+первого\s+контакт|перв[ао]е?\s+касани/i.test(text);
+}
+
+function latestTextRestatesCapacityClaim(context) {
+  const text = ensureString(context.userText).toLowerCase();
+  return /люди\s+не\s+справ|не\s+хватает|перегруж|не\s+успева/i.test(text);
+}
+
+function latestTextLooksLikeLeadVolumeAndTiming(context) {
+  const text = ensureString(context.userText).toLowerCase();
+  return /\d/.test(text) && /(день|дня|час|минут|в месяц|в неделю|касани|контакт)/i.test(text);
+}
+
+function latestTextAlreadyResolvesUpstreamLayer(context) {
+  const text = ensureString(context.userText).toLowerCase();
+  return /icp|квалификац|предквалификац|приоритет|сегмент|маршрутиз|всё подряд|целев/i.test(text);
+}
+
+function shouldHoldLeadFlowInClarify(context, entryState) {
+  if (!isLeadFlowScenarioContext(context, entryState)) {
+    return false;
+  }
+
+  if (latestTextAlreadyResolvesUpstreamLayer(context)) {
+    return false;
+  }
+
+  return (
+    latestTextSuggestsEarlyFunnelStage(context) ||
+    latestTextSuggestsWarmInbound(context) ||
+    latestTextRestatesCapacityClaim(context) ||
+    latestTextLooksLikeLeadVolumeAndTiming(context)
+  );
 }
 
 function buildLeadScenarioSpread() {
@@ -304,7 +352,8 @@ function ensureMultiLayerSpread(candidateConstraints, context, entryState) {
   const uniqueLayers = new Set(constraints.map((item) => item.layer));
 
   if (isLeadFlowScenarioContext(context, entryState)) {
-    constraints = normalizeCandidateConstraints([...constraints, ...buildLeadScenarioSpread()], 5);
+    const specificConstraints = constraints.filter((item) => !isGenericPlaceholderConstraint(item.label));
+    constraints = normalizeCandidateConstraints([...buildLeadScenarioSpread(), ...specificConstraints], 5);
   } else if (uniqueLayers.size < 3 && context.classification.type === "free_text_problem") {
     constraints = normalizeCandidateConstraints([...constraints, ...inferGenericConstraints(context)], 5);
   }
@@ -321,6 +370,18 @@ function pickBestNextQuestion(context, entryState, graphAnalysis) {
   ], 4);
 
   if (isLeadFlowScenarioContext(context, entryState)) {
+    if (latestTextSuggestsWarmInbound(context)) {
+      return "Тёплый ещё не значит целевой. До продавца у вас есть слой квалификации и приоритета, который отделяет ICP-лид от просто входящего интереса, или в работу идёт всё подряд?";
+    }
+
+    if (latestTextSuggestsEarlyFunnelStage(context)) {
+      return "До первого контакта у вас вообще есть слой квалификации и приоритета, который отсеивает слабый поток раньше продавца, или продавцы сами разбирают всё подряд?";
+    }
+
+    if (latestTextRestatesCapacityClaim(context)) {
+      return "Когда говорите, что люди не справляются, это про объём уже целевых лидов или про то, что команда вручную разбирает смешанный поток без предквалификации и приоритета?";
+    }
+
     const directFlowSplitQuestion = candidates.find((item) => questionLooksDirectFlowSplit(item.question));
     if (directFlowSplitQuestion) {
       return directFlowSplitQuestion.question;
@@ -380,6 +441,18 @@ function buildDiagnosticClarifySurfaceResponse(response, entryState, context) {
   const secondAlternative = humanizeConstraintLabel(constraints[1]?.label);
   const thirdAlternative = humanizeConstraintLabel(constraints[2]?.label);
   const spread = summarizeConstraintSpread(constraints, 3);
+
+  if (isLeadFlowScenarioContext(context, entryState) && spread.length >= 3) {
+    const opening = userLikelyClaimedCause(context, entryState) && claimedCause
+      ? `Версия про то, что ${claimedCause}, возможна, но пока вторична.`
+      : ensureSentence(response.whatIUnderstood);
+
+    return joinParagraphs([
+      opening,
+      `Пока вижу три версии: ${spread[0]}; ${spread[1]}; ${spread[2]}.`,
+      `${ensureSentence(response.whyItMatters)} ${ensureString(response.nextStep)}`
+    ]);
+  }
 
   if (userLikelyClaimedCause(context, entryState) && claimedCause && spread.length >= 3) {
     return joinParagraphs([
@@ -481,7 +554,7 @@ function inferGenericConstraints(context) {
   const text = ensureString(context.userText).toLowerCase();
   const constraints = [];
 
-  if (/заяв|лид/.test(text) && /не усп|люд|ответ|очеред|обработ/.test(text)) {
+  if (/заяв|лид/.test(text) && /не усп|люд|ответ|очеред|обработ|продавц|менеджер|штат/.test(text)) {
     constraints.push(
       {
         label: "Поток перегружен нецелевыми или слабо квалифицированными лидами",
@@ -858,6 +931,31 @@ export function applyGuardrails(rawDecision, context) {
   }
 
   decision.memory = decision.memory || {};
+  decision.memory.actionWave = decision.memory.actionWave || {};
+  decision.memory.artifact = decision.memory.artifact || {};
+
+  if (shouldHoldLeadFlowInClarify(context, decision.entryState)) {
+    decision.selectedMode = "diagnostic_mode";
+    decision.decision.action = "clarify";
+    decision.decision.signalSufficiency = "partial";
+    decision.entryState.signalSufficiency = "partial";
+    decision.entryState.selectedConstraint = "";
+    decision.entryState.promotionReadiness = "keep_in_entry";
+    decision.memory.constraint = "";
+    decision.memory.actionWave.enabled = false;
+    decision.memory.actionWave.firstStep = "";
+    decision.memory.actionWave.notNow = "";
+    decision.memory.actionWave.whyThisFirst = "";
+    decision.memory.artifact.shouldSave = false;
+    decision.response.nextStep = ensureString(decision.entryState.nextBestQuestion, decision.response.nextStep);
+    decision.response.whatIUnderstood = latestTextSuggestsWarmInbound(context)
+      ? "Тёплый вход уже сужает поле, но ещё не доказывает, что проблема только в скорости первого ответа или в штате."
+      : latestTextRestatesCapacityClaim(context)
+        ? "Перегруз команды виден, но сам по себе он ещё не доказывает, что узкое место именно в количестве людей."
+        : "Узкое место уже видно во входе в продажи, но причина всё ещё может лежать в разных слоях системы.";
+    decision.response.whyItMatters = "Если сейчас схлопнуться в версию про найм или SLA, можно пропустить более глубокую поломку в квалификации, сегментации и конструкции первого контура.";
+  }
+
   decision.memory.companyName = ensureString(decision.memory.companyName);
   decision.memory.caseKind = ensureString(
     decision.memory.caseKind,
