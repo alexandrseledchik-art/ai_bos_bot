@@ -1,7 +1,7 @@
 export const DECISION_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["selectedMode", "decision", "response", "guardrails", "entryState", "memory"],
+  required: ["selectedMode", "decision", "response", "guardrails", "graphAnalysis", "entryState", "memory"],
   properties: {
     selectedMode: {
       type: "string",
@@ -103,6 +103,167 @@ export const DECISION_SCHEMA = {
         }
       }
     },
+    graphAnalysis: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "observedSignals",
+        "candidateStates",
+        "candidateCauses",
+        "candidateInterventions",
+        "discriminatingSignals",
+        "graphTrace",
+        "graphConfidence",
+        "hypothesisConflicts"
+      ],
+      properties: {
+        observedSignals: {
+          type: "array",
+          items: {
+            type: "string"
+          }
+        },
+        candidateStates: {
+          type: "array",
+          maxItems: 5,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["id", "label", "layer", "domains", "score", "supportedBy"],
+            properties: {
+              id: { type: "string" },
+              label: { type: "string" },
+              layer: {
+                type: "string",
+                enum: ["strategy", "commercial", "operations", "finance", "people", "management"]
+              },
+              domains: {
+                type: "array",
+                items: { type: "string" }
+              },
+              score: {
+                type: "number",
+                minimum: 0,
+                maximum: 1
+              },
+              supportedBy: {
+                type: "array",
+                items: { type: "string" }
+              }
+            }
+          }
+        },
+        candidateCauses: {
+          type: "array",
+          maxItems: 5,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["id", "label", "layer", "domains", "score", "supportedBy"],
+            properties: {
+              id: { type: "string" },
+              label: { type: "string" },
+              layer: {
+                type: "string",
+                enum: ["strategy", "commercial", "operations", "finance", "people", "management"]
+              },
+              domains: {
+                type: "array",
+                items: { type: "string" }
+              },
+              score: {
+                type: "number",
+                minimum: 0,
+                maximum: 1
+              },
+              supportedBy: {
+                type: "array",
+                items: { type: "string" }
+              }
+            }
+          }
+        },
+        candidateInterventions: {
+          type: "array",
+          maxItems: 5,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["id", "label", "layer", "domains", "score", "whyUseful"],
+            properties: {
+              id: { type: "string" },
+              label: { type: "string" },
+              layer: {
+                type: "string",
+                enum: ["strategy", "commercial", "operations", "finance", "people", "management"]
+              },
+              domains: {
+                type: "array",
+                items: { type: "string" }
+              },
+              score: {
+                type: "number",
+                minimum: 0,
+                maximum: 1
+              },
+              whyUseful: { type: "string" }
+            }
+          }
+        },
+        discriminatingSignals: {
+          type: "array",
+          maxItems: 4,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["signal", "question", "separates", "whyUseful", "informationGain"],
+            properties: {
+              signal: { type: "string" },
+              question: { type: "string" },
+              separates: {
+                type: "array",
+                items: { type: "string" }
+              },
+              whyUseful: { type: "string" },
+              informationGain: {
+                type: "number",
+                minimum: 0,
+                maximum: 1
+              }
+            }
+          }
+        },
+        graphTrace: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["fromSignal", "viaState", "toCause", "weight"],
+            properties: {
+              fromSignal: { type: "string" },
+              viaState: { type: "string" },
+              toCause: { type: "string" },
+              weight: {
+                type: "number",
+                minimum: 0,
+                maximum: 1
+              }
+            }
+          }
+        },
+        graphConfidence: {
+          type: "number",
+          minimum: 0,
+          maximum: 1
+        },
+        hypothesisConflicts: {
+          type: "array",
+          items: {
+            type: "string"
+          }
+        }
+      }
+    },
     entryState: {
       type: "object",
       additionalProperties: false,
@@ -111,9 +272,16 @@ export const DECISION_SCHEMA = {
         "claimedCause",
         "knownFacts",
         "symptoms",
+        "observedSignals",
         "systemLayers",
         "candidateConstraints",
+        "candidateStates",
+        "candidateCauses",
         "selectedConstraint",
+        "graphTrace",
+        "discriminatingSignals",
+        "graphConfidence",
+        "hypothesisConflicts",
         "signalSufficiency",
         "nextBestQuestion",
         "nextBestStep",
@@ -134,6 +302,12 @@ export const DECISION_SCHEMA = {
           }
         },
         symptoms: {
+          type: "array",
+          items: {
+            type: "string"
+          }
+        },
+        observedSignals: {
           type: "array",
           items: {
             type: "string"
@@ -177,8 +351,119 @@ export const DECISION_SCHEMA = {
             }
           }
         },
+        candidateStates: {
+          type: "array",
+          maxItems: 5,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["id", "label", "layer", "domains", "score", "supportedBy"],
+            properties: {
+              id: { type: "string" },
+              label: { type: "string" },
+              layer: {
+                type: "string",
+                enum: ["strategy", "commercial", "operations", "finance", "people", "management"]
+              },
+              domains: {
+                type: "array",
+                items: { type: "string" }
+              },
+              score: {
+                type: "number",
+                minimum: 0,
+                maximum: 1
+              },
+              supportedBy: {
+                type: "array",
+                items: { type: "string" }
+              }
+            }
+          }
+        },
+        candidateCauses: {
+          type: "array",
+          maxItems: 5,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["id", "label", "layer", "domains", "score", "supportedBy"],
+            properties: {
+              id: { type: "string" },
+              label: { type: "string" },
+              layer: {
+                type: "string",
+                enum: ["strategy", "commercial", "operations", "finance", "people", "management"]
+              },
+              domains: {
+                type: "array",
+                items: { type: "string" }
+              },
+              score: {
+                type: "number",
+                minimum: 0,
+                maximum: 1
+              },
+              supportedBy: {
+                type: "array",
+                items: { type: "string" }
+              }
+            }
+          }
+        },
         selectedConstraint: {
           type: "string"
+        },
+        graphTrace: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["fromSignal", "viaState", "toCause", "weight"],
+            properties: {
+              fromSignal: { type: "string" },
+              viaState: { type: "string" },
+              toCause: { type: "string" },
+              weight: {
+                type: "number",
+                minimum: 0,
+                maximum: 1
+              }
+            }
+          }
+        },
+        discriminatingSignals: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["signal", "question", "separates", "whyUseful", "informationGain"],
+            properties: {
+              signal: { type: "string" },
+              question: { type: "string" },
+              separates: {
+                type: "array",
+                items: { type: "string" }
+              },
+              whyUseful: { type: "string" },
+              informationGain: {
+                type: "number",
+                minimum: 0,
+                maximum: 1
+              }
+            }
+          }
+        },
+        graphConfidence: {
+          type: "number",
+          minimum: 0,
+          maximum: 1
+        },
+        hypothesisConflicts: {
+          type: "array",
+          items: {
+            type: "string"
+          }
         },
         signalSufficiency: {
           type: "string",

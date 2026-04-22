@@ -31,9 +31,16 @@ export function emptyEntryState() {
     claimedCause: "",
     knownFacts: [],
     symptoms: [],
+    observedSignals: [],
     systemLayers: [],
     candidateConstraints: [],
+    candidateStates: [],
+    candidateCauses: [],
     selectedConstraint: "",
+    graphTrace: [],
+    discriminatingSignals: [],
+    graphConfidence: 0,
+    hypothesisConflicts: [],
     signalSufficiency: "weak",
     nextBestQuestion: "",
     nextBestStep: "",
@@ -198,7 +205,8 @@ export function createSnapshot({
   understanding,
   knownFacts,
   observations,
-  workingHypotheses
+  workingHypotheses,
+  graphSnapshot = null
 }) {
   return {
     id: createId("snapshot"),
@@ -210,6 +218,7 @@ export function createSnapshot({
     knownFacts,
     observations,
     workingHypotheses,
+    graphSnapshot,
     createdAt: nowIso()
   };
 }

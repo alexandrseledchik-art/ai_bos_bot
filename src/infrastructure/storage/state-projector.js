@@ -109,6 +109,7 @@ export function projectStateToRelationalRows(state) {
       known_facts: item.knownFacts,
       observations: item.observations,
       working_hypotheses: item.workingHypotheses,
+      graph_snapshot: item.graphSnapshot || {},
       created_at: item.createdAt
     }))
   };

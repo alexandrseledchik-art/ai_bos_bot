@@ -15,6 +15,11 @@ MVP-ядро для Telegram-first AI-бота, который работает 
 - Двухслойная логика состояния:
   - `entryState` в чате — лёгкий скрытый объект маршрутизации
   - `diagnostic_case` — полноценный объект диагностики после достаточного сигнала
+- Observation layer:
+  - извлекает наблюдения и симптом-сигналы из живого текста до final reasoning
+- Graph-assisted reasoning:
+  - graph engine не отвечает пользователю сам
+  - graph packet подаёт reasoner'у candidate states, candidate causes, conflicts и discriminating signals
 - Guardrails против ложной уверенности и внутреннего диагноза по одному URL
 - Constraint-first reasoning:
   - не принимает пользовательскую причину за факт
@@ -40,9 +45,13 @@ MVP-ядро для Telegram-first AI-бота, который работает 
 ## Архитектура
 
 - [src/application/classify-input.js](/Users/aleksandrseledcik/Library/Mobile%20Documents/com~apple~CloudDocs/Проект%20ТГ%20Бота/src/application/classify-input.js) — маршрутизация входа
+- [src/application/observation-extractor.js](/Users/aleksandrseledcik/Library/Mobile%20Documents/com~apple~CloudDocs/Проект%20ТГ%20Бота/src/application/observation-extractor.js) — перевод живого текста в наблюдения и symptom signals
+- [src/application/graph-reasoner.js](/Users/aleksandrseledcik/Library/Mobile%20Documents/com~apple~CloudDocs/Проект%20ТГ%20Бота/src/application/graph-reasoner.js) — graph analyzer: candidate states, causes, interventions, discriminating signals
 - [src/application/conversation-service.js](/Users/aleksandrseledcik/Library/Mobile%20Documents/com~apple~CloudDocs/Проект%20ТГ%20Бота/src/application/conversation-service.js) — decision flow, promotion из `entryState` в `diagnostic_case`, память, артефакты
 - [src/application/guardrails.js](/Users/aleksandrseledcik/Library/Mobile%20Documents/com~apple~CloudDocs/Проект%20ТГ%20Бота/src/application/guardrails.js) — жёсткие ограничения против ложного causal closure и нормализация ответов
 - [src/infrastructure/openai/reasoning-client.js](/Users/aleksandrseledcik/Library/Mobile%20Documents/com~apple~CloudDocs/Проект%20ТГ%20Бота/src/infrastructure/openai/reasoning-client.js) — OpenAI + fallback reasoner
+- [src/domain/causal-graph.js](/Users/aleksandrseledcik/Library/Mobile%20Documents/com~apple~CloudDocs/Проект%20ТГ%20Бота/src/domain/causal-graph.js) — узлы и связи прагматического weighted causal graph
+- [src/infrastructure/graph/load-graph.js](/Users/aleksandrseledcik/Library/Mobile%20Documents/com~apple~CloudDocs/Проект%20ТГ%20Бота/src/infrastructure/graph/load-graph.js) — инфраструктурный loader graph-model
 - [src/infrastructure/screening/website-screener.js](/Users/aleksandrseledcik/Library/Mobile%20Documents/com~apple~CloudDocs/Проект%20ТГ%20Бота/src/infrastructure/screening/website-screener.js) — внешний скрининг сайта
 - [src/infrastructure/storage/file-store.js](/Users/aleksandrseledcik/Library/Mobile%20Documents/com~apple~CloudDocs/Проект%20ТГ%20Бота/src/infrastructure/storage/file-store.js) — JSON storage + artifact files
 - [src/infrastructure/telegram/telegram-bot.js](/Users/aleksandrseledcik/Library/Mobile%20Documents/com~apple~CloudDocs/Проект%20ТГ%20Бота/src/infrastructure/telegram/telegram-bot.js) — Telegram runner
@@ -120,6 +129,16 @@ SUPABASE_SYNC_TRANSPORT=auto
 - `rest` — только REST transport
 - `cli` — сразу sync через `supabase db query --linked`
 
+## Доступ и RLS
+
+- В Supabase включён deny-by-default RLS на пользовательских таблицах: `workspaces`, `workspace_members`, `companies`, `cases`, `threads`, `messages`, `snapshots`, `artifacts` и связанных case-entities
+- Доступ строится не вокруг прямого `user_id` на каждой записи, а вокруг membership-модели:
+  - `workspaces`
+  - `workspace_members`
+  - `workspace_id` на корневых сущностях
+- Graph/runtime sync продолжает работать через `SUPABASE_SERVICE_ROLE_KEY`, а клиентский доступ теперь должен идти только через membership policies
+- После миграции новые клиентские пользователи ничего не видят автоматически, пока им не назначен `workspace_members` row
+
 ## Что хранится
 
 - Диалог и решения — локально в `data/state.json`, а на serverless в `/tmp/aibosbot/state.json`
@@ -127,10 +146,23 @@ SUPABASE_SYNC_TRANSPORT=auto
   - `claimedProblem`
   - `claimedCause`
   - `symptoms`
+  - `observedSignals`
   - `systemLayers`
   - `candidateConstraints`
+  - `candidateStates`
+  - `candidateCauses`
+  - `graphTrace`
+  - `discriminatingSignals`
+  - `graphConfidence`
   - `selectedConstraint`
   - `nextBestQuestion`
+- На уровне `snapshot` теперь дополнительно сохраняется `graphSnapshot`:
+  - candidate states
+  - candidate causes
+  - candidate interventions
+  - discriminating signals
+  - graph trace
+  - graph confidence
 - Артефакты кейсов — локально в `data/artifacts/*.md`, а их содержимое дополнительно сохраняется в structured memory для serverless-runtime
 - Реляционный staging export — в `data/relational-export/*.json`
 

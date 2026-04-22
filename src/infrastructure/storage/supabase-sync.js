@@ -237,6 +237,7 @@ export class SupabaseSyncClient {
           known_facts: row.known_facts,
           observations: row.observations,
           working_hypotheses: row.working_hypotheses,
+          graph_snapshot: row.graph_snapshot || {},
           created_at: row.created_at
         }))
         .filter((row) => row.case_id)

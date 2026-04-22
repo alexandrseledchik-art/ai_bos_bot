@@ -174,8 +174,80 @@ function suggestionPack(focus, text) {
   return common[focus] || common.general;
 }
 
+function interventionSuggestionsFromGraph(graphPacket) {
+  return (graphPacket?.candidateInterventions || [])
+    .slice(0, 3)
+    .map((item) => ({
+      name: item.label,
+      reason: item.whyUseful || "Граф поднял это как сильную точку системного изменения.",
+      usageMoment: "После подтверждения этой версии ограничения."
+    }));
+}
+
+function mergeSuggestions(baseSuggestions, graphPacket) {
+  const merged = new Map();
+
+  for (const item of [...(baseSuggestions || []), ...interventionSuggestionsFromGraph(graphPacket)]) {
+    const key = normalizeText(item?.name).toLowerCase();
+    if (!key || merged.has(key)) {
+      continue;
+    }
+
+    merged.set(key, {
+      name: normalizeText(item?.name),
+      reason: normalizeText(item?.reason),
+      usageMoment: normalizeText(item?.usageMoment)
+    });
+  }
+
+  return [...merged.values()].slice(0, 4);
+}
+
 function buildConstraint(label, layer, confidence, whyPossible, whatWouldDisprove) {
   return { label, layer, confidence, whyPossible, whatWouldDisprove };
+}
+
+function constraintsFromGraphPacket(graphPacket) {
+  const stateConstraints = (graphPacket?.candidateStates || []).map((item) =>
+    buildConstraint(
+      item.label,
+      item.layer,
+      item.score ?? 0.5,
+      `Эта версия поддержана графом сигналов: ${(item.supportedBy || []).join(", ") || "несколькими наблюдениями"}.`,
+      graphPacket?.discriminatingSignals?.[0]?.question || "Нужен дополнительный сигнал, который отделит эту версию от соседних."
+    )
+  );
+
+  const causeConstraints = (graphPacket?.candidateCauses || []).map((item) =>
+    buildConstraint(
+      item.label,
+      item.layer,
+      item.score ?? 0.5,
+      `Граф поднял эту причину как более глубокое объяснение текущих симптомов.`,
+      graphPacket?.discriminatingSignals?.[1]?.question || graphPacket?.discriminatingSignals?.[0]?.question || "Нужен вопрос, который проверит именно эту причину."
+    )
+  );
+
+  return uniqueConstraints([...stateConstraints, ...causeConstraints], 5);
+}
+
+function pickGraphQuestion(graphPacket) {
+  return normalizeText(
+    graphPacket?.suggestedQuestion || graphPacket?.discriminatingSignals?.[0]?.question
+  );
+}
+
+function buildGraphAnalysisPacket(graphPacket) {
+  return {
+    observedSignals: graphPacket?.observedSignals || [],
+    candidateStates: graphPacket?.candidateStates || [],
+    candidateCauses: graphPacket?.candidateCauses || [],
+    candidateInterventions: graphPacket?.candidateInterventions || [],
+    discriminatingSignals: graphPacket?.discriminatingSignals || [],
+    graphTrace: graphPacket?.graphTrace || [],
+    graphConfidence: Number(graphPacket?.graphConfidence ?? 0),
+    hypothesisConflicts: graphPacket?.hypothesisConflicts || []
+  };
 }
 
 function genericConstraintsByFocus(focus, text) {
@@ -366,8 +438,13 @@ function inferSystemLayers(text, focus, candidateConstraints, existingLayers = [
   return uniqueStrings(layers, 6);
 }
 
-function buildNextQuestion(focus, text, candidateConstraints) {
+function buildNextQuestion(focus, text, candidateConstraints, graphPacket) {
   const normalized = normalizeText(text).toLowerCase();
+  const graphQuestion = pickGraphQuestion(graphPacket);
+
+  if (graphQuestion) {
+    return graphQuestion;
+  }
 
   if (/заяв|лид/.test(normalized) && /не усп|люд|ответ|очеред|обработ/.test(normalized)) {
     return "Из последних 20 заявок сколько вообще были целевыми и достойными быстрого ответа, а сколько отвалились бы уже на квалификации?";
@@ -397,11 +474,13 @@ function buildEntryState(context, focus, signalSufficiency, selectedConstraint =
   const text = normalizeText(context.userText);
   const previous = context.entryState || {};
   const claimedCause = extractClaimedCause(text) || normalizeText(previous.claimedCause);
+  const graphConstraints = constraintsFromGraphPacket(context.graphPacket);
   const candidateConstraints = uniqueConstraints([
     ...(previous.candidateConstraints || []),
+    ...graphConstraints,
     ...genericConstraintsByFocus(focus, text)
   ]);
-  const nextBestQuestion = buildNextQuestion(focus, text, candidateConstraints);
+  const nextBestQuestion = buildNextQuestion(focus, text, candidateConstraints, context.graphPacket);
 
   const symptoms = uniqueStrings([
     ...(previous.symptoms || []),
@@ -418,9 +497,22 @@ function buildEntryState(context, focus, signalSufficiency, selectedConstraint =
     claimedCause,
     knownFacts,
     symptoms,
+    observedSignals: uniqueStrings([
+      ...(previous.observedSignals || []),
+      ...(context.graphPacket?.observedSignals || [])
+    ], 12),
     systemLayers: inferSystemLayers(text, focus, candidateConstraints, previous.systemLayers || []),
     candidateConstraints,
+    candidateStates: context.graphPacket?.candidateStates || previous.candidateStates || [],
+    candidateCauses: context.graphPacket?.candidateCauses || previous.candidateCauses || [],
     selectedConstraint,
+    graphTrace: context.graphPacket?.graphTrace || previous.graphTrace || [],
+    discriminatingSignals: context.graphPacket?.discriminatingSignals || previous.discriminatingSignals || [],
+    graphConfidence: Number(context.graphPacket?.graphConfidence ?? previous.graphConfidence ?? 0),
+    hypothesisConflicts: uniqueStrings([
+      ...(previous.hypothesisConflicts || []),
+      ...(context.graphPacket?.hypothesisConflicts || [])
+    ], 6),
     signalSufficiency,
     nextBestQuestion,
     nextBestStep: promotionReadiness === "ready_for_diagnostic_case"
@@ -493,15 +585,23 @@ function buildWebsiteDecision(context, linkedProblem = false) {
       canNotAssert: screen?.canNotAssert || [],
       confidenceNote: "Это внешний скрининг, а не внутренний управленческий диагноз."
     },
+    graphAnalysis: buildGraphAnalysisPacket(context.graphPacket),
     entryState: {
       claimedProblem: linkedProblem ? normalizeText(context.classification.cleanText) : "Понять, что можно увидеть по внешнему контуру сайта.",
       claimedCause: "",
       knownFacts: screen?.knownFacts || [],
       symptoms: linkedProblem ? [context.userText] : [],
+      observedSignals: context.graphPacket?.observedSignals || [],
       systemLayers: ["commercial", "operations"],
       candidateConstraints,
+      candidateStates: context.graphPacket?.candidateStates || [],
+      candidateCauses: context.graphPacket?.candidateCauses || [],
       selectedConstraint: "",
       signalSufficiency: "partial",
+      graphTrace: context.graphPacket?.graphTrace || [],
+      discriminatingSignals: context.graphPacket?.discriminatingSignals || [],
+      graphConfidence: Number(context.graphPacket?.graphConfidence ?? 0),
+      hypothesisConflicts: context.graphPacket?.hypothesisConflicts || [],
       nextBestQuestion: linkedProblem
         ? "Разбираем сначала внешний контур сайта или пойдём в глубинную диагностику бизнеса за ним?"
         : "Разбирать сайт как продукт/воронку или переходить к диагнозу бизнеса за ним?",
@@ -527,7 +627,7 @@ function buildWebsiteDecision(context, linkedProblem = false) {
         notNow: "",
         whyThisFirst: ""
       },
-      toolRecommendations: suggestionPack("growth", context.userText),
+      toolRecommendations: mergeSuggestions(suggestionPack("growth", context.userText), context.graphPacket),
       artifact: {
         shouldSave: true,
         title: linkedProblem
@@ -579,6 +679,7 @@ function buildClarificationDecision(context, focus, claimedProblemText) {
       canNotAssert: ["Нельзя на таком входе уверенно назвать корневую причину."],
       confidenceNote: "Пока это настройка фокуса, а не диагноз."
     },
+    graphAnalysis: buildGraphAnalysisPacket(context.graphPacket),
     entryState: {
       ...entryState,
       claimedProblem: claimedProblemText
@@ -597,7 +698,7 @@ function buildClarificationDecision(context, focus, claimedProblemText) {
         notNow: "",
         whyThisFirst: ""
       },
-      toolRecommendations: suggestionPack(focus, context.userText),
+      toolRecommendations: mergeSuggestions(suggestionPack(focus, context.userText), context.graphPacket),
       artifact: {
         shouldSave: false,
         title: "",
@@ -638,6 +739,7 @@ function buildUnknownDecision(context) {
       canNotAssert: ["Нельзя делать сильный вывод на таком входе."],
       confidenceNote: "Сейчас это только настройка направления."
     },
+    graphAnalysis: buildGraphAnalysisPacket(context.graphPacket),
     entryState,
     memory: {
       companyName: "",
@@ -653,7 +755,7 @@ function buildUnknownDecision(context) {
         notNow: "",
         whyThisFirst: ""
       },
-      toolRecommendations: suggestionPack("general", context.userText),
+      toolRecommendations: mergeSuggestions(suggestionPack("general", context.userText), context.graphPacket),
       artifact: {
         shouldSave: false,
         title: "",
@@ -706,6 +808,7 @@ function buildProblemDecision(context) {
         canNotAssert: ["Даже при хорошем сигнале это ещё рабочий диагноз, а не окончательная истина."],
         confidenceNote: "Ограничение выбрано как лучшая рабочая версия и требует следующей проверки."
       },
+      graphAnalysis: buildGraphAnalysisPacket(context.graphPacket),
       entryState,
       memory: {
         companyName: "",
@@ -717,11 +820,14 @@ function buildProblemDecision(context) {
         situation: "Пользователь дал конкретный симптом и количественный сигнал.",
         actionWave: {
           enabled: true,
-          firstStep: `Проверить ограничение "${primaryConstraint}" по одному узлу данных или процесса.`,
+          firstStep:
+            context.graphPacket?.candidateInterventions?.[0]?.label
+              ? `Сначала проверь ограничение "${primaryConstraint}", а затем переходи к интервенции "${context.graphPacket.candidateInterventions[0].label}".`
+              : `Проверить ограничение "${primaryConstraint}" по одному узлу данных или процесса.`,
           notNow: "Не добавлять сразу новые ресурсы и не запускать длинный список параллельных изменений.",
           whyThisFirst: "Это ограничение объясняет несколько симптомов и даёт самый сильный системный сдвиг на ближайшем шаге."
         },
-        toolRecommendations: suggestionPack(focus, context.userText),
+        toolRecommendations: mergeSuggestions(suggestionPack(focus, context.userText), context.graphPacket),
         artifact: {
           shouldSave: true,
           title: "Primary constraint diagnostic snapshot",
@@ -762,6 +868,7 @@ function buildProblemDecision(context) {
       canNotAssert: ["Нельзя уверенно назвать корневую причину без вопроса, который разделит конкурирующие ограничения."],
       confidenceNote: "Следующий вопрос нужен не для анкеты, а для выбора главного ограничения."
     },
+    graphAnalysis: buildGraphAnalysisPacket(context.graphPacket),
     entryState,
     memory: {
       companyName: "",
@@ -777,7 +884,7 @@ function buildProblemDecision(context) {
         notNow: "",
         whyThisFirst: ""
       },
-      toolRecommendations: suggestionPack(focus, context.userText),
+      toolRecommendations: mergeSuggestions(suggestionPack(focus, context.userText), context.graphPacket),
       artifact: {
         shouldSave: false,
         title: "",

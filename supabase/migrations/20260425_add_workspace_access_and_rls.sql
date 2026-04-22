@@ -1,33 +1,5 @@
 create extension if not exists pgcrypto;
 
-do $$
-begin
-  if not exists (select 1 from pg_type where typname = 'case_kind') then
-    create type public.case_kind as enum ('preliminary_screening', 'diagnostic_case');
-  end if;
-
-  if not exists (select 1 from pg_type where typname = 'case_mode') then
-    create type public.case_mode as enum ('clarification_mode', 'diagnostic_mode', 'website_screening_mode');
-  end if;
-
-  if not exists (select 1 from pg_type where typname = 'case_status') then
-    create type public.case_status as enum ('active', 'archived');
-  end if;
-
-  if not exists (select 1 from pg_type where typname = 'decision_action') then
-    create type public.decision_action as enum ('clarify', 'screen', 'diagnose', 'answer');
-  end if;
-
-  if not exists (select 1 from pg_type where typname = 'signal_sufficiency') then
-    create type public.signal_sufficiency as enum ('weak', 'partial', 'enough');
-  end if;
-
-  if not exists (select 1 from pg_type where typname = 'artifact_kind') then
-    create type public.artifact_kind as enum ('screening', 'diagnosis', 'action_wave', 'snapshot');
-  end if;
-end
-$$;
-
 create table if not exists public.workspaces (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -46,175 +18,43 @@ create table if not exists public.workspace_members (
   unique (workspace_id, user_id)
 );
 
-create table if not exists public.companies (
-  id uuid primary key default gen_random_uuid(),
-  external_id text not null unique,
-  workspace_id uuid not null references public.workspaces(id) on delete restrict,
-  name text not null,
-  telegram_chat_id text not null unique,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
+alter table if exists public.companies
+  add column if not exists workspace_id uuid references public.workspaces(id) on delete restrict;
 
-create table if not exists public.cases (
-  id uuid primary key default gen_random_uuid(),
-  external_id text not null unique,
-  company_id uuid not null references public.companies(id) on delete cascade,
-  workspace_id uuid not null references public.workspaces(id) on delete restrict,
-  kind public.case_kind not null,
-  mode public.case_mode not null,
-  summary text not null default '',
-  status public.case_status not null default 'active',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
+alter table if exists public.cases
+  add column if not exists workspace_id uuid references public.workspaces(id) on delete restrict;
 
-create table if not exists public.threads (
-  id uuid primary key default gen_random_uuid(),
-  external_id text not null unique,
-  company_id uuid not null references public.companies(id) on delete cascade,
-  workspace_id uuid not null references public.workspaces(id) on delete restrict,
-  telegram_chat_id text not null unique,
-  active_case_id uuid references public.cases(id) on delete set null,
-  entry_state jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
+alter table if exists public.threads
+  add column if not exists workspace_id uuid references public.workspaces(id) on delete restrict;
 
-create table if not exists public.messages (
-  id uuid primary key default gen_random_uuid(),
-  external_id text not null unique,
-  thread_id uuid not null references public.threads(id) on delete cascade,
-  role text not null check (role in ('user', 'assistant')),
-  text text not null,
-  created_at timestamptz not null default now()
-);
+alter table if exists public.artifacts
+  add column if not exists workspace_id uuid references public.workspaces(id) on delete restrict;
 
-create table if not exists public.goals (
-  id uuid primary key default gen_random_uuid(),
-  external_id text not null unique,
-  case_id uuid not null references public.cases(id) on delete cascade,
-  statement text not null,
-  confidence numeric(3,2) not null default 0.60,
-  created_at timestamptz not null default now()
-);
+alter table if exists public.snapshots
+  add column if not exists workspace_id uuid references public.workspaces(id) on delete restrict;
 
-create table if not exists public.symptoms (
-  id uuid primary key default gen_random_uuid(),
-  external_id text not null unique,
-  case_id uuid not null references public.cases(id) on delete cascade,
-  statement text not null,
-  evidence text not null default '',
-  created_at timestamptz not null default now()
-);
-
-create table if not exists public.hypotheses (
-  id uuid primary key default gen_random_uuid(),
-  external_id text not null unique,
-  case_id uuid not null references public.cases(id) on delete cascade,
-  statement text not null,
-  basis text not null default '',
-  confidence numeric(3,2) not null default 0.50,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists public.constraints (
-  id uuid primary key default gen_random_uuid(),
-  external_id text not null unique,
-  case_id uuid not null references public.cases(id) on delete cascade,
-  statement text not null,
-  confidence numeric(3,2) not null default 0.50,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists public.situations (
-  id uuid primary key default gen_random_uuid(),
-  external_id text not null unique,
-  case_id uuid not null references public.cases(id) on delete cascade,
-  summary text not null,
-  source text not null default 'conversation',
-  created_at timestamptz not null default now()
-);
-
-create table if not exists public.action_waves (
-  id uuid primary key default gen_random_uuid(),
-  external_id text not null unique,
-  case_id uuid not null references public.cases(id) on delete cascade,
-  first_step text not null,
-  not_now text not null,
-  why_this_first text not null,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists public.tool_recommendations (
-  id uuid primary key default gen_random_uuid(),
-  external_id text not null unique,
-  case_id uuid not null references public.cases(id) on delete cascade,
-  name text not null,
-  reason text not null,
-  usage_moment text not null,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists public.artifacts (
-  id uuid primary key default gen_random_uuid(),
-  external_id text not null unique,
-  case_id uuid not null references public.cases(id) on delete cascade,
-  workspace_id uuid not null references public.workspaces(id) on delete restrict,
-  kind public.artifact_kind not null,
-  title text not null,
-  summary text not null,
-  path text not null default '',
-  content text not null default '',
-  created_at timestamptz not null default now()
-);
-
-create table if not exists public.snapshots (
-  id uuid primary key default gen_random_uuid(),
-  external_id text not null unique,
-  case_id uuid not null references public.cases(id) on delete cascade,
-  workspace_id uuid not null references public.workspaces(id) on delete restrict,
-  mode public.case_mode not null,
-  action public.decision_action not null,
-  signal_sufficiency public.signal_sufficiency not null,
-  understanding text not null,
-  known_facts jsonb not null default '[]'::jsonb,
-  observations jsonb not null default '[]'::jsonb,
-  working_hypotheses jsonb not null default '[]'::jsonb,
-  graph_snapshot jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now()
-);
+do $$
+begin
+  if to_regclass('public.conversations') is not null then
+    execute 'alter table public.conversations add column if not exists workspace_id uuid references public.workspaces(id) on delete restrict';
+  end if;
+end
+$$;
 
 create index if not exists workspace_members_workspace_user_idx on public.workspace_members(workspace_id, user_id);
 create index if not exists workspace_members_user_idx on public.workspace_members(user_id);
 create index if not exists companies_workspace_id_idx on public.companies(workspace_id);
-create index if not exists companies_telegram_chat_id_idx on public.companies(telegram_chat_id);
-create index if not exists cases_company_id_idx on public.cases(company_id);
 create index if not exists cases_workspace_id_idx on public.cases(workspace_id);
-create index if not exists cases_status_idx on public.cases(status);
-create index if not exists threads_company_id_idx on public.threads(company_id);
 create index if not exists threads_workspace_id_idx on public.threads(workspace_id);
-create index if not exists messages_thread_id_created_at_idx on public.messages(thread_id, created_at desc);
-create index if not exists goals_case_id_idx on public.goals(case_id);
-create index if not exists symptoms_case_id_idx on public.symptoms(case_id);
-create index if not exists hypotheses_case_id_idx on public.hypotheses(case_id);
-create index if not exists constraints_case_id_idx on public.constraints(case_id);
-create index if not exists situations_case_id_idx on public.situations(case_id);
-create index if not exists action_waves_case_id_idx on public.action_waves(case_id);
-create index if not exists tool_recommendations_case_id_idx on public.tool_recommendations(case_id);
 create index if not exists artifacts_workspace_id_idx on public.artifacts(workspace_id);
-create index if not exists artifacts_case_id_idx on public.artifacts(case_id);
 create index if not exists snapshots_workspace_id_idx on public.snapshots(workspace_id);
-create index if not exists snapshots_case_id_created_at_idx on public.snapshots(case_id, created_at desc);
 
-create or replace function public.set_updated_at()
-returns trigger
-language plpgsql
-as $$
+do $$
 begin
-  new.updated_at = now();
-  return new;
-end;
+  if to_regclass('public.conversations') is not null then
+    execute 'create index if not exists conversations_workspace_id_idx on public.conversations(workspace_id)';
+  end if;
+end
 $$;
 
 create or replace function public.slugify_workspace_name(input_text text)
@@ -358,6 +198,7 @@ as $$
     select 1
     from public.cases c
     where c.id = target_case_id
+      and c.workspace_id is not null
       and public.is_workspace_member(c.workspace_id)
   );
 $$;
@@ -373,8 +214,41 @@ as $$
     select 1
     from public.threads t
     where t.id = target_thread_id
+      and t.workspace_id is not null
       and public.is_workspace_member(t.workspace_id)
   );
+$$;
+
+create or replace function public.can_access_conversation(target_conversation_id uuid)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  allowed boolean := false;
+begin
+  if to_regclass('public.conversations') is null then
+    return false;
+  end if;
+
+  execute $query$
+    select exists (
+      select 1
+      from public.conversations c
+      where c.id = $1
+        and (
+          (c.workspace_id is not null and public.is_workspace_member(c.workspace_id))
+          or (c.user_id is not null and c.user_id = auth.uid())
+        )
+    )
+  $query$
+  into allowed
+  using target_conversation_id;
+
+  return allowed;
+end;
 $$;
 
 drop trigger if exists workspaces_set_updated_at on public.workspaces;
@@ -392,30 +266,15 @@ create trigger companies_assign_workspace
 before insert or update of workspace_id, name, external_id on public.companies
 for each row execute function public.assign_company_workspace();
 
-drop trigger if exists companies_set_updated_at on public.companies;
-create trigger companies_set_updated_at
-before update on public.companies
-for each row execute function public.set_updated_at();
-
 drop trigger if exists cases_assign_workspace on public.cases;
 create trigger cases_assign_workspace
 before insert or update of company_id on public.cases
 for each row execute function public.assign_case_workspace();
 
-drop trigger if exists cases_set_updated_at on public.cases;
-create trigger cases_set_updated_at
-before update on public.cases
-for each row execute function public.set_updated_at();
-
 drop trigger if exists threads_assign_workspace on public.threads;
 create trigger threads_assign_workspace
 before insert or update of company_id on public.threads
 for each row execute function public.assign_thread_workspace();
-
-drop trigger if exists threads_set_updated_at on public.threads;
-create trigger threads_set_updated_at
-before update on public.threads
-for each row execute function public.set_updated_at();
 
 drop trigger if exists artifacts_assign_workspace on public.artifacts;
 create trigger artifacts_assign_workspace
@@ -427,21 +286,84 @@ create trigger snapshots_assign_workspace
 before insert or update of case_id on public.snapshots
 for each row execute function public.assign_case_child_workspace();
 
-alter table public.workspaces enable row level security;
-alter table public.workspace_members enable row level security;
-alter table public.companies enable row level security;
-alter table public.cases enable row level security;
-alter table public.threads enable row level security;
-alter table public.messages enable row level security;
-alter table public.goals enable row level security;
-alter table public.symptoms enable row level security;
-alter table public.hypotheses enable row level security;
-alter table public.constraints enable row level security;
-alter table public.situations enable row level security;
-alter table public.action_waves enable row level security;
-alter table public.tool_recommendations enable row level security;
-alter table public.artifacts enable row level security;
-alter table public.snapshots enable row level security;
+update public.companies
+set workspace_id = public.ensure_workspace_for_company(
+  name,
+  coalesce(external_id, left(id::text, 8))
+)
+where workspace_id is null;
+
+update public.cases ca
+set workspace_id = co.workspace_id
+from public.companies co
+where ca.company_id = co.id
+  and (ca.workspace_id is null or ca.workspace_id is distinct from co.workspace_id);
+
+update public.threads th
+set workspace_id = co.workspace_id
+from public.companies co
+where th.company_id = co.id
+  and (th.workspace_id is null or th.workspace_id is distinct from co.workspace_id);
+
+update public.artifacts a
+set workspace_id = ca.workspace_id
+from public.cases ca
+where a.case_id = ca.id
+  and (a.workspace_id is null or a.workspace_id is distinct from ca.workspace_id);
+
+update public.snapshots s
+set workspace_id = ca.workspace_id
+from public.cases ca
+where s.case_id = ca.id
+  and (s.workspace_id is null or s.workspace_id is distinct from ca.workspace_id);
+
+do $$
+begin
+  if to_regclass('public.conversations') is not null then
+    execute $query$
+      update public.conversations conv
+      set workspace_id = derived.workspace_id
+      from (
+        select distinct on (c.conversation_id)
+          c.conversation_id,
+          c.workspace_id
+        from public.cases c
+        where c.conversation_id is not null
+          and c.workspace_id is not null
+        order by c.conversation_id, c.updated_at desc nulls last, c.created_at desc nulls last
+      ) derived
+      where conv.id = derived.conversation_id
+        and (conv.workspace_id is null or conv.workspace_id is distinct from derived.workspace_id)
+    $query$;
+  end if;
+end
+$$;
+
+alter table if exists public.companies alter column workspace_id set not null;
+alter table if exists public.cases alter column workspace_id set not null;
+alter table if exists public.threads alter column workspace_id set not null;
+alter table if exists public.artifacts alter column workspace_id set not null;
+alter table if exists public.snapshots alter column workspace_id set not null;
+
+alter table if exists public.workspaces enable row level security;
+alter table if exists public.workspace_members enable row level security;
+alter table if exists public.companies enable row level security;
+alter table if exists public.cases enable row level security;
+alter table if exists public.threads enable row level security;
+alter table if exists public.messages enable row level security;
+alter table if exists public.goals enable row level security;
+alter table if exists public.symptoms enable row level security;
+alter table if exists public.hypotheses enable row level security;
+alter table if exists public.constraints enable row level security;
+alter table if exists public.situations enable row level security;
+alter table if exists public.action_waves enable row level security;
+alter table if exists public.tool_recommendations enable row level security;
+alter table if exists public.artifacts enable row level security;
+alter table if exists public.snapshots enable row level security;
+alter table if exists public.conversations enable row level security;
+alter table if exists public.case_snapshots enable row level security;
+alter table if exists public.prompt_traces enable row level security;
+alter table if exists public.users enable row level security;
 
 drop policy if exists "Workspace members can view workspaces" on public.workspaces;
 create policy "Workspace members can view workspaces"
@@ -499,19 +421,53 @@ for insert
 to authenticated
 with check (public.is_workspace_member(workspace_id));
 
-drop policy if exists "Workspace members can read messages" on public.messages;
-create policy "Workspace members can read messages"
-on public.messages
-for select
-to authenticated
-using (public.can_access_thread(thread_id));
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'messages'
+      and column_name = 'conversation_id'
+  ) then
+    execute 'drop policy if exists "Workspace members can read messages" on public.messages';
+    execute $sql$
+      create policy "Workspace members can read messages"
+      on public.messages
+      for select
+      to authenticated
+      using (public.can_access_thread(thread_id) or public.can_access_conversation(conversation_id))
+    $sql$;
 
-drop policy if exists "Workspace members can create messages" on public.messages;
-create policy "Workspace members can create messages"
-on public.messages
-for insert
-to authenticated
-with check (public.can_access_thread(thread_id));
+    execute 'drop policy if exists "Workspace members can create messages" on public.messages';
+    execute $sql$
+      create policy "Workspace members can create messages"
+      on public.messages
+      for insert
+      to authenticated
+      with check (public.can_access_thread(thread_id) or public.can_access_conversation(conversation_id))
+    $sql$;
+  else
+    execute 'drop policy if exists "Workspace members can read messages" on public.messages';
+    execute $sql$
+      create policy "Workspace members can read messages"
+      on public.messages
+      for select
+      to authenticated
+      using (public.can_access_thread(thread_id))
+    $sql$;
+
+    execute 'drop policy if exists "Workspace members can create messages" on public.messages';
+    execute $sql$
+      create policy "Workspace members can create messages"
+      on public.messages
+      for insert
+      to authenticated
+      with check (public.can_access_thread(thread_id))
+    $sql$;
+  end if;
+end
+$$;
 
 drop policy if exists "Workspace members can read goals" on public.goals;
 create policy "Workspace members can read goals"
@@ -638,6 +594,118 @@ on public.snapshots
 for insert
 to authenticated
 with check (public.can_access_case(case_id));
+
+do $$
+begin
+  if to_regclass('public.conversations') is not null then
+    execute 'drop policy if exists "Users can read conversations" on public.conversations';
+    execute $sql$
+      create policy "Users can read conversations"
+      on public.conversations
+      for select
+      to authenticated
+      using (
+        (workspace_id is not null and public.is_workspace_member(workspace_id))
+        or (user_id is not null and user_id = auth.uid())
+      )
+    $sql$;
+
+    execute 'drop policy if exists "Users can create conversations" on public.conversations';
+    execute $sql$
+      create policy "Users can create conversations"
+      on public.conversations
+      for insert
+      to authenticated
+      with check (
+        (workspace_id is not null and public.is_workspace_member(workspace_id))
+        or (user_id is not null and user_id = auth.uid())
+      )
+    $sql$;
+  end if;
+end
+$$;
+
+do $$
+begin
+  if to_regclass('public.case_snapshots') is not null then
+    execute 'drop policy if exists "Workspace members can read case snapshots" on public.case_snapshots';
+    execute $sql$
+      create policy "Workspace members can read case snapshots"
+      on public.case_snapshots
+      for select
+      to authenticated
+      using (public.can_access_case(case_id))
+    $sql$;
+
+    execute 'drop policy if exists "Workspace members can create case snapshots" on public.case_snapshots';
+    execute $sql$
+      create policy "Workspace members can create case snapshots"
+      on public.case_snapshots
+      for insert
+      to authenticated
+      with check (public.can_access_case(case_id))
+    $sql$;
+  end if;
+end
+$$;
+
+do $$
+begin
+  if to_regclass('public.prompt_traces') is not null then
+    execute 'drop policy if exists "Workspace members can read prompt traces" on public.prompt_traces';
+    execute $sql$
+      create policy "Workspace members can read prompt traces"
+      on public.prompt_traces
+      for select
+      to authenticated
+      using (public.can_access_case(case_id) or public.can_access_conversation(conversation_id))
+    $sql$;
+
+    execute 'drop policy if exists "Workspace members can create prompt traces" on public.prompt_traces';
+    execute $sql$
+      create policy "Workspace members can create prompt traces"
+      on public.prompt_traces
+      for insert
+      to authenticated
+      with check (public.can_access_case(case_id) or public.can_access_conversation(conversation_id))
+    $sql$;
+  end if;
+end
+$$;
+
+do $$
+begin
+  if to_regclass('public.users') is not null then
+    execute 'drop policy if exists "Users can read own profile" on public.users';
+    execute $sql$
+      create policy "Users can read own profile"
+      on public.users
+      for select
+      to authenticated
+      using (id = auth.uid())
+    $sql$;
+
+    execute 'drop policy if exists "Users can create own profile" on public.users';
+    execute $sql$
+      create policy "Users can create own profile"
+      on public.users
+      for insert
+      to authenticated
+      with check (id = auth.uid())
+    $sql$;
+
+    execute 'drop policy if exists "Users can update own profile" on public.users';
+    execute $sql$
+      create policy "Users can update own profile"
+      on public.users
+      for update
+      to authenticated
+      using (id = auth.uid())
+      with check (id = auth.uid())
+    $sql$;
+  end if;
+end
+$$;
 
 create or replace view public.active_case_overview
 with (security_invoker = true) as

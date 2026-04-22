@@ -17,6 +17,8 @@ import {
   nowIso
 } from "../domain/entities.js";
 import { classifyInput } from "./classify-input.js";
+import { extractObservations } from "./observation-extractor.js";
+import { analyzeWithGraph } from "./graph-reasoner.js";
 import { applyGuardrails } from "./guardrails.js";
 
 function normalizeText(value) {
@@ -25,6 +27,27 @@ function normalizeText(value) {
 
 function uniqueStrings(items, maxItems = 10) {
   return [...new Set((items || []).map((item) => String(item || "").trim()).filter(Boolean))].slice(0, maxItems);
+}
+
+function uniqueObjectsBy(items, keyFn, maxItems = 5) {
+  const result = [];
+  const seen = new Set();
+
+  for (const item of items || []) {
+    const key = keyFn(item);
+    if (!key || seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    result.push(item);
+
+    if (result.length >= maxItems) {
+      break;
+    }
+  }
+
+  return result;
 }
 
 function mergeCandidateConstraints(existing = [], incoming = []) {
@@ -51,6 +74,62 @@ function mergeCandidateConstraints(existing = [], incoming = []) {
   }
 
   return result.slice(0, 5);
+}
+
+function mergeRankedGraphItems(existing = [], incoming = [], maxItems = 5) {
+  const merged = new Map();
+
+  for (const item of [...existing, ...incoming]) {
+    const id = String(item?.id || "").trim();
+    if (!id) {
+      continue;
+    }
+
+    const current = merged.get(id);
+    const score = Number(item?.score ?? 0);
+    if (!current || score >= Number(current.score ?? 0)) {
+      merged.set(id, {
+        id,
+        label: String(item?.label || "").trim(),
+        layer: String(item?.layer || "management").trim().toLowerCase(),
+        domains: uniqueStrings(item?.domains || [], 6),
+        score,
+        supportedBy: uniqueStrings(item?.supportedBy || [], 6),
+        whyUseful: String(item?.whyUseful || "").trim()
+      });
+    }
+  }
+
+  return [...merged.values()]
+    .sort((left, right) => Number(right.score || 0) - Number(left.score || 0))
+    .slice(0, maxItems);
+}
+
+function mergeDiscriminatingSignals(existing = [], incoming = [], maxItems = 4) {
+  return uniqueObjectsBy(
+    [...existing, ...incoming].map((item) => ({
+      signal: String(item?.signal || "").trim(),
+      question: String(item?.question || "").trim(),
+      separates: uniqueStrings(item?.separates || [], 4),
+      whyUseful: String(item?.whyUseful || "").trim(),
+      informationGain: Number(item?.informationGain ?? 0)
+    })),
+    (item) => item.question,
+    maxItems
+  );
+}
+
+function mergeGraphTrace(existing = [], incoming = [], maxItems = 8) {
+  return uniqueObjectsBy(
+    [...existing, ...incoming].map((item) => ({
+      fromSignal: String(item?.fromSignal || "").trim(),
+      viaState: String(item?.viaState || "").trim(),
+      toCause: String(item?.toCause || "").trim(),
+      weight: Number(item?.weight ?? 0)
+    })),
+    (item) => `${item.fromSignal}:${item.viaState}:${item.toCause}`,
+    maxItems
+  );
 }
 
 function emptyCaseMemory() {
@@ -206,9 +285,16 @@ function mergeEntryState(currentState, incomingState, routeType) {
     claimedCause: incoming.claimedCause || current.claimedCause,
     knownFacts: uniqueStrings([...(current.knownFacts || []), ...(incoming.knownFacts || [])], 8),
     symptoms: uniqueStrings([...(current.symptoms || []), ...(incoming.symptoms || [])], 10),
+    observedSignals: uniqueStrings([...(current.observedSignals || []), ...(incoming.observedSignals || [])], 12),
     systemLayers: uniqueStrings([...(current.systemLayers || []), ...(incoming.systemLayers || [])], 6),
     candidateConstraints: mergeCandidateConstraints(current.candidateConstraints, incoming.candidateConstraints),
+    candidateStates: mergeRankedGraphItems(current.candidateStates, incoming.candidateStates, 5),
+    candidateCauses: mergeRankedGraphItems(current.candidateCauses, incoming.candidateCauses, 5),
     selectedConstraint: incoming.selectedConstraint || current.selectedConstraint,
+    graphTrace: mergeGraphTrace(current.graphTrace, incoming.graphTrace, 8),
+    discriminatingSignals: mergeDiscriminatingSignals(current.discriminatingSignals, incoming.discriminatingSignals, 4),
+    graphConfidence: Math.max(Number(current.graphConfidence || 0), Number(incoming.graphConfidence || 0)),
+    hypothesisConflicts: uniqueStrings([...(current.hypothesisConflicts || []), ...(incoming.hypothesisConflicts || [])], 6),
     signalSufficiency: incoming.signalSufficiency || current.signalSufficiency,
     nextBestQuestion: incoming.nextBestQuestion || current.nextBestQuestion,
     nextBestStep: incoming.nextBestStep || current.nextBestStep,
@@ -267,6 +353,11 @@ function buildPersistedMemory(decision) {
 function buildArtifactBody({ company, activeCase, decision, classification, userText, artifactId }) {
   const entryState = decision.entryState || emptyEntryState();
   const candidateConstraints = (entryState.candidateConstraints || []).map((item) => `- [${item.layer}] ${item.label}`);
+  const candidateStates = (entryState.candidateStates || []).map((item) => `- [${item.layer}] ${item.label} (${item.score})`);
+  const candidateCauses = (entryState.candidateCauses || []).map((item) => `- [${item.layer}] ${item.label} (${item.score})`);
+  const discriminatingSignals = (entryState.discriminatingSignals || []).map(
+    (item) => `- ${item.question} | separates: ${(item.separates || []).join(" vs ")}`
+  );
   const sections = [
     `# ${decision.memory.artifact.title || "Diagnostic artifact"}`,
     "",
@@ -287,14 +378,29 @@ function buildArtifactBody({ company, activeCase, decision, classification, user
     "## Symptoms",
     ...(entryState.symptoms.length > 0 ? entryState.symptoms.map((item) => `- ${item}`) : ["- No symptoms captured."]),
     "",
+    "## Observed signals",
+    ...(entryState.observedSignals.length > 0 ? entryState.observedSignals.map((item) => `- ${item}`) : ["- No observed signals captured."]),
+    "",
     "## System layers in play",
     ...(entryState.systemLayers.length > 0 ? entryState.systemLayers.map((item) => `- ${item}`) : ["- No layers captured."]),
     "",
     "## Candidate constraints",
     ...(candidateConstraints.length > 0 ? candidateConstraints : ["- No candidate constraints captured."]),
     "",
+    "## Candidate states",
+    ...(candidateStates.length > 0 ? candidateStates : ["- No candidate states captured."]),
+    "",
+    "## Candidate causes",
+    ...(candidateCauses.length > 0 ? candidateCauses : ["- No candidate causes captured."]),
+    "",
     "## Selected constraint",
     decision.memory.constraint || entryState.selectedConstraint || "Not selected yet.",
+    "",
+    "## Discriminating signals",
+    ...(discriminatingSignals.length > 0 ? discriminatingSignals : ["- No discriminating signals captured."]),
+    "",
+    "## Graph confidence",
+    `- ${entryState.graphConfidence || 0}`,
     "",
     "## Understanding",
     decision.response.whatIUnderstood,
@@ -394,6 +500,20 @@ export class ConversationService {
         entryState: thread.entryState || emptyEntryState(),
         history: recentHistory(state, thread.id, this.maxHistoryMessages)
       };
+
+      const extracted = extractObservations({
+        userText: text,
+        classification,
+        entryState: context.entryState,
+        memorySummary: context.memorySummary
+      });
+      const graphPacket = analyzeWithGraph({
+        extracted,
+        entryState: context.entryState,
+        memorySummary: context.memorySummary
+      });
+      context.observationPacket = extracted;
+      context.graphPacket = graphPacket;
 
       let decision = await this.reasoner.decide(context);
       decision = applyGuardrails(decision, context);
@@ -575,7 +695,8 @@ export class ConversationService {
             understanding: decision.response.whatIUnderstood,
             knownFacts: decision.guardrails.knownFacts,
             observations: decision.guardrails.observations,
-            workingHypotheses: decision.guardrails.workingHypotheses
+            workingHypotheses: decision.guardrails.workingHypotheses,
+            graphSnapshot: decision.graphAnalysis || graphPacket
           })
         );
 

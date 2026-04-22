@@ -156,6 +156,7 @@ export function buildSupabaseSyncSql(state) {
     known_facts: quoteJson(row.known_facts),
     observations: quoteJson(row.observations),
     working_hypotheses: quoteJson(row.working_hypotheses),
+    graph_snapshot: quoteJson(row.graph_snapshot),
     created_at: quote(row.created_at)
   }));
 
@@ -209,6 +210,7 @@ export function buildSupabaseSyncSql(state) {
         "known_facts",
         "observations",
         "working_hypotheses",
+        "graph_snapshot",
         "created_at"
       ],
       filterResolved(snapshots, ["case_id"])

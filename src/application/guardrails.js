@@ -24,6 +24,15 @@ function trimSentence(value) {
   return ensureString(value).replace(/[.?!…]+$/u, "");
 }
 
+function ensureSentence(value) {
+  const normalized = ensureString(value);
+  if (!normalized) {
+    return "";
+  }
+
+  return /[.?!…:]$/u.test(normalized) ? normalized : `${normalized}.`;
+}
+
 function normalizeLayer(value, fallback = "management") {
   const normalized = ensureString(value, fallback).toLowerCase();
   return SYSTEM_LAYERS.includes(normalized) ? normalized : fallback;
@@ -68,24 +77,231 @@ function normalizeCandidateConstraints(value, maxItems = 5) {
   return result;
 }
 
-function composeResponseText(response) {
-  const whatIUnderstood = ensureString(response.whatIUnderstood);
-  const hypotheses = ensureArray(response.hypotheses, 2).map(trimSentence).filter(Boolean);
-  const whyItMatters = ensureString(response.whyItMatters);
-  const nextStep = ensureString(response.nextStep);
-  const hypothesisLead = hypotheses.length > 1 ? "Сейчас вижу две рабочие версии" : "Сейчас вижу рабочую версию";
-  const nextStepLine = /[?]$/.test(nextStep) || /^первый шаг:/i.test(nextStep)
-    ? nextStep
-    : `Следующий шаг: ${nextStep}`;
+function normalizeGraphRankedItems(value, maxItems = 5) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
 
-  return [
-    whatIUnderstood,
-    `${hypothesisLead}: ${hypotheses.join("; ")}.`,
-    whyItMatters,
-    nextStepLine
-  ]
+  const seen = new Set();
+  const result = [];
+
+  for (const item of value) {
+    const id = ensureString(item?.id);
+    const label = ensureString(item?.label);
+    if (!id || !label || seen.has(id)) {
+      continue;
+    }
+
+    seen.add(id);
+    result.push({
+      id,
+      label,
+      layer: normalizeLayer(item?.layer),
+      domains: ensureArray(item?.domains, 6),
+      score: clampConfidence(item?.score, 0.45),
+      supportedBy: ensureArray(item?.supportedBy, 6),
+      whyUseful: ensureString(item?.whyUseful)
+    });
+
+    if (result.length >= maxItems) {
+      break;
+    }
+  }
+
+  return result;
+}
+
+function normalizeDiscriminatingSignals(value, maxItems = 4) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const seen = new Set();
+  const result = [];
+
+  for (const item of value) {
+    const question = ensureString(item?.question);
+    if (!question || seen.has(question)) {
+      continue;
+    }
+
+    seen.add(question);
+    result.push({
+      signal: ensureString(item?.signal, question),
+      question,
+      separates: ensureArray(item?.separates, 4),
+      whyUseful: ensureString(item?.whyUseful, "Этот сигнал лучше всего отделяет ближайшие конкурирующие версии."),
+      informationGain: clampConfidence(item?.informationGain, 0.55)
+    });
+
+    if (result.length >= maxItems) {
+      break;
+    }
+  }
+
+  return result;
+}
+
+function normalizeGraphTrace(value, maxItems = 8) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const seen = new Set();
+  const result = [];
+
+  for (const item of value) {
+    const fromSignal = ensureString(item?.fromSignal);
+    const viaState = ensureString(item?.viaState);
+    const toCause = ensureString(item?.toCause);
+    const key = `${fromSignal}:${viaState}:${toCause}`;
+
+    if (!fromSignal || !viaState || !toCause || seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    result.push({
+      fromSignal,
+      viaState,
+      toCause,
+      weight: clampConfidence(item?.weight, 0.45)
+    });
+
+    if (result.length >= maxItems) {
+      break;
+    }
+  }
+
+  return result;
+}
+
+function joinParagraphs(parts) {
+  return parts
+    .map((item) => ensureString(item))
     .filter(Boolean)
     .join("\n\n");
+}
+
+function humanizeConstraintLabel(value) {
+  const normalized = trimSentence(value);
+  if (!normalized) {
+    return "";
+  }
+
+  return normalized.charAt(0).toLowerCase() + normalized.slice(1);
+}
+
+function stripVisibleTemplateLabels(text) {
+  return ensureString(text)
+    .replace(/^что я понял:\s*/i, "")
+    .replace(/^гипотезы:\s*/i, "")
+    .replace(/^почему это важно:\s*/i, "")
+    .replace(/^следующий шаг:\s*/i, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function looksMechanicalResponse(text) {
+  const normalized = ensureString(text).toLowerCase();
+  if (!normalized) {
+    return true;
+  }
+
+  const patterns = [
+    /^что я понял:/i,
+    /^гипотезы:/i,
+    /^почему это важно:/i,
+    /^следующий шаг:/i,
+    /сейчас вижу две рабочие версии/i,
+    /сейчас вижу рабочую версию/i
+  ];
+
+  return patterns.some((pattern) => pattern.test(normalized));
+}
+
+function buildWebsiteSurfaceResponse(response) {
+  return joinParagraphs([
+    `${ensureSentence(response.whatIUnderstood)} ${ensureSentence(response.whyItMatters)}`,
+    ensureString(response.nextStep)
+  ]);
+}
+
+function buildVagueSurfaceResponse(response) {
+  return joinParagraphs([
+    `${ensureSentence(response.whatIUnderstood)} ${ensureSentence(response.whyItMatters)}`,
+    ensureString(response.nextStep)
+  ]);
+}
+
+function buildDiagnosticClarifySurfaceResponse(response, entryState, context) {
+  const claimedCause = ensureString(entryState.claimedCause);
+  const constraints = Array.isArray(entryState.candidateConstraints) ? entryState.candidateConstraints.slice(0, 5) : [];
+  const strongestAlternative = humanizeConstraintLabel(constraints[0]?.label);
+  const secondAlternative = humanizeConstraintLabel(constraints[1]?.label);
+
+  if (userLikelyClaimedCause(context, entryState) && claimedCause) {
+    const alternatives = [strongestAlternative, secondAlternative].filter(Boolean);
+    const alternativesLine = alternatives.length >= 2
+      ? `Здесь легко перепутать это с тем, что ${alternatives[0]} или что ${alternatives[1]}.`
+      : ensureSentence(response.whyItMatters);
+
+    return joinParagraphs([
+      `Я бы пока не фиксировал причину в том, что ${claimedCause}. Это пока версия пользователя, а не доказанное ограничение системы. ${ensureSentence(response.whyItMatters)}`,
+      alternativesLine,
+      ensureString(response.nextStep)
+    ]);
+  }
+
+  if (strongestAlternative && secondAlternative) {
+    return joinParagraphs([
+      `${ensureSentence(response.whatIUnderstood)} Пока сильнее всего выглядят версии, что ${strongestAlternative} или что ${secondAlternative}.`,
+      `${ensureSentence(response.whyItMatters)} ${ensureString(response.nextStep)}`
+    ]);
+  }
+
+  return joinParagraphs([
+    ensureSentence(response.whatIUnderstood),
+    `${ensureSentence(response.whyItMatters)} ${ensureString(response.nextStep)}`
+  ]);
+}
+
+function buildAnswerSurfaceResponse(response, entryState) {
+  const selectedConstraint = humanizeConstraintLabel(entryState.selectedConstraint);
+  const firstParagraph = selectedConstraint
+    ? `${ensureSentence(response.whatIUnderstood)} Похоже, сейчас главный рычаг в том, что ${selectedConstraint}.`
+    : ensureSentence(response.whatIUnderstood);
+
+  return joinParagraphs([
+    firstParagraph,
+    `${ensureSentence(response.whyItMatters)} ${ensureString(response.nextStep)}`
+  ]);
+}
+
+function buildSurfaceResponse(decision, context) {
+  const response = decision.response || {};
+  const entryState = decision.entryState || emptyEntryState();
+  const routeType = context.classification.type;
+  const action = ensureString(decision.decision?.action);
+  const visibleResponse = stripVisibleTemplateLabels(response.responseText);
+
+  if (visibleResponse && !looksMechanicalResponse(visibleResponse)) {
+    return visibleResponse;
+  }
+
+  if (decision.selectedMode === "website_screening_mode") {
+    return buildWebsiteSurfaceResponse(response);
+  }
+
+  if (action === "answer" || action === "diagnose") {
+    return buildAnswerSurfaceResponse(response, entryState);
+  }
+
+  if (routeType === "free_text_problem") {
+    return buildDiagnosticClarifySurfaceResponse(response, entryState, context);
+  }
+
+  return buildVagueSurfaceResponse(response);
 }
 
 function inferGenericConstraints(context) {
@@ -186,25 +402,59 @@ function normalizeEntryState(rawEntryState, context, decision) {
   entryState.claimedCause = ensureString(entryState.claimedCause);
   entryState.knownFacts = ensureArray(entryState.knownFacts, 8);
   entryState.symptoms = ensureArray(entryState.symptoms, 10);
+  entryState.observedSignals = ensureArray(entryState.observedSignals, 12);
   if (!entryState.symptoms.length && routeType !== "url_only") {
     entryState.symptoms = ensureArray([context.classification.cleanText], 10);
+  }
+  if (!entryState.observedSignals.length) {
+    entryState.observedSignals = ensureArray(context.graphPacket?.observedSignals, 12);
   }
   entryState.systemLayers = ensureArray(entryState.systemLayers, 6)
     .map((item) => normalizeLayer(item))
     .filter((item, index, items) => items.indexOf(item) === index);
   entryState.candidateConstraints = normalizeCandidateConstraints(entryState.candidateConstraints, 5);
+  entryState.candidateStates = normalizeGraphRankedItems(entryState.candidateStates, 5);
+  entryState.candidateCauses = normalizeGraphRankedItems(entryState.candidateCauses, 5);
   if (entryState.candidateConstraints.length < 2 && routeType !== "url_only" && routeType !== "url_plus_problem") {
     entryState.candidateConstraints = normalizeCandidateConstraints(
       [...entryState.candidateConstraints, ...inferredConstraints],
       5
     );
   }
+  if (!entryState.candidateStates.length) {
+    entryState.candidateStates = normalizeGraphRankedItems(context.graphPacket?.candidateStates, 5);
+  }
+  if (!entryState.candidateCauses.length) {
+    entryState.candidateCauses = normalizeGraphRankedItems(context.graphPacket?.candidateCauses, 5);
+  }
   entryState.selectedConstraint = ensureString(entryState.selectedConstraint);
+  entryState.graphTrace = normalizeGraphTrace(entryState.graphTrace, 8);
+  entryState.discriminatingSignals = normalizeDiscriminatingSignals(entryState.discriminatingSignals, 4);
+  entryState.graphConfidence = clampConfidence(
+    entryState.graphConfidence,
+    clampConfidence(context.graphPacket?.graphConfidence, 0.3)
+  );
+  entryState.hypothesisConflicts = ensureArray(entryState.hypothesisConflicts, 6);
+  if (!entryState.graphTrace.length) {
+    entryState.graphTrace = normalizeGraphTrace(context.graphPacket?.graphTrace, 8);
+  }
+  if (!entryState.discriminatingSignals.length) {
+    entryState.discriminatingSignals = normalizeDiscriminatingSignals(context.graphPacket?.discriminatingSignals, 4);
+  }
+  if (!entryState.hypothesisConflicts.length) {
+    entryState.hypothesisConflicts = ensureArray(context.graphPacket?.hypothesisConflicts, 6);
+  }
   entryState.signalSufficiency = ensureString(
     entryState.signalSufficiency,
     ensureString(decision.decision?.signalSufficiency, fallback.signalSufficiency)
   );
   entryState.nextBestQuestion = ensureString(entryState.nextBestQuestion);
+  if (!entryState.nextBestQuestion) {
+    entryState.nextBestQuestion = ensureString(
+      context.graphPacket?.suggestedQuestion,
+      entryState.discriminatingSignals[0]?.question
+    );
+  }
   entryState.nextBestStep = ensureString(entryState.nextBestStep, decision.response?.nextStep);
   entryState.whyThisStep = ensureString(
     entryState.whyThisStep,
@@ -243,6 +493,48 @@ function normalizeEntryState(rawEntryState, context, decision) {
   }
 
   return entryState;
+}
+
+function normalizeGraphAnalysis(rawGraphAnalysis, context, decision) {
+  const graphAnalysis = rawGraphAnalysis && typeof rawGraphAnalysis === "object"
+    ? structuredClone(rawGraphAnalysis)
+    : {};
+  const fallback = context.graphPacket || {};
+
+  graphAnalysis.observedSignals = ensureArray(graphAnalysis.observedSignals, 12);
+  if (!graphAnalysis.observedSignals.length) {
+    graphAnalysis.observedSignals = ensureArray(fallback.observedSignals, 12);
+  }
+  graphAnalysis.candidateStates = normalizeGraphRankedItems(graphAnalysis.candidateStates, 5);
+  if (!graphAnalysis.candidateStates.length) {
+    graphAnalysis.candidateStates = normalizeGraphRankedItems(fallback.candidateStates, 5);
+  }
+  graphAnalysis.candidateCauses = normalizeGraphRankedItems(graphAnalysis.candidateCauses, 5);
+  if (!graphAnalysis.candidateCauses.length) {
+    graphAnalysis.candidateCauses = normalizeGraphRankedItems(fallback.candidateCauses, 5);
+  }
+  graphAnalysis.candidateInterventions = normalizeGraphRankedItems(graphAnalysis.candidateInterventions, 5);
+  if (!graphAnalysis.candidateInterventions.length) {
+    graphAnalysis.candidateInterventions = normalizeGraphRankedItems(fallback.candidateInterventions, 5);
+  }
+  graphAnalysis.discriminatingSignals = normalizeDiscriminatingSignals(graphAnalysis.discriminatingSignals, 4);
+  if (!graphAnalysis.discriminatingSignals.length) {
+    graphAnalysis.discriminatingSignals = normalizeDiscriminatingSignals(fallback.discriminatingSignals, 4);
+  }
+  graphAnalysis.graphTrace = normalizeGraphTrace(graphAnalysis.graphTrace, 8);
+  if (!graphAnalysis.graphTrace.length) {
+    graphAnalysis.graphTrace = normalizeGraphTrace(fallback.graphTrace, 8);
+  }
+  graphAnalysis.graphConfidence = clampConfidence(
+    graphAnalysis.graphConfidence,
+    clampConfidence(fallback.graphConfidence, 0.3)
+  );
+  graphAnalysis.hypothesisConflicts = ensureArray(graphAnalysis.hypothesisConflicts, 6);
+  if (!graphAnalysis.hypothesisConflicts.length) {
+    graphAnalysis.hypothesisConflicts = ensureArray(fallback.hypothesisConflicts, 6);
+  }
+
+  return graphAnalysis;
 }
 
 function userLikelyClaimedCause(context, entryState) {
@@ -323,7 +615,30 @@ export function applyGuardrails(rawDecision, context) {
     ], 8);
   }
 
+  decision.graphAnalysis = normalizeGraphAnalysis(decision.graphAnalysis, context, decision);
   decision.entryState = normalizeEntryState(decision.entryState, context, decision);
+  if (decision.graphAnalysis.observedSignals.length && !decision.entryState.observedSignals.length) {
+    decision.entryState.observedSignals = decision.graphAnalysis.observedSignals;
+  }
+  if (decision.graphAnalysis.candidateStates.length && !decision.entryState.candidateStates.length) {
+    decision.entryState.candidateStates = decision.graphAnalysis.candidateStates;
+  }
+  if (decision.graphAnalysis.candidateCauses.length && !decision.entryState.candidateCauses.length) {
+    decision.entryState.candidateCauses = decision.graphAnalysis.candidateCauses;
+  }
+  if (decision.graphAnalysis.discriminatingSignals.length && !decision.entryState.discriminatingSignals.length) {
+    decision.entryState.discriminatingSignals = decision.graphAnalysis.discriminatingSignals;
+  }
+  if (decision.graphAnalysis.graphTrace.length && !decision.entryState.graphTrace.length) {
+    decision.entryState.graphTrace = decision.graphAnalysis.graphTrace;
+  }
+  if (decision.graphAnalysis.hypothesisConflicts.length && !decision.entryState.hypothesisConflicts.length) {
+    decision.entryState.hypothesisConflicts = decision.graphAnalysis.hypothesisConflicts;
+  }
+  decision.entryState.graphConfidence = Math.max(
+    Number(decision.entryState.graphConfidence || 0),
+    Number(decision.graphAnalysis.graphConfidence || 0)
+  );
   decision.entryState.signalSufficiency = decision.decision.signalSufficiency;
 
   if (routeType === "url_only" || routeType === "url_plus_problem") {
@@ -449,7 +764,9 @@ export function applyGuardrails(rawDecision, context) {
 
   decision.guardrails.workingHypotheses = ensureArray([
     ...decision.guardrails.workingHypotheses,
-    ...decision.entryState.candidateConstraints.map((item) => item.label)
+    ...decision.entryState.candidateConstraints.map((item) => item.label),
+    ...decision.graphAnalysis.candidateStates.map((item) => item.label),
+    ...decision.graphAnalysis.candidateCauses.map((item) => item.label)
   ], 8);
 
   if (
@@ -461,10 +778,7 @@ export function applyGuardrails(rawDecision, context) {
     decision.response.nextStep = ensureString(decision.entryState.nextBestQuestion, decision.response.nextStep);
   }
 
-  decision.response.responseText = ensureString(
-    decision.response.responseText,
-    composeResponseText(decision.response)
-  );
+  decision.response.responseText = buildSurfaceResponse(decision, context);
 
   return decision;
 }
