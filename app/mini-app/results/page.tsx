@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { listCaseSnapshots } from "@/lib/persistence/repository";
 
+export const dynamic = "force-dynamic";
+
 export default async function ResultsPage() {
   const snapshots = await listCaseSnapshots();
 

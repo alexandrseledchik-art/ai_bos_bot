@@ -7,6 +7,8 @@ import {
   getConversationArtifacts,
 } from "@/lib/persistence/repository";
 
+export const dynamic = "force-dynamic";
+
 export default async function ResultDetailPage(props: {
   params: Promise<{ id: string }>;
 }) {
