@@ -5,10 +5,12 @@ import { RENDERER_PROMPT } from "@/prompts/renderer.prompt";
 import { z } from "zod";
 
 const FORBIDDEN_REPLY_PATTERNS = [
-  /^\s*вы хотите\b/i,
-  /^\s*чтобы помочь\b/i,
-  /^\s*для того чтобы помочь\b/i,
-  /^\s*уточните, пожалуйста\b/i,
+  /\bвы хотите\b/i,
+  /\bчтобы помочь\b/i,
+  /\bдля того чтобы помочь\b/i,
+  /\bуточните, пожалуйста\b/i,
+  /какой запрос хотите разобрать дальше/i,
+  /это важный шаг\./i,
 ];
 
 const rendererReplySchema = z
