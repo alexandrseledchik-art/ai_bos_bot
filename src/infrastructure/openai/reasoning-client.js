@@ -81,6 +81,9 @@ function extractClaimedCause(text) {
   if (/лиды плох/i.test(normalized)) {
     return "лиды плохого качества";
   }
+  if (/не\s+справля|не\s+успева|перегруж|тонут/i.test(normalized)) {
+    return "";
+  }
   if (/люд[а-я]* не хватает/i.test(normalized)) {
     return "не хватает людей";
   }
@@ -89,9 +92,6 @@ function extractClaimedCause(text) {
   }
   if (/менеджер[а-я]*\s+не\s+хватает/i.test(normalized)) {
     return "не хватает менеджеров";
-  }
-  if (/не успева[а-я]* обработ/i.test(normalized)) {
-    return "команда не успевает обрабатывать входящий поток";
   }
   if (/долго отвеча/i.test(normalized)) {
     return "слишком долгий первый ответ";
@@ -109,6 +109,10 @@ function isMetaFollowUpText(text) {
   return /что ты имеешь в виду|что именно ты имеешь в виду|в смысле|почему мы идем именно сюда|почему ид[её]м сюда|ок[, ]*а дальше|что дальше|и дальше|что потом|я не уверен|сомневаюсь|не думаю|не похоже/i.test(
     normalized
   );
+}
+
+function shouldCarryPreviousClaimedCause(text) {
+  return isMetaFollowUpText(text);
 }
 
 function suggestionPack(focus, text) {
@@ -267,7 +271,7 @@ function questionLooksUpstream(question) {
 
 function claimedCauseLooksLocal(text) {
   const normalized = normalizeText(text).toLowerCase();
-  return /не хватает|люд|продавц|перегруж|ответ|очеред|sla|звон/.test(normalized);
+  return /не хватает|люд|продавц|перегруж|не справля|ответ|очеред|sla|звон/.test(normalized);
 }
 
 function pickGraphQuestion(graphPacket, text = "") {
@@ -301,7 +305,26 @@ function buildGraphAnalysisPacket(graphPacket) {
   };
 }
 
-function genericConstraintsByFocus(focus, text) {
+function graphSignalSet(graphPacket) {
+  return new Set((graphPacket?.observedSignals || []).map((item) => normalizeText(item).toLowerCase()).filter(Boolean));
+}
+
+function pureStaffingHypothesisAllowed(text, graphPacket) {
+  const normalized = normalizeText(text).toLowerCase();
+  const signals = graphSignalSet(graphPacket);
+  const targetFlowConfirmed =
+    signals.has("target_leads_confirmed") ||
+    /почти\s+все\s+целев|все\s+лиды?\s+целев|в\s+основном\s+целев/i.test(normalized);
+  const upstreamNoiseStillPossible =
+    signals.has("mixed_inbound_confirmed") ||
+    signals.has("qualification_missing_confirmed") ||
+    signals.has("priority_rules_missing") ||
+    /всё\s+подряд|смешан|неразобран|квалификац|предквалификац|приоритет/i.test(normalized);
+
+  return targetFlowConfirmed && !upstreamNoiseStillPossible;
+}
+
+function genericConstraintsByFocus(focus, text, graphPacket) {
   const normalized = normalizeText(text).toLowerCase();
 
   if (focus === "sale") {
@@ -383,7 +406,7 @@ function genericConstraintsByFocus(focus, text) {
   }
 
   if (/заяв|лид/.test(normalized) && /не усп|люд|ответ|очеред|обработ/.test(normalized)) {
-    return [
+    const constraints = [
       buildConstraint(
         "Поток перегружен нецелевыми или слабо квалифицированными лидами",
         "commercial",
@@ -406,13 +429,27 @@ function genericConstraintsByFocus(focus, text) {
         "Если входящие уже распределяются по роли, SLA соблюдается, а очередь всё равно растёт."
       ),
       buildConstraint(
-        "Реально не хватает мощности на первичную обработку входящего потока",
-        "people",
-        0.54,
-        "Если лиды целевые и поток уже организован, то ограничение действительно может быть в capacity команды.",
-        "Если значимая часть перегруза уходит после квалификации или смены маршрутизации."
+        "Продавцы тащат на себе разбор, квалификацию и сортировку входа вместо продажи",
+        "commercial",
+        0.56,
+        "Если до продавца нет отдельного слоя отбора и приоритета, перегруз быстро выглядит как проблема штата, хотя корень сидит в конструкции потока.",
+        "Если до продавца уже есть жёсткая квалификация, приоритет и раздельная маршрутизация, а продавцы получают только готовый целевой поток."
       )
     ];
+
+    if (pureStaffingHypothesisAllowed(text, graphPacket)) {
+      constraints.push(
+        buildConstraint(
+          "Реально не хватает мощности на обработку уже целевого и правильно приоритизированного потока",
+          "people",
+          0.5,
+          "Эта версия становится рабочей только когда уже подтверждено, что поток целевой, квалификация есть, а правила приоритета и ownership реально держатся.",
+          "Если перегруз уходит после фильтрации, маршрутизации или выноса лишней работы из продавцов."
+        )
+      );
+    }
+
+    return constraints;
   }
 
   if (focus === "growth") {
@@ -524,7 +561,12 @@ function buildNextQuestion(focus, text, candidateConstraints, graphPacket) {
 function buildEntryState(context, focus, signalSufficiency, selectedConstraint = "", promotionReadiness = "keep_in_entry") {
   const text = normalizeText(context.userText);
   const previous = context.entryState || {};
-  const claimedCause = extractClaimedCause(text) || normalizeText(previous.claimedCause);
+  const explicitClaimedCause = extractClaimedCause(text);
+  const claimedCause = explicitClaimedCause || (
+    shouldCarryPreviousClaimedCause(text)
+      ? normalizeText(previous.claimedCause)
+      : ""
+  );
   const graphConstraints = constraintsFromGraphPacket(context.graphPacket);
   const shouldPreservePreviousSpread = Boolean(context.classification?.inferredFollowUp) || isMetaFollowUpText(text);
   const candidateConstraints = uniqueConstraints(
@@ -532,11 +574,11 @@ function buildEntryState(context, focus, signalSufficiency, selectedConstraint =
       ? [
           ...(previous.candidateConstraints || []),
           ...graphConstraints,
-          ...genericConstraintsByFocus(focus, text)
+          ...genericConstraintsByFocus(focus, text, context.graphPacket)
         ]
       : [
           ...graphConstraints,
-          ...genericConstraintsByFocus(focus, text),
+          ...genericConstraintsByFocus(focus, text, context.graphPacket),
           ...(previous.candidateConstraints || [])
         ]
   );

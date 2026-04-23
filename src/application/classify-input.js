@@ -57,9 +57,14 @@ export function classifyInput(text) {
   const hasProblemMarkers = PROBLEM_PATTERNS.some((pattern) => pattern.test(cleanText));
   const matchesExplicitVagueIntent = VAGUE_PATTERNS.some((pattern) => pattern.test(cleanText));
   const matchesUnknownIntent = /^(не понимаю|неясно|не знаю)$/i.test(cleanText);
+  const hasConcreteProblemSignal =
+    hasProblemMarkers &&
+    /(не\s+\S+|не хватает|не успева|не справля|перегруж|тонут|много|мало|просел|упал|падает|срыва|завис|долго|очеред|теря|дорог|буксу)/i.test(
+      cleanText
+    );
   const looksVague =
     matchesExplicitVagueIntent ||
-    wordCount <= 5 ||
+    (wordCount <= 5 && !hasConcreteProblemSignal) ||
     /^(помоги|что делать|нужен совет|не понимаю)$/i.test(cleanText);
 
   let type = "unknown";
@@ -70,6 +75,8 @@ export function classifyInput(text) {
     type = "url_plus_problem";
   } else if (!urls.length && matchesUnknownIntent) {
     type = "unknown";
+  } else if (!urls.length && hasConcreteProblemSignal && !matchesExplicitVagueIntent) {
+    type = "free_text_problem";
   } else if (!urls.length && looksVague) {
     type = "free_text_vague";
   } else if (!urls.length && hasProblemMarkers) {
@@ -82,6 +89,7 @@ export function classifyInput(text) {
     cleanText: cleanText || trimmed,
     wordCount,
     hasProblemMarkers,
-    looksVague
+    looksVague,
+    hasConcreteProblemSignal
   };
 }

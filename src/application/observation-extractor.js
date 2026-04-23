@@ -20,6 +20,16 @@ function uniqueBy(items, keyFn) {
   return result;
 }
 
+function isMetaFollowUpText(text) {
+  return /что ты имеешь в виду|что именно ты имеешь в виду|в смысле|почему мы идем именно сюда|почему ид[её]м сюда|почему именно этот вопрос|почему|зачем|ок[, ]*а дальше|что дальше|и дальше|что потом|я не уверен|сомневаюсь|не думаю|не похоже/i.test(
+    normalizeText(text).toLowerCase()
+  );
+}
+
+function shouldCarryPreviousClaimedCause(text) {
+  return isMetaFollowUpText(text);
+}
+
 function detectClaimedCause(text) {
   const normalized = normalizeText(text);
   const patterns = [
@@ -36,6 +46,9 @@ function detectClaimedCause(text) {
     }
   }
 
+  if (/не\s+справля|не\s+успева|перегруж|тонут/i.test(normalized)) {
+    return "";
+  }
   if (/люд[а-я]*\s+не\s+хватает/i.test(normalized)) {
     return "не хватает людей";
   }
@@ -91,7 +104,12 @@ export function extractObservations({ userText, classification, entryState, memo
     });
   }
 
-  const claimedCause = detectClaimedCause(text) || normalizeText(entryState?.claimedCause);
+  const explicitClaimedCause = detectClaimedCause(text);
+  const claimedCause = explicitClaimedCause || (
+    shouldCarryPreviousClaimedCause(text)
+      ? normalizeText(entryState?.claimedCause)
+      : ""
+  );
   const normalizedObservations = uniqueBy(observations, (item) => item.signalId);
   const observedSignals = normalizedObservations.map((item) => item.signalId);
   const currentClaimedProblem = normalizeText(classification.cleanText || text);

@@ -86,7 +86,7 @@ function isLeadFlowScenario(observedSignals, extracted) {
 
 function claimedCauseLooksLocal(extracted) {
   const claimedCause = normalizeText(extracted?.claimedCause).toLowerCase();
-  return /не хватает|люд|продавц|перегруж|ответ|звон|sla|очеред|обработ/.test(claimedCause);
+  return /не хватает|люд|продавц|перегруж|не справля|ответ|звон|sla|очеред|обработ/.test(claimedCause);
 }
 
 function questionLooksUpstream(question) {
@@ -95,6 +95,46 @@ function questionLooksUpstream(question) {
 
 function questionLooksLocal(question) {
   return /sla|владелец|кто отвечает|кто должен|очеред|сколько.*минут|сколько.*час|срок|перв[ао]й\s+(звон|ответ|контакт|касани)|ownership/i.test(question);
+}
+
+function questionAssumesQualificationMissing(question) {
+  return /есть\s+ли\s+до\s+продавца\s+этап\s+квалификац|до\s+продавца\s+вообще\s+есть\s+слой|без\s+отдельной\s+квалификац|этап\s+квалификац.*отсеивает/i.test(
+    question
+  );
+}
+
+function hasTargetFlowConfirmed(observedSignals, extracted) {
+  const text = normalizeText(extracted?.claimedProblem || extracted?.observations?.map((item) => item?.evidence).join(" ") || "");
+  return observedSignals.includes("target_leads_confirmed") ||
+    /почти\s+все\s+целев|все\s+лиды?\s+целев|в\s+основном\s+целев/i.test(text);
+}
+
+function qualificationLayerExists(observedSignals, extracted) {
+  const text = normalizeText(extracted?.claimedProblem || extracted?.observations?.map((item) => item?.evidence).join(" ") || "");
+  return observedSignals.includes("qualification_stage_exists") ||
+    /есть\s+менеджер.*квалификац|есть\s+этап.*квалификац|на\s+этапе\s+квалификац|квалификац[ияи].*есть/i.test(text);
+}
+
+function qualificationLayerOverloaded(observedSignals, extracted) {
+  const text = normalizeText(extracted?.claimedProblem || extracted?.observations?.map((item) => item?.evidence).join(" ") || "");
+  return observedSignals.includes("qualification_stage_overloaded") ||
+    /квалификац[ияи].*зашива|квалификац[ияи].*перегруж|менеджер.*квалификац.*зашива/i.test(text);
+}
+
+function hasUpstreamLeadNoiseSignals(observedSignals, extracted) {
+  const text = normalizeText(extracted?.claimedProblem || extracted?.observations?.map((item) => item?.evidence).join(" ") || "");
+  return observedSignals.includes("mixed_inbound_confirmed") ||
+    observedSignals.includes("qualification_missing_confirmed") ||
+    observedSignals.includes("priority_rules_missing") ||
+    /всё\s+подряд|смешан|неразобран|квалификац|предквалификац|приоритет/i.test(text);
+}
+
+function pureStaffingHypothesisAllowed(observedSignals, extracted) {
+  return hasTargetFlowConfirmed(observedSignals, extracted) && !hasUpstreamLeadNoiseSignals(observedSignals, extracted);
+}
+
+function isStaffingNode(nodeId) {
+  return nodeId === "capacity_model_missing" || nodeId === "staffing_not_tied_to_lead_load";
 }
 
 function upstreamResolutionObserved(observedSignals, extracted) {
@@ -110,11 +150,19 @@ function buildQuestionCandidates({ candidateStates, candidateCauses, observedSig
   const leadFlowScenario = isLeadFlowScenario(observedSignals, extracted);
   const localClaimedCause = claimedCauseLooksLocal(extracted);
   const upstreamResolved = upstreamResolutionObserved(observedSignals, extracted);
+  const staffingAllowed = pureStaffingHypothesisAllowed(observedSignals, extracted);
+  const qualificationExists = qualificationLayerExists(observedSignals, extracted);
   const candidates = [];
 
   const pushQuestion = (item, type, index, separates) => {
     const question = nodeById.get(item.id)?.relatedQuestions?.[0];
     if (!question) {
+      return;
+    }
+    if (leadFlowScenario && !staffingAllowed && isStaffingNode(item.id)) {
+      return;
+    }
+    if (qualificationExists && questionAssumesQualificationMissing(question)) {
       return;
     }
 
@@ -134,6 +182,9 @@ function buildQuestionCandidates({ candidateStates, candidateCauses, observedSig
     }
     if (leadFlowScenario && questionLooksLocal(question)) {
       priority -= upstreamResolved ? 0.05 : 0.18;
+    }
+    if (leadFlowScenario && qualificationExists && /целев|приоритет|размеченн|вручную|квалификац/i.test(question)) {
+      priority += 0.16;
     }
 
     candidates.push({
@@ -252,6 +303,41 @@ export function analyzeWithGraph({ extracted, entryState, memorySummary }) {
 
       addSupport(interventionScores, interventionSupport, edge, score * edge.weight, causeId);
     }
+  }
+
+  const leadFlowScenario = isLeadFlowScenario(observedSignals, extracted);
+  const qualificationExists = qualificationLayerExists(observedSignals, extracted);
+  const qualificationOverloaded = qualificationLayerOverloaded(observedSignals, extracted);
+
+  if (leadFlowScenario && !pureStaffingHypothesisAllowed(observedSignals, extracted)) {
+    if (stateScores.has("capacity_model_missing")) {
+      stateScores.set("capacity_model_missing", stateScores.get("capacity_model_missing") * 0.42);
+    }
+    if (causeScores.has("staffing_not_tied_to_lead_load")) {
+      causeScores.set("staffing_not_tied_to_lead_load", causeScores.get("staffing_not_tied_to_lead_load") * 0.3);
+    }
+  }
+
+  if (qualificationExists && stateScores.has("no_prequalification_layer")) {
+    stateScores.set("no_prequalification_layer", stateScores.get("no_prequalification_layer") * 0.12);
+  }
+  if (qualificationExists && stateScores.has("weak_lead_qualification")) {
+    stateScores.set("weak_lead_qualification", stateScores.get("weak_lead_qualification") * 1.18);
+  }
+  if (qualificationExists && stateScores.has("sales_processing_non_sales_work")) {
+    stateScores.set("sales_processing_non_sales_work", stateScores.get("sales_processing_non_sales_work") * 1.22);
+  }
+  if (qualificationExists && stateScores.has("uniform_sla_for_mixed_leads")) {
+    stateScores.set("uniform_sla_for_mixed_leads", stateScores.get("uniform_sla_for_mixed_leads") * 1.14);
+  }
+  if (qualificationExists && causeScores.has("icp_defined_but_not_operationalized")) {
+    causeScores.set("icp_defined_but_not_operationalized", causeScores.get("icp_defined_but_not_operationalized") * 1.16);
+  }
+  if (qualificationOverloaded && stateScores.has("sales_processing_non_sales_work")) {
+    stateScores.set("sales_processing_non_sales_work", stateScores.get("sales_processing_non_sales_work") * 1.2);
+  }
+  if (qualificationOverloaded && stateScores.has("weak_lead_qualification")) {
+    stateScores.set("weak_lead_qualification", stateScores.get("weak_lead_qualification") * 1.1);
   }
 
   const candidateStates = scoreMapToRankedList(stateScores, stateSupport, 5);

@@ -54,6 +54,19 @@ export const CAUSAL_GRAPH_NODES = [
     ]
   },
   {
+    id: "team_overload_reported",
+    type: "symptom",
+    label: "Команда перегружена на первом контуре",
+    description: "Пользователь описывает перегруз продавцов или команды, но это ещё не доказывает staffing-cause.",
+    domains: ["sales", "people", "ops"],
+    layer: "operations",
+    evidencePatterns: [/не\s+справля/i, /не\s+успева(ют|ем)/i, /перегруж/i, /тонут/i, /захлеб/i],
+    contradictionPatterns: [],
+    relatedQuestions: [
+      "Перегруз здесь из-за объёма уже отобранных лидов, или продавцы ещё и руками сортируют, квалифицируют и приоритизируют вход?"
+    ]
+  },
+  {
     id: "slow_first_response",
     type: "symptom",
     label: "Слишком долгий первый ответ",
@@ -103,6 +116,42 @@ export const CAUSAL_GRAPH_NODES = [
     contradictionPatterns: [],
     relatedQuestions: [
       "Если квалификации до продавца нет, тогда вопрос уже не в найме сам по себе: где у вас вообще должен отделяться ICP-лид от вторичного шума?"
+    ]
+  },
+  {
+    id: "qualification_stage_exists",
+    type: "symptom",
+    label: "Этап квалификации существует",
+    description: "Пользователь подтверждает, что до продажи есть отдельный этап или человек, который занимается квалификацией.",
+    domains: ["sales", "sale_prep", "ops"],
+    layer: "commercial",
+    evidencePatterns: [
+      /есть\s+менеджер.*квалификац/i,
+      /есть\s+этап.*квалификац/i,
+      /на\s+этапе\s+квалификац/i,
+      /квалификац[ияи].*есть/i
+    ],
+    contradictionPatterns: [],
+    relatedQuestions: [
+      "Если этап квалификации уже есть, тогда вопрос не в его существовании, а в его роли: он получает уже размеченный поток или сам руками решает, кто вообще целевой и кому идти первым?"
+    ]
+  },
+  {
+    id: "qualification_stage_overloaded",
+    type: "symptom",
+    label: "Этап квалификации перегружен",
+    description: "Пользователь подтверждает, что человек или роль на квалификации захлёбывается на входящем потоке.",
+    domains: ["sales", "sale_prep", "ops"],
+    layer: "commercial",
+    evidencePatterns: [
+      /квалификац[ияи].*зашива/i,
+      /на\s+этапе\s+квалификац.*зашива/i,
+      /квалификац[ияи].*перегруж/i,
+      /менеджер.*квалификац.*зашива/i
+    ],
+    contradictionPatterns: [],
+    relatedQuestions: [
+      "Если на квалификации уже зашиваются, мне важно понять не только объём, а механику: этот этап фильтрует поток по жёстким правилам или вручную разбирает всё подряд?"
     ]
   },
   {
@@ -236,6 +285,19 @@ export const CAUSAL_GRAPH_NODES = [
     ]
   },
   {
+    id: "sales_processing_non_sales_work",
+    type: "state",
+    label: "Продавцы делают разбор и квалификацию потока вместо продажи",
+    description: "Коммерческая команда занята не продажей, а ручной сортировкой, квалификацией и приоритизацией входа.",
+    domains: ["sales", "sale_prep", "ops"],
+    layer: "commercial",
+    evidencePatterns: [],
+    contradictionPatterns: [],
+    relatedQuestions: [
+      "Команда получает уже размеченный поток или всё ещё руками решает, кто вообще целевой, кому отвечать первым и кого вести дальше?"
+    ]
+  },
+  {
     id: "no_icp",
     type: "state",
     label: "Не определён ICP",
@@ -278,7 +340,7 @@ export const CAUSAL_GRAPH_NODES = [
     id: "inbound_noise_mixed_with_target_demand",
     type: "state",
     label: "Шумный входящий поток смешан с целевым спросом",
-    description: "Целевые и нецелевые лиды смешаны в одном потоке, поэтому нагрузка выглядит как нехватка людей.",
+    description: "Целевые и нецелевые лиды смешаны в одном потоке, поэтому нагрузка выглядит как чистый bottleneck по мощности, хотя корень глубже.",
     domains: ["growth", "sales", "strategy"],
     layer: "commercial",
     evidencePatterns: [],
@@ -612,6 +674,12 @@ export const CAUSAL_GRAPH_EDGES = [
   { from: "lead_overload", to: "no_prequalification_layer", relation: "suggests", weight: 0.79, confidence: "high", domainCross: ["sales", "sale_prep"] },
   { from: "lead_overload", to: "uniform_sla_for_mixed_leads", relation: "suggests", weight: 0.74, confidence: "high", domainCross: ["sales", "growth"] },
   { from: "lead_overload", to: "inbound_noise_mixed_with_target_demand", relation: "suggests", weight: 0.77, confidence: "high", domainCross: ["growth", "strategy"] },
+  { from: "lead_overload", to: "sales_processing_non_sales_work", relation: "suggests", weight: 0.8, confidence: "high", domainCross: ["sales", "sale_prep"] },
+  { from: "team_overload_reported", to: "sales_processing_non_sales_work", relation: "supports", weight: 0.84, confidence: "high", domainCross: ["sales", "sale_prep"] },
+  { from: "team_overload_reported", to: "no_prequalification_layer", relation: "supports", weight: 0.73, confidence: "high", domainCross: ["sales", "sale_prep"] },
+  { from: "team_overload_reported", to: "uniform_sla_for_mixed_leads", relation: "supports", weight: 0.68, confidence: "medium", domainCross: ["sales", "growth"] },
+  { from: "team_overload_reported", to: "no_inbound_routing", relation: "supports", weight: 0.62, confidence: "medium", domainCross: ["sales", "ops"] },
+  { from: "team_overload_reported", to: "capacity_model_missing", relation: "supports", weight: 0.34, confidence: "low", domainCross: ["people", "ops"] },
   { from: "slow_first_response", to: "no_inbound_routing", relation: "supports", weight: 0.82, confidence: "high", domainCross: ["sales", "ops"] },
   { from: "slow_first_response", to: "unclear_role_boundaries", relation: "supports", weight: 0.61, confidence: "medium", domainCross: ["sales", "people"] },
   { from: "slow_first_response", to: "ownership_of_first_contact_blurred", relation: "supports", weight: 0.78, confidence: "high", domainCross: ["sales", "ops"] },
@@ -623,6 +691,10 @@ export const CAUSAL_GRAPH_EDGES = [
   { from: "mixed_inbound_confirmed", to: "inbound_noise_mixed_with_target_demand", relation: "supports", weight: 0.93, confidence: "high", domainCross: ["growth", "strategy"] },
   { from: "mixed_inbound_confirmed", to: "no_prequalification_layer", relation: "supports", weight: 0.87, confidence: "high", domainCross: ["sales", "sale_prep"] },
   { from: "qualification_missing_confirmed", to: "no_prequalification_layer", relation: "supports", weight: 0.95, confidence: "high", domainCross: ["sales", "sale_prep"] },
+  { from: "qualification_stage_overloaded", to: "sales_processing_non_sales_work", relation: "supports", weight: 0.91, confidence: "high", domainCross: ["sales", "sale_prep"] },
+  { from: "qualification_stage_overloaded", to: "weak_lead_qualification", relation: "supports", weight: 0.73, confidence: "medium", domainCross: ["sales", "growth"] },
+  { from: "qualification_stage_overloaded", to: "uniform_sla_for_mixed_leads", relation: "supports", weight: 0.66, confidence: "medium", domainCross: ["growth", "sales"] },
+  { from: "qualification_stage_overloaded", to: "icp_defined_but_not_operationalized", relation: "supports", weight: 0.61, confidence: "medium", domainCross: ["strategy", "sale_prep"] },
   { from: "priority_rules_missing", to: "uniform_sla_for_mixed_leads", relation: "supports", weight: 0.91, confidence: "high", domainCross: ["growth", "sales"] },
   { from: "priority_rules_missing", to: "no_inbound_routing", relation: "supports", weight: 0.72, confidence: "medium", domainCross: ["sales", "ops"] },
   { from: "target_leads_confirmed", to: "capacity_model_missing", relation: "supports", weight: 0.71, confidence: "medium", domainCross: ["people", "ops"] },
@@ -641,6 +713,9 @@ export const CAUSAL_GRAPH_EDGES = [
   { from: "decision_centralization", to: "control_loop_missing", relation: "depends_on", weight: 0.63, confidence: "medium", domainCross: ["governance", "ops"] },
   { from: "no_inbound_routing", to: "sales_process_not_defined", relation: "depends_on", weight: 0.68, confidence: "medium", domainCross: ["sales", "ops"] },
   { from: "no_inbound_routing", to: "authority_not_distributed", relation: "depends_on", weight: 0.58, confidence: "medium", domainCross: ["ops", "people"] },
+  { from: "sales_processing_non_sales_work", to: "icp_defined_but_not_operationalized", relation: "depends_on", weight: 0.84, confidence: "high", domainCross: ["strategy", "sale_prep"] },
+  { from: "sales_processing_non_sales_work", to: "gtm_not_synced_with_sales_capacity", relation: "depends_on", weight: 0.7, confidence: "medium", domainCross: ["strategy", "ops"] },
+  { from: "sales_processing_non_sales_work", to: "operating_model_not_formalized", relation: "depends_on", weight: 0.67, confidence: "medium", domainCross: ["ops", "sales"] },
   { from: "weak_lead_qualification", to: "icp_not_defined", relation: "depends_on", weight: 0.79, confidence: "high", domainCross: ["strategy", "sales"] },
   { from: "weak_lead_qualification", to: "icp_defined_but_not_operationalized", relation: "depends_on", weight: 0.77, confidence: "high", domainCross: ["strategy", "sales"] },
   { from: "no_prequalification_layer", to: "icp_defined_but_not_operationalized", relation: "depends_on", weight: 0.81, confidence: "high", domainCross: ["strategy", "sale_prep"] },
@@ -668,6 +743,8 @@ export const CAUSAL_GRAPH_EDGES = [
   { from: "unit_economics_unknown", to: "build_unit_economics", relation: "resolved_by", weight: 0.94, confidence: "high", domainCross: ["finance", "strategy"] },
   { from: "no_inbound_routing", to: "assign_inbound_owner", relation: "resolved_by", weight: 0.89, confidence: "high", domainCross: ["sales", "ops"] },
   { from: "no_prequalification_layer", to: "build_prequalification_layer", relation: "resolved_by", weight: 0.9, confidence: "high", domainCross: ["sales", "sale_prep"] },
+  { from: "sales_processing_non_sales_work", to: "build_prequalification_layer", relation: "resolved_by", weight: 0.87, confidence: "high", domainCross: ["sales", "sale_prep"] },
+  { from: "sales_processing_non_sales_work", to: "segment_inbound_routing", relation: "resolved_by", weight: 0.78, confidence: "medium", domainCross: ["sales", "ops"] },
   { from: "uniform_sla_for_mixed_leads", to: "segment_inbound_routing", relation: "resolved_by", weight: 0.88, confidence: "high", domainCross: ["growth", "sales"] },
   { from: "inbound_noise_mixed_with_target_demand", to: "build_prequalification_layer", relation: "resolved_by", weight: 0.76, confidence: "medium", domainCross: ["growth", "sales"] },
   { from: "weak_lead_qualification", to: "define_icp", relation: "resolved_by", weight: 0.74, confidence: "medium", domainCross: ["strategy", "sales"] },

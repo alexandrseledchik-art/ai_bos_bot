@@ -65,7 +65,7 @@
         "requireClaimedCauseNotSelected": true,
         "minCandidateStates": 4,
         "minCandidateCauses": 3,
-        "minUniqueLayers": 4,
+        "minUniqueLayers": 3,
         "minGraphConfidence": 0.5
       },
       "uncertainty": {
@@ -83,6 +83,57 @@
       "surface": {
         "mustContainAny": ["три версии", "не покупал", "нехватку продавцов"],
         "mustNotContain": ["снова возвращаешь"],
+        "minParagraphs": 2,
+        "maxParagraphs": 3
+      },
+      "promotion": {
+        "expectPromotion": false,
+        "expectedCaseKind": ""
+      },
+      "artifact": {
+        "expectSaved": false
+      }
+    }
+  },
+  {
+    "id": "lead_overload_does_not_invent_staffing_cause",
+    "turns": [
+      "Лидов много, менеджеры не справляются."
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["целев", "всё подряд", "квалификац", "приоритет"],
+        "mustNotContain": ["сколько минут", "SLA", "кто отвечает", "кто должен"],
+        "minDiscriminatingSignals": 2,
+        "minCandidateConstraints": 4
+      },
+      "causeDepth": {
+        "requireClaimedCauseNotSelected": false,
+        "minCandidateStates": 4,
+        "minCandidateCauses": 3,
+        "minUniqueLayers": 3,
+        "minGraphConfidence": 0.5
+      },
+      "uncertainty": {
+        "minResponseHypotheses": 2,
+        "minAlternativeHypotheses": 4,
+        "minConflicts": 1,
+        "forbiddenCertaintyPhrases": ["главная причина уже в людях", "главная причина уже в менеджерах", "вопрос уже в нехватке менеджеров"]
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "forbiddenTerms": ["нанять", "расширить отдел", "назначьте SLA"],
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      },
+      "surface": {
+        "mustContainAny": ["перегруз", "смешанный", "квалификац", "приоритет", "фильтруется"],
+        "mustNotContain": ["нехватку менеджеров", "не хватает менеджеров", "нехватку продавцов", "не хватает продавцов"],
         "minParagraphs": 2,
         "maxParagraphs": 3
       },
@@ -244,6 +295,111 @@
       "surface": {
         "mustContainAny": ["Имею в виду", "это ещё не диагноз", "ты описываешь боль"],
         "mustNotContain": ["пользователь видит локальную боль", "слой, который пока не назван прямо", "Что я понял"],
+        "minParagraphs": 2,
+        "maxParagraphs": 3
+      },
+      "promotion": {
+        "expectPromotion": false,
+        "expectedCaseKind": ""
+      },
+      "artifact": {
+        "expectSaved": false
+      }
+    }
+  },
+  {
+    "id": "icp_definition_turns_into_action_not_dictionary",
+    "turns": [
+      "лидов много, менеджеры не справляются",
+      "много разных лидов",
+      "как определить ICP?"
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": false,
+        "mustContainAny": ["ICP", "сегмент", "лидов"],
+        "minDiscriminatingSignals": 2,
+        "minCandidateConstraints": 4
+      },
+      "causeDepth": {
+        "requireClaimedCauseNotSelected": false,
+        "minCandidateStates": 4,
+        "minCandidateCauses": 3,
+        "minUniqueLayers": 3,
+        "minGraphConfidence": 0.5
+      },
+      "uncertainty": {
+        "minResponseHypotheses": 2,
+        "minAlternativeHypotheses": 4,
+        "minConflicts": 1,
+        "forbiddenCertaintyPhrases": ["главная причина уже в людях"]
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "forbiddenTerms": ["нанять", "расширить отдел"],
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      },
+      "surface": {
+        "mustContainAny": ["20-30 лидов", "лучших сделок", "сравни", "шаблон"],
+        "mustNotContain": ["Ideal Customer Profile", "это профиль клиента"],
+        "minParagraphs": 2,
+        "maxParagraphs": 2
+      },
+      "promotion": {
+        "expectPromotion": false,
+        "expectedCaseKind": ""
+      },
+      "artifact": {
+        "expectSaved": false
+      }
+    }
+  },
+  {
+    "id": "qualification_layer_exists_changes_question_from_existence_to_operation",
+    "turns": [
+      "лидов много, менеджеры не справляются",
+      "много разных лидов",
+      "есть менеджер на этапе квалификации и как раз он и зашивается"
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["размеченный поток", "вручную", "кто вообще целевой", "кому идти первым", "приоритет"],
+        "mustNotContain": ["есть ли до продавца этап квалификации", "до этого менеджера есть отдельная предквалификация", "до продавца вообще есть слой"],
+        "minDiscriminatingSignals": 2,
+        "minCandidateConstraints": 4
+      },
+      "causeDepth": {
+        "requireClaimedCauseNotSelected": false,
+        "minCandidateStates": 4,
+        "minCandidateCauses": 3,
+        "minUniqueLayers": 3,
+        "minGraphConfidence": 0.5
+      },
+      "uncertainty": {
+        "minResponseHypotheses": 2,
+        "minAlternativeHypotheses": 4,
+        "minConflicts": 1,
+        "forbiddenCertaintyPhrases": ["главная причина уже в менеджере квалификации", "вопрос уже просто в найме"]
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "forbiddenTerms": ["нанять", "расширить отдел"],
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      },
+      "surface": {
+        "mustContainAny": ["вопрос не в его наличии", "его роли", "вручную", "размеченный"],
+        "mustNotContain": ["есть ли до продавца этап квалификации", "до этого менеджера есть отдельная предквалификация"],
         "minParagraphs": 2,
         "maxParagraphs": 3
       },
