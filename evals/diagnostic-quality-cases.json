@@ -147,6 +147,58 @@
     }
   },
   {
+    "id": "multi_turn_lead_overload_does_not_raise_staffing_frame",
+    "turns": [
+      "проблема в продажах",
+      "есть много заявок, не успеваем обработать, но и продаж тоже нет"
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["целевые", "квалификац", "маршрутизац", "приоритет"],
+        "mustNotContain": ["нехватк", "не хватает людей", "не хватает менеджеров"],
+        "minDiscriminatingSignals": 2,
+        "minCandidateConstraints": 4
+      },
+      "causeDepth": {
+        "requireClaimedCauseNotSelected": false,
+        "minCandidateStates": 4,
+        "minCandidateCauses": 3,
+        "minUniqueLayers": 3,
+        "minGraphConfidence": 0.5
+      },
+      "uncertainty": {
+        "minResponseHypotheses": 2,
+        "minAlternativeHypotheses": 4,
+        "minConflicts": 1,
+        "forbiddenCertaintyPhrases": ["главная причина уже в людях", "вопрос в нехватке людей"]
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "forbiddenTerms": ["нанять", "расширить отдел"],
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      },
+      "surface": {
+        "mustContainAny": ["входящим потоком", "смешанный", "квалификация", "маршрутизация", "приоритет"],
+        "mustNotContain": ["нехватку людей", "не хватает людей", "нехватку менеджеров", "не хватает менеджеров"],
+        "minParagraphs": 2,
+        "maxParagraphs": 3
+      },
+      "promotion": {
+        "expectPromotion": false,
+        "expectedCaseKind": ""
+      },
+      "artifact": {
+        "expectSaved": false
+      }
+    }
+  },
+  {
     "id": "lead_flow_followups_keep_upstream_hypotheses_alive",
     "turns": [
       "много лидов и не хватает продавцов",

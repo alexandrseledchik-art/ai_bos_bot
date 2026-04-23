@@ -443,15 +443,15 @@ function buildLeadScenarioField(spread, context, entryState) {
   }
 
   if (latestTextLooksLikeLeadVolumeAndTiming(context) && hasSlowFirstResponse) {
-    return "100 лидов в месяц на продавца и сутки до первого касания сами по себе ещё не кричат про чистый bottleneck мощности. Для меня это скорее сигнал, что первый контур собран слабо: фильтрация, приоритет и ownership не держат живой поток как систему.";
+    return "100 лидов в месяц на продавца и сутки до первого касания сами по себе ещё не объясняют корень. Для меня это скорее сигнал, что первый контур собран слабо: фильтрация, приоритет и ownership не держат живой поток как систему.";
   }
 
   if (latestTextRestatesCapacityClaim(context) && hasWarmInbound) {
-    return "Чистую версию про bottleneck мощности я держу, но пока как следствие, а не как корень. На тёплом потоке меня больше интересует другое: почему продавцы вообще тащат на себе разбор входа и не работает ли у вас вместо продаж ручная предквалификация.";
+    return "На тёплом потоке я бы пока не спорил про ресурс, а смотрел глубже: почему продавцы вообще тащат на себе разбор входа и не работает ли у вас вместо продаж ручная предквалификация.";
   }
 
   if (latestTextSuggestsEarlyFunnelStage(context)) {
-    return "Это уже переносит проблему в сам вход, а не в переговоры или дожим. Значит сейчас важнее не спорить о чистой мощности, а отделить слабую фильтрацию потока от поломки ownership и первого отклика.";
+    return "Это уже переносит проблему в сам вход, а не в переговоры или дожим. Значит сейчас важнее не спорить о ресурсе, а отделить слабую фильтрацию потока от поломки ownership и первого отклика.";
   }
 
   if (isShortFollowUpContext(context) && (hasWarmInbound || hasSlowFirstResponse || hasLeadOverload)) {
@@ -484,19 +484,19 @@ function buildWhyAndQuestion(response, context) {
 
 function buildLeadScenarioWhy(response, context, entryState) {
   if (latestTextSuggestsWarmInbound(context)) {
-    return "Тёплый вход убирает только самую простую отговорку про слабый спрос. Теперь важно не перепутать чистый bottleneck мощности с тем, что до продавца вообще не работает фильтр, приоритет и нормальная квалификация.";
+    return "Тёплый вход убирает только самую простую отговорку про слабый спрос. Теперь важно не перепутать локальный перегруз с тем, что до продавца вообще не работает фильтр, приоритет и нормальная квалификация.";
   }
 
   if (latestTextLooksLikeLeadVolumeAndTiming(context)) {
-    return "При таком объёме и сроке очень легко усилить не ту проблему. Усиление команды может понадобиться, но только если сначала проверить, что продавцы действительно получают уже отфильтрованный и приоритизированный поток.";
+    return "При таком объёме и сроке очень легко усилить не ту проблему. Любое усиление контура имеет смысл только если сначала проверить, что продавцы действительно получают уже отфильтрованный и приоритизированный поток.";
   }
 
   if (latestTextSuggestsEarlyFunnelStage(context)) {
-    return "Раз поломка сидит до первого касания, вопрос уже не только в людях. Такие сбои часто создаются конструкцией входа: что вообще доходит до продавца, кто это держит и по каким правилам.";
+    return "Раз поломка сидит до первого касания, вопрос уже не только в самом объёме работ. Такие сбои часто создаются конструкцией входа: что вообще доходит до продавца, кто это держит и по каким правилам.";
   }
 
   if (latestTextRestatesCapacityClaim(context)) {
-    return "Перегруз команды я вижу, но он вполне может быть следствием. Если продавцы тащат на себе разбор смешанного потока или ручную предквалификацию, простое усиление команды лечит симптом, а не саму конструкцию.";
+    return "Перегруз первого контура я вижу, но он вполне может быть следствием. Если продавцы тащат на себе разбор смешанного потока или ручную предквалификацию, простое усиление контура лечит симптом, а не саму конструкцию.";
   }
 
   if (isLeadFlowScenarioContext(context, entryState)) {
@@ -538,8 +538,8 @@ function buildMetaWhySurfaceResponse(response, entryState, context) {
 
   const middle = isLeadFlowScenarioContext(context, entryState)
     ? signals.has("warm_inbound_demand")
-      ? "На тёплом входе суточный провал до первого касания всё ещё не доказывает, что проблема только в мощности команды. Сначала мне нужно отделить чистый bottleneck мощности от версии, что поток плохо фильтруется и приоритеты до продавца просто не доведены."
-      : "Сначала мне нужно отделить чистый bottleneck мощности от двух других версий: в продавцов летит смешанный поток, или ICP и приоритеты вообще не доведены до живой обработки."
+      ? "На тёплом входе суточный провал до первого касания всё ещё не доказывает, что корень уже точно в ресурсе. Сначала мне нужно отделить локальный перегруз от версии, что поток плохо фильтруется и приоритеты до продавца просто не доведены."
+      : "Сначала мне нужно отделить локальный перегруз от двух других версий: в продавцов летит смешанный поток, или ICP и приоритеты вообще не доведены до живой обработки."
     : spread.length >= 3
       ? `Сейчас мне важнее отделить ${spread[2]} от версий про ${spread[0]} и ${spread[1]}.`
       : ensureSentence(response.whyItMatters);
@@ -649,6 +649,30 @@ function leadFlowAllowsPureStaffingVersion(context, entryState) {
     /всё\s+подряд|смешан|неразобран|квалификац|предквалификац|приоритет/i.test(text);
 
   return targetFlowConfirmed && !upstreamNoiseStillPossible;
+}
+
+function shouldSuppressStaffingSurface(context, entryState) {
+  return isLeadFlowScenarioContext(context, entryState) &&
+    !leadFlowAllowsPureStaffingVersion(context, entryState) &&
+    !userExplicitlyClaimedStaffing(context);
+}
+
+function sanitizeLeadFlowStaffingSurface(text, context, entryState) {
+  let sanitized = ensureString(text);
+  if (!shouldSuppressStaffingSurface(context, entryState)) {
+    return sanitized;
+  }
+
+  sanitized = sanitized
+    .replace(/я бы пока не спешил с версией про нехватк[ауеи]\s+(людей|продавцов|менеджеров)/gi, "я бы пока не фиксировал объяснение через чистую мощность")
+    .replace(/нехватк[аиуые]?\s+(люд(?:ей|и)?|продавц(?:ов|а)?|менеджер(?:ов|а)?)/gi, "чистую нехватку мощности")
+    .replace(/не хватает\s+(людей|продавцов|менеджеров)/gi, "не хватает чистой мощности")
+    .replace(/проблема только в мощности команды/gi, "корень уже точно только в мощности")
+    .replace(/усиление команды/gi, "усиление контура")
+    .replace(/перегруз команды/gi, "перегруз первого контура")
+    .replace(/вопрос уже не только в людях/gi, "вопрос уже не только в самом объёме работ");
+
+  return sanitized.replace(/\s{2,}/g, " ").trim();
 }
 
 function shouldHoldLeadFlowInClarify(context, entryState) {
@@ -1078,7 +1102,11 @@ function buildSurfaceResponse(decision, context) {
   const entryState = decision.entryState || emptyEntryState();
   const routeType = context.classification.type;
   const action = ensureString(decision.decision?.action);
-  const visibleResponse = polishSurfaceText(stripVisibleTemplateLabels(response.responseText));
+  const visibleResponse = sanitizeLeadFlowStaffingSurface(
+    polishSurfaceText(stripVisibleTemplateLabels(response.responseText)),
+    context,
+    entryState
+  );
 
   if (isOpeningMessageContext(context)) {
     return buildVagueSurfaceResponse(response, context);
@@ -1137,7 +1165,7 @@ function inferGenericConstraints(context) {
         label: "Поток перегружен нецелевыми или слабо квалифицированными лидами",
         layer: "commercial",
         confidence: 0.58,
-        whyPossible: "Большой входящий поток может создавать ложное ощущение нехватки людей, если значимая доля лидов не проходит по ICP.",
+        whyPossible: "Большой входящий поток может создавать ложное ощущение, что проблема только в ресурсе, если значимая доля лидов не проходит по ICP.",
         whatWouldDisprove: "Если окажется, что почти все последние лиды были целевыми и достойными быстрого ответа."
       },
       {
