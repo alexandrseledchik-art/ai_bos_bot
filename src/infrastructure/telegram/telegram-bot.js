@@ -1,4 +1,5 @@
 import { extractTelegramMessagePayload, TelegramApiClient } from "./telegram-api.js";
+import { buildVoiceCapabilityReply, isVoiceCapabilityQuestion } from "./telegram-meta.js";
 import { resolveTelegramPayloadToText } from "./resolve-telegram-input.js";
 
 function delay(ms) {
@@ -53,6 +54,14 @@ export class TelegramBotRunner {
 
             if (resolved.replyOnly) {
               await this.sendMessage(payload.chatId, resolved.replyOnly);
+              continue;
+            }
+
+            if (isVoiceCapabilityQuestion(resolved.text)) {
+              await this.sendMessage(
+                payload.chatId,
+                buildVoiceCapabilityReply({ voiceEnabled: Boolean(this.audioTranscriber?.isEnabled) })
+              );
               continue;
             }
 

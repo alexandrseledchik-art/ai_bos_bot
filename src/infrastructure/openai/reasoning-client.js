@@ -558,6 +558,27 @@ function buildNextQuestion(focus, text, candidateConstraints, graphPacket) {
   return `Какой один факт лучше всего отделит текущую версию причины от альтернативы "${alternative}"?`;
 }
 
+function buildNeutralLeadOverloadQuestion(text) {
+  const normalized = normalizeText(text).toLowerCase();
+  const warmInbound = /т[её]пл|входящ/i.test(normalized);
+
+  if (/не\s+успева|обработ/i.test(normalized)) {
+    return warmInbound
+      ? "Этот перегруз у вас из-за объёма уже целевых лидов или из-за того, что продавцы ещё и руками квалифицируют тёплый вход?"
+      : "Этот перегруз у вас из-за объёма уже целевых лидов или из-за того, что команда вручную разбирает смешанный поток без предквалификации и приоритета?";
+  }
+
+  if (/перегруж|тонут|захлеб/i.test(normalized)) {
+    return warmInbound
+      ? "Этот перегруз сидит в объёме уже целевых лидов или в том, что тёплый поток всё равно приходится руками разбирать и квалифицировать?"
+      : "Этот перегруз сидит в объёме уже целевых лидов или в том, что команда сначала руками сортирует и квалифицирует смешанный поток?";
+  }
+
+  return warmInbound
+    ? "Сейчас важнее отделить объём уже целевых лидов от ручной квалификации тёплого входа. Что у вас ближе?"
+    : "Сейчас важнее отделить объём уже целевых лидов от ручной разборки смешанного потока. Что у вас ближе?";
+}
+
 function buildEntryState(context, focus, signalSufficiency, selectedConstraint = "", promotionReadiness = "keep_in_entry") {
   const text = normalizeText(context.userText);
   const previous = context.entryState || {};
@@ -582,7 +603,16 @@ function buildEntryState(context, focus, signalSufficiency, selectedConstraint =
           ...(previous.candidateConstraints || [])
         ]
   );
-  const nextBestQuestion = buildNextQuestion(focus, text, candidateConstraints, context.graphPacket);
+  let nextBestQuestion = buildNextQuestion(focus, text, candidateConstraints, context.graphPacket);
+
+  if (
+    /заяв|лид|входящ/.test(text.toLowerCase()) &&
+    /не усп|обработ|перегруж|тонут|захлеб/i.test(text.toLowerCase()) &&
+    !/не\s+хватает\s+(люд|продав|менеджер)|нехватк/i.test(text.toLowerCase()) &&
+    !/icp|квалификац|предквалификац|приоритет|всё подряд|смешан|неразобран|целев/i.test(text.toLowerCase())
+  ) {
+    nextBestQuestion = buildNeutralLeadOverloadQuestion(text);
+  }
 
   const symptoms = uniqueStrings([
     ...(previous.symptoms || []),

@@ -4,6 +4,7 @@ import { ConversationService } from "../application/conversation-service.js";
 import { ReasoningClient } from "../infrastructure/openai/reasoning-client.js";
 import { FileMemoryStore } from "../infrastructure/storage/file-store.js";
 import { extractTelegramMessagePayload } from "../infrastructure/telegram/telegram-api.js";
+import { buildVoiceCapabilityReply, isVoiceCapabilityQuestion } from "../infrastructure/telegram/telegram-meta.js";
 
 class StubWebsiteScreener {
   async screen(url) {
@@ -48,6 +49,14 @@ async function run() {
 
   if (!voicePayload || voicePayload.kind !== "voice") {
     throw new Error("Voice payload should be extracted instead of ignored.");
+  }
+
+  if (!isVoiceCapabilityQuestion("Ты голосовые принимаешь?")) {
+    throw new Error("Voice capability question should be detected.");
+  }
+
+  if (!/Да, принимаю/i.test(buildVoiceCapabilityReply({ voiceEnabled: true }))) {
+    throw new Error("Voice capability positive reply should be available.");
   }
 
   const cwd = process.cwd();

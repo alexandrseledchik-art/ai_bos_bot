@@ -1,5 +1,6 @@
 import { getServices } from "../src/create-services.js";
 import { extractTelegramMessagePayload } from "../src/infrastructure/telegram/telegram-api.js";
+import { buildVoiceCapabilityReply, isVoiceCapabilityQuestion } from "../src/infrastructure/telegram/telegram-meta.js";
 import { resolveTelegramPayloadToText } from "../src/infrastructure/telegram/resolve-telegram-input.js";
 
 function json(payload, init = {}) {
@@ -50,6 +51,14 @@ async function handleTelegramWebhook(request) {
     if (resolved.replyOnly) {
       await telegramApi.sendMessage(payload.chatId, resolved.replyOnly);
       return json({ ok: true, handled: payload.kind });
+    }
+
+    if (isVoiceCapabilityQuestion(resolved.text)) {
+      await telegramApi.sendMessage(
+        payload.chatId,
+        buildVoiceCapabilityReply({ voiceEnabled: Boolean(audioTranscriber?.isEnabled) })
+      );
+      return json({ ok: true, handled: "voice-capability-question" });
     }
 
     result = await conversationService.handleUserMessage({

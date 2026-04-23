@@ -362,6 +362,12 @@ function userAskedHowToDefineICP(context) {
   );
 }
 
+function userAskedWhatIsICP(context) {
+  return /что\s+такое\s+icp|что\s+значит\s+icp|icp\s+это\s+что/i.test(
+    ensureString(context.userText).toLowerCase()
+  );
+}
+
 function userAskedMeaning(context) {
   return /что ты имеешь в виду|что именно ты имеешь в виду|в смысле|что ты хочешь сказать|объясни, что ты имеешь в виду/i.test(
     ensureString(context.userText).toLowerCase()
@@ -787,9 +793,9 @@ function pickBestNextQuestion(context, entryState, graphAnalysis) {
 
     if (latestTextRestatesCapacityClaim(context) && !upstreamResolved) {
       if (hasWarmInbound) {
-        return "Когда говорите, что люди не справляются, это про объём уже целевых лидов или про то, что продавцы у вас ещё и руками квалифицируют тёплый вход?";
+        return "Этот перегруз у вас из-за объёма уже целевых лидов или из-за того, что продавцы ещё и руками квалифицируют тёплый вход?";
       }
-      return "Когда говорите, что люди не справляются, это про объём уже целевых лидов или про то, что команда вручную разбирает смешанный поток без предквалификации и приоритета?";
+      return "Этот перегруз у вас из-за объёма уже целевых лидов или из-за того, что команда вручную разбирает смешанный поток без предквалификации и приоритета?";
     }
 
     if (previousAssistantWasLocal && latestTextRestatesCapacityClaim(context) && !upstreamResolved) {
@@ -994,6 +1000,18 @@ function buildHowToDefineIcpSurfaceResponse(entryState) {
   ]);
 }
 
+function buildWhatIsIcpSurfaceResponse(entryState) {
+  const spread = summarizeRenderableConstraintSpread(entryState, 2);
+  const focus = spread.length
+    ? `В твоём кейсе это важно не как красивый термин, а как правило отбора: ${spread[0]}${spread[1] ? `, а рядом проверить ${spread[1]}` : ""}.`
+    : "В твоём кейсе это важно не как красивый термин, а как правило отбора между целевым спросом и шумом.";
+
+  return joinParagraphs([
+    "Если совсем по-простому, ICP — это правило, кто для вас свой клиент, а кто только создаёт шум на входе. Не портрет «идеального клиента», а рабочий фильтр: кому даём приоритет, а кого должны отрезать раньше.",
+    `${focus} То есть вопрос не в слове, а в том, превращается ли это правило в рекламу, квалификацию, приоритет и маршрутизацию.`
+  ]);
+}
+
 function buildDirectionSurfaceResponse(response, entryState) {
   const spread = summarizeRenderableConstraintSpread(entryState, 3);
   const nextQuestion = ensureString(entryState.nextBestQuestion, response.nextStep);
@@ -1112,16 +1130,12 @@ function buildSurfaceResponse(decision, context) {
     return buildVagueSurfaceResponse(response, context);
   }
 
-  if (visibleResponse && !looksMechanicalResponse(visibleResponse) && !visibleResponseMissesDepth(visibleResponse, entryState, context)) {
-    return visibleResponse;
-  }
-
-  if (decision.selectedMode === "website_screening_mode") {
-    return buildWebsiteSurfaceResponse(response);
-  }
-
   if (routeType === "free_text_problem" && userAskedMeaning(context)) {
     return buildMeaningSurfaceResponse(response, entryState);
+  }
+
+  if (routeType === "free_text_problem" && userAskedWhatIsICP(context)) {
+    return buildWhatIsIcpSurfaceResponse(entryState);
   }
 
   if (routeType === "free_text_problem" && userAskedHowToDefineICP(context)) {
@@ -1142,6 +1156,14 @@ function buildSurfaceResponse(decision, context) {
 
   if (routeType === "free_text_problem" && userExpressesDoubt(context)) {
     return buildDoubtSurfaceResponse(response, entryState);
+  }
+
+  if (visibleResponse && !looksMechanicalResponse(visibleResponse) && !visibleResponseMissesDepth(visibleResponse, entryState, context)) {
+    return visibleResponse;
+  }
+
+  if (decision.selectedMode === "website_screening_mode") {
+    return buildWebsiteSurfaceResponse(response);
   }
 
   if (action === "answer" || action === "diagnose") {

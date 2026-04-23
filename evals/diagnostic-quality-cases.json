@@ -199,6 +199,38 @@
     }
   },
   {
+    "id": "lead_overload_neutral_overload_wording_without_staffing_frame",
+    "turns": [
+      "продажи",
+      "есть много заявок, не успеваем обработать, но и продаж тоже нет"
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["целевых", "смешанный", "квалификац", "приоритет"],
+        "mustNotContain": ["когда говорите, что люди не справляются", "нехватк", "не хватает менеджеров"],
+        "minDiscriminatingSignals": 2,
+        "minCandidateConstraints": 4
+      },
+      "surface": {
+        "mustContainAny": ["перегруз", "смешанный", "квалификац", "приоритет"],
+        "mustNotContain": ["когда говорите, что люди не справляются", "нехватку людей", "не хватает менеджеров"],
+        "minParagraphs": 2,
+        "maxParagraphs": 3
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "forbiddenTerms": ["нанять", "расширить отдел"],
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      }
+    }
+  },
+  {
     "id": "lead_flow_followups_keep_upstream_hypotheses_alive",
     "turns": [
       "много лидов и не хватает продавцов",
@@ -408,6 +440,30 @@
       },
       "artifact": {
         "expectSaved": false
+      }
+    }
+  },
+  {
+    "id": "icp_what_is_turn_stays_case_linked",
+    "turns": [
+      "лидов много, менеджеры не справляются",
+      "много разных лидов",
+      "что такое ICP?"
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "surface": {
+        "mustContainAny": ["правило", "кого вы считаете своим клиентом", "приорит", "маршрутизац"],
+        "mustNotContain": ["Ideal Customer Profile", "профиль клиента, который вам подходит лучше всего"],
+        "minParagraphs": 2,
+        "maxParagraphs": 2
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
       }
     }
   },

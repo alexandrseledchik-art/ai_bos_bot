@@ -191,6 +191,12 @@ function lastAssistantAskedQuestion(history = []) {
   return Boolean(lastAssistant?.text && /\?\s*$/.test(String(lastAssistant.text).trim()));
 }
 
+function looksDiagnosticMetaFollowUp(text) {
+  return /что\s+такое\s+icp|как\s+(определить|понять|собрать|описать)\s+icp|что\s+ты\s+имеешь\s+в\s+виду|почему|зачем|что\s+дальше|а\s+дальше|и\s+дальше|не\s+уверен|сомневаюсь/i.test(
+    String(text || "").trim().toLowerCase()
+  );
+}
+
 function contextualizeClassification(classification, thread, history) {
   if (classification.type !== "free_text_vague" && classification.type !== "unknown") {
     return classification;
@@ -208,6 +214,14 @@ function contextualizeClassification(classification, thread, history) {
   const looksFreshGreeting = /^\/start$|^(привет|здравствуй|здравствуйте|добрый день|добрый вечер)$/i.test(cleanText);
   if (looksFreshGreeting) {
     return classification;
+  }
+
+  if (looksDiagnosticMetaFollowUp(cleanText)) {
+    return {
+      ...classification,
+      type: "free_text_problem",
+      inferredFollowUp: true
+    };
   }
 
   const hasOngoingDiagnosticThread =
