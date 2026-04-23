@@ -286,6 +286,41 @@ function scoreAdviceDiscipline(run, spec = {}) {
   return finalizeMetric(checks);
 }
 
+function scoreSurface(run, spec = {}) {
+  const checks = buildChecks();
+  const reply = run.reply || "";
+  const paragraphs = reply
+    .split(/\n\s*\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if ((spec.mustContain || []).length) {
+    addCheck(checks, includesAll(reply, spec.mustContain), "reply missed required surface phrase(s)");
+  }
+  if ((spec.mustContainAny || []).length) {
+    addCheck(checks, includesAny(reply, spec.mustContainAny), "reply missed any allowed surface phrase");
+  }
+  if ((spec.mustNotContain || []).length) {
+    addCheck(checks, !includesAny(reply, spec.mustNotContain), "reply included forbidden surface phrase");
+  }
+  if (spec.minParagraphs != null) {
+    addCheck(
+      checks,
+      paragraphs.length >= spec.minParagraphs,
+      `surface paragraphs expected>=${spec.minParagraphs} actual=${paragraphs.length}`
+    );
+  }
+  if (spec.maxParagraphs != null) {
+    addCheck(
+      checks,
+      paragraphs.length <= spec.maxParagraphs,
+      `surface paragraphs expected<=${spec.maxParagraphs} actual=${paragraphs.length}`
+    );
+  }
+
+  return finalizeMetric(checks);
+}
+
 function scorePromotion(run, caseSpec, spec = {}, turnRuns = []) {
   const checks = buildChecks();
 
@@ -456,6 +491,7 @@ async function runCase(testCase, service, store) {
     causeDepth: scoreCauseDepth(run, testCase.metrics?.causeDepth),
     uncertainty: scoreUncertainty(run, testCase.metrics?.uncertainty),
     adviceDiscipline: scoreAdviceDiscipline(run, testCase.metrics?.adviceDiscipline),
+    surface: scoreSurface(run, testCase.metrics?.surface),
     promotion: scorePromotion(run, testCase, testCase.metrics?.promotion, turnRuns),
     artifact: scoreArtifact(run, artifactBody, testCase.metrics?.artifact)
   };
@@ -507,11 +543,12 @@ async function run() {
     printMetric(result, "causeDepth");
     printMetric(result, "uncertainty");
     printMetric(result, "adviceDiscipline");
+    printMetric(result, "surface");
     printMetric(result, "promotion");
     printMetric(result, "artifact");
   }
 
-  const metricNames = ["nextBestQuestion", "causeDepth", "uncertainty", "adviceDiscipline", "promotion", "artifact"];
+  const metricNames = ["nextBestQuestion", "causeDepth", "uncertainty", "adviceDiscipline", "surface", "promotion", "artifact"];
   const passed = results.filter((item) => item.passed).length;
   const averages = Object.fromEntries(
     metricNames.map((metricName) => [

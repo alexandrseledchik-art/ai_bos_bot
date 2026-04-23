@@ -71,6 +71,9 @@ function extractClaimedCause(text) {
   for (const pattern of patterns) {
     const match = normalized.match(pattern);
     if (match?.[1]) {
+      if (/не хватает/i.test(pattern.source)) {
+        return `нехватка ${normalizeText(match[1])}`;
+      }
       return normalizeText(match[1]);
     }
   }

@@ -139,6 +139,61 @@
     }
   },
   {
+    "id": "lead_flow_why_reply_stays_human_and_upstream",
+    "turns": [
+      "много лидов и не хватает продавцов",
+      "до первого контакта",
+      "100 в месяц, 1 день на первое касание",
+      "тёплый",
+      "почему ты не идешь сразу в найм?"
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["ICP", "квалификации", "всё подряд", "приоритета", "целев"],
+        "mustNotContain": ["кто отвечает", "SLA", "сколько минут"],
+        "minDiscriminatingSignals": 2,
+        "minCandidateConstraints": 4
+      },
+      "causeDepth": {
+        "requireClaimedCauseNotSelected": true,
+        "minCandidateStates": 4,
+        "minCandidateCauses": 3,
+        "minUniqueLayers": 4,
+        "minGraphConfidence": 0.5
+      },
+      "uncertainty": {
+        "minResponseHypotheses": 2,
+        "minAlternativeHypotheses": 4,
+        "minConflicts": 1,
+        "forbiddenCertaintyPhrases": ["главная причина уже в людях", "вопрос только в найме"]
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "forbiddenTerms": ["нанять", "расширить отдел", "назначьте SLA"],
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      },
+      "surface": {
+        "mustContainAny": ["Потому что", "версия про", "одна из рабочих", "не самая сильная"],
+        "mustNotContain": ["Что я понял", "Следующий шаг:", "working hypotheses"],
+        "minParagraphs": 2,
+        "maxParagraphs": 3
+      },
+      "promotion": {
+        "expectPromotion": false,
+        "expectedCaseKind": ""
+      },
+      "artifact": {
+        "expectSaved": false
+      }
+    }
+  },
+  {
     "id": "owner_bottleneck_vs_people_fix",
     "turns": [
       "Продажи не растут, менеджеров наняли, но собственник всё равно влезает во все сделки."

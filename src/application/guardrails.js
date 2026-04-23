@@ -196,6 +196,19 @@ function humanizeConstraintLabel(value) {
   return normalized.charAt(0).toLowerCase() + normalized.slice(1);
 }
 
+function humanizeClaimedCauseForAbout(value) {
+  const normalized = trimSentence(value);
+  if (!normalized) {
+    return "";
+  }
+
+  if (/^нехватка\s+/i.test(normalized)) {
+    return normalized.replace(/^нехватка\s+/i, "нехватку ");
+  }
+
+  return normalized;
+}
+
 function stripVisibleTemplateLabels(text) {
   return ensureString(text)
     .replace(/^что я понял:\s*/i, "")
@@ -250,6 +263,17 @@ function isShortFollowUpContext(context) {
   return currentWordCount(context) <= 5 && Array.isArray(context.history) && context.history.length > 0;
 }
 
+function observedSignalSet(context, entryState) {
+  return new Set(
+    ensureArray([
+      ...(entryState?.observedSignals || []),
+      ...(context.graphPacket?.observedSignals || [])
+    ], 12)
+      .map((item) => ensureString(item).toLowerCase())
+      .filter(Boolean)
+  );
+}
+
 function userAskedWhy(context) {
   return /почему|зачем|с чего|на каком основании/i.test(ensureString(context.userText).toLowerCase());
 }
@@ -261,6 +285,8 @@ function userAskedHow(context) {
 }
 
 function latestLeadScenarioOpener(context, entryState, claimedCause) {
+  const claimedCauseForAbout = humanizeClaimedCauseForAbout(claimedCause);
+
   if (latestTextSuggestsWarmInbound(context)) {
     return "Ок, это уже сужает поле.";
   }
@@ -270,11 +296,11 @@ function latestLeadScenarioOpener(context, entryState, claimedCause) {
   }
 
   if (latestTextRestatesCapacityClaim(context) && claimedCause) {
-    return `Слышу версию про ${claimedCause}, но я бы пока не делал её главной.`;
+    return `Слышу версию про ${claimedCauseForAbout || claimedCause}, но я бы пока не делал её главной.`;
   }
 
   if (userLikelyClaimedCause(context, entryState) && claimedCause) {
-    return `Я бы пока не спешил покупать версию про ${claimedCause} как главную.`;
+    return `Я бы пока не спешил покупать версию про ${claimedCauseForAbout || claimedCause} как главную.`;
   }
 
   if (isShortFollowUpContext(context)) {
@@ -300,6 +326,35 @@ function buildSpreadLine(spread, context) {
   return `Сейчас я бы держал три версии: ${spread[0]}; ${spread[1]}; ${spread[2]}.`;
 }
 
+function buildLeadScenarioField(spread, context, entryState) {
+  const signals = observedSignalSet(context, entryState);
+  const hasWarmInbound = signals.has("warm_inbound_demand") || latestTextSuggestsWarmInbound(context);
+  const hasSlowFirstResponse = signals.has("slow_first_response") || latestTextSuggestsEarlyFunnelStage(context);
+  const hasLeadOverload = signals.has("lead_overload");
+
+  if (latestTextSuggestsWarmInbound(context)) {
+    return "Тёплый поток отрезает самую грубую версию про совсем случайный спрос. Для меня теперь остаются две развилки: либо в работу всё равно попадает смешанный поток без нормальной квалификации и приоритета, либо первый контур не держит ownership и очередь.";
+  }
+
+  if (latestTextLooksLikeLeadVolumeAndTiming(context) && hasSlowFirstResponse) {
+    return "100 лидов в месяц на продавца и сутки до первого касания сами по себе ещё не доказывают найм. Это больше похоже на поломку конструкции первого контура: фильтрация, приоритет и ownership не держат живой поток.";
+  }
+
+  if (latestTextRestatesCapacityClaim(context) && hasWarmInbound) {
+    return "Версию про нехватку людей я держу, но пока как ближайшую, а не как корень. На тёплом потоке меня больше интересует, почему продавцы вообще тащат на себе разбор входа: нет ли здесь провала в квалификации, приоритете и маршрутизации.";
+  }
+
+  if (latestTextSuggestsEarlyFunnelStage(context)) {
+    return "Это уже переносит проблему в сам вход, а не в переговоры или дожим. Значит сейчас важно не спорить о штате, а отделить слабую фильтрацию потока от поломки ownership и первого отклика.";
+  }
+
+  if (isShortFollowUpContext(context) && (hasWarmInbound || hasSlowFirstResponse || hasLeadOverload)) {
+    return "Поле уже стало уже. Я бы здесь держал не весь список причин, а две главные развилки: поток плохо фильтруется до продавца, или сам первый контур не собран как работающая конструкция.";
+  }
+
+  return buildSpreadLine(spread, context);
+}
+
 function buildWhyAndQuestion(response, context) {
   const why = ensureSentence(response.whyItMatters);
   const next = ensureString(response.nextStep);
@@ -321,15 +376,64 @@ function buildWhyAndQuestion(response, context) {
   return `${why} ${next}`.trim();
 }
 
+function buildLeadScenarioWhy(response, context, entryState) {
+  if (latestTextSuggestsWarmInbound(context)) {
+    return "Тёплый вход уже убирает самую простую отговорку про слабый спрос. Теперь важно не перепутать реальную нехватку мощности с отсутствием фильтра, приоритета и нормальной квалификации до продавца.";
+  }
+
+  if (latestTextLooksLikeLeadVolumeAndTiming(context)) {
+    return "При таком объёме и сроке легко ошибиться в выводе про найм и залить деньгами проблему, которая на самом деле сидит в фильтрации, приоритете и ownership первого контура.";
+  }
+
+  if (latestTextSuggestsEarlyFunnelStage(context)) {
+    return "Раз поломка сидит до первого касания, вопрос уже не только в людях. Такие сбои часто создаются конструкцией входа: что и как доходит до продавца, кто это держит и по каким правилам.";
+  }
+
+  if (latestTextRestatesCapacityClaim(context)) {
+    return "Перегруз команды я вижу, но он вполне может быть следствием. Если продавцы тащат на себе разбор смешанного потока, найм лечит симптом, а не саму конструкцию.";
+  }
+
+  if (isLeadFlowScenarioContext(context, entryState)) {
+    return "Здесь опасно рано схлопнуться в локальную версию. Иначе легко принять ближайшую операционную боль за ограничение, которое на самом деле сидит в квалификации, сегментации или ownership.";
+  }
+
+  return ensureSentence(response.whyItMatters);
+}
+
+function buildLeadScenarioWhyAndQuestion(response, context, entryState) {
+  const why = ensureSentence(buildLeadScenarioWhy(response, context, entryState));
+  const next = ensureString(response.nextStep);
+
+  if (userAskedWhy(context)) {
+    return joinParagraphs([
+      why,
+      next
+    ]);
+  }
+
+  if (userAskedHow(context)) {
+    return joinParagraphs([
+      `${why} Я бы здесь не расползался в длинный план, пока не отделил одну версию от другой.`,
+      next
+    ]);
+  }
+
+  return `${why} ${next}`.trim();
+}
+
 function buildMetaWhySurfaceResponse(response, entryState, context) {
   const claimedCause = ensureString(entryState.claimedCause);
+  const claimedCauseForAbout = humanizeClaimedCauseForAbout(claimedCause);
   const spread = summarizeConstraintSpread(entryState.candidateConstraints || [], 3);
+  const signals = observedSignalSet(context, entryState);
   const opening = claimedCause
-    ? `Потому что версия про ${claimedCause} здесь пока только одна из рабочих, а не самая сильная.`
+    ? `Потому что версия про ${claimedCauseForAbout || claimedCause} здесь пока только одна из рабочих, а не самая сильная.`
     : "Потому что здесь рано фиксировать одну причину как главную.";
 
   const middle = isLeadFlowScenarioContext(context, entryState)
-    ? "Сначала мне нужно отделить реальную нехватку мощности от двух других версий: в продавцов летит смешанный поток, или ICP и приоритеты вообще не доведены до живой обработки."
+    ? signals.has("warm_inbound_demand")
+      ? "На тёплом входе суточный провал до первого касания всё ещё не доказывает, что проблема только в штате. Сначала мне нужно отделить реальную нехватку мощности от версии, что поток плохо фильтруется и приоритеты до продавца просто не доведены."
+      : "Сначала мне нужно отделить реальную нехватку мощности от двух других версий: в продавцов летит смешанный поток, или ICP и приоритеты вообще не доведены до живой обработки."
     : spread.length >= 3
       ? `Сейчас мне важнее отделить ${spread[2]} от версий про ${spread[0]} и ${spread[1]}.`
       : ensureSentence(response.whyItMatters);
@@ -471,10 +575,17 @@ function pickBestNextQuestion(context, entryState, graphAnalysis) {
     ...(graphAnalysis?.discriminatingSignals || []),
     ...(context.graphPacket?.discriminatingSignals || [])
   ], 4);
+  const signals = observedSignalSet(context, entryState);
+  const hasWarmInbound = signals.has("warm_inbound_demand");
+  const hasSlowFirstResponse = signals.has("slow_first_response");
 
   if (isLeadFlowScenarioContext(context, entryState)) {
     if (latestTextSuggestsWarmInbound(context)) {
       return "Тёплый ещё не значит целевой. До продавца у вас есть слой квалификации и приоритета, который отделяет ICP-лид от просто входящего интереса, или в работу идёт всё подряд?";
+    }
+
+    if (latestTextLooksLikeLeadVolumeAndTiming(context) && hasSlowFirstResponse) {
+      return "При таком объёме и сроке меня больше интересует не штат сам по себе, а фильтрация входа. До продавца у вас есть квалификация и приоритет, или в работу попадает всё подряд?";
     }
 
     if (latestTextSuggestsEarlyFunnelStage(context)) {
@@ -482,6 +593,9 @@ function pickBestNextQuestion(context, entryState, graphAnalysis) {
     }
 
     if (latestTextRestatesCapacityClaim(context)) {
+      if (hasWarmInbound) {
+        return "Если поток тёплый, где он вообще отделяется на ICP-лиды и вторичный шум: до продавца есть квалификация и приоритет, или команда сама руками разбирает весь вход?";
+      }
       return "Когда говорите, что люди не справляются, это про объём уже целевых лидов или про то, что команда вручную разбирает смешанный поток без предквалификации и приоритета?";
     }
 
@@ -550,8 +664,8 @@ function buildDiagnosticClarifySurfaceResponse(response, entryState, context) {
 
     return joinParagraphs([
       opening,
-      buildSpreadLine(spread, context),
-      buildWhyAndQuestion(response, context)
+      buildLeadScenarioField(spread, context, entryState),
+      buildLeadScenarioWhyAndQuestion(response, context, entryState)
     ]);
   }
 
