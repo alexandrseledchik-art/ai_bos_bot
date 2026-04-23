@@ -388,6 +388,12 @@ function userAskedDirection(context) {
   );
 }
 
+function userAskedRoadmap(context) {
+  return /всю\s+схем|по\s+какой\s+схем|как\s+мы\s+пойд[её]м|в\s+какой\s+последовательност|какой\s+порядок|какая\s+логика\s+дальше|какой\s+план\s+проверки/i.test(
+    ensureString(context.userText).toLowerCase()
+  );
+}
+
 function userAskedNext(context) {
   return /^((ну )?ок|хорошо|ладно)[, ]*(и )?а дальше\??$|^что дальше\??$|^и дальше\??$|^что потом\??$/i.test(
     ensureString(context.userText).toLowerCase()
@@ -454,7 +460,7 @@ function buildLeadScenarioField(spread, context, entryState) {
   const strategicSplit = strategicSplitNeeded(context, entryState);
 
   if (strategicSplit) {
-    return "Сейчас я бы уже держал не одну верхнюю версию, а две. Либо ICP и сегментация изначально выбраны слишком широко и рынок несёт вам лишний поток, либо сегмент в целом верный, но это не доведено до правил квалификации, приоритета и handoff.";
+    return "Сейчас я бы уже держал не одну верхнюю версию, а две. Либо сам ICP и сегментация выбраны слишком широко, и рынок несёт вам лишний поток, либо сегмент в целом верный, но это не переведено в живые правила отбора, приоритета и передачи дальше.";
   }
 
   if (latestTextSuggestsWarmInbound(context)) {
@@ -503,7 +509,7 @@ function buildWhyAndQuestion(response, context) {
 
 function buildLeadScenarioWhy(response, context, entryState) {
   if (strategicSplitNeeded(context, entryState)) {
-    return "Одинаковые правила и похожая конверсия у команды ослабляют версию про конкретных людей. Значит сейчас важнее отделить ошибку в самой сегментации и ICP от ошибки перевода этих правил в живую коммерческую работу.";
+    return "Одинаковые правила и похожая конверсия у команды ослабляют версию про конкретных людей. Значит сейчас важнее не спорить о менеджерах, а отделить ошибку в самой сегментации и ICP от ошибки перевода этих правил в живую коммерческую работу.";
   }
 
   if (latestTextSuggestsWarmInbound(context)) {
@@ -561,7 +567,7 @@ function buildMetaWhySurfaceResponse(response, entryState, context) {
 
   const middle = isLeadFlowScenarioContext(context, entryState)
     ? strategicSplitNeeded(context, entryState)
-      ? "Сейчас мне нужно не выбрать красивую верхнюю историю, а отделить две сильные стратегические версии: сам ICP и сегментация заданы неверно, или они в целом верны, но не превращены в рабочее правило отбора и handoff."
+      ? "Сейчас мне нужно не выбрать красивую верхнюю историю, а развести две сильные стратегические версии: сам ICP и сегментация заданы неверно, или они в целом верны, но не превращены в рабочее правило отбора, приоритета и передачи дальше."
       : signals.has("warm_inbound_demand")
       ? "На тёплом входе суточный провал до первого касания всё ещё не доказывает, что корень уже точно в ресурсе. Сначала мне нужно отделить локальный перегруз от версии, что поток плохо фильтруется и приоритеты до продавца просто не доведены."
       : "Сначала мне нужно отделить локальный перегруз от двух других версий: в продавцов летит смешанный поток, или ICP и приоритеты вообще не доведены до живой обработки."
@@ -688,10 +694,19 @@ function qualificationLayerExistsInContext(context, entryState) {
 
 function strategicSplitNeeded(context, entryState) {
   const signals = observedSignalSet(context, entryState);
+  const text = ensureString(context.userText).toLowerCase();
+  const qualificationPresent = signals.has("qualification_stage_exists") || latestTextMentionsQualificationLayer(context);
+  const qualificationOverloaded =
+    signals.has("qualification_stage_overloaded") ||
+    signals.has("team_overload_reported") ||
+    /зашива|перегруж|не успева/i.test(text);
+  const rulesAligned = signals.has("qualification_rules_consistent") || latestTextMentionsUniformRules(context);
+  const conversionAligned = signals.has("conversion_uniform_across_team") || latestTextMentionsUniformConversion(context);
+
   return latestTextRaisesStrategicIcpDoubt(context) ||
     signals.has("strategic_icp_doubt") ||
-    ((signals.has("qualification_rules_consistent") || latestTextMentionsUniformRules(context)) &&
-      (signals.has("conversion_uniform_across_team") || latestTextMentionsUniformConversion(context)));
+    (rulesAligned && conversionAligned) ||
+    (qualificationPresent && qualificationOverloaded && rulesAligned);
 }
 
 function userExplicitlyClaimedStaffing(context) {
@@ -850,7 +865,7 @@ function pickBestNextQuestion(context, entryState, graphAnalysis) {
 
   if (isLeadFlowScenarioContext(context, entryState)) {
     if (strategicSplit) {
-      return "Тогда разведу две верхние версии: у вас изначально в маркетинг и вход идёт слишком широкий сегмент, или сегмент в целом верный, но ICP не доведён до правил квалификации, приоритета и handoff. Что у вас ближе?";
+      return "Тогда я бы уже развёл две верхние версии: у вас изначально слишком широко выбран сегмент и обещание рынку, или сегмент в целом верный, но ICP не доведён до рекламы, квалификации, приоритета и передачи дальше. Что у вас ближе?";
     }
 
     if (qualificationLayerExists && !latestTextResolvesQualificationMechanics(context)) {
@@ -1095,6 +1110,15 @@ function buildWhatIsIcpSurfaceResponse(entryState) {
 function buildDirectionSurfaceResponse(response, entryState) {
   const spread = summarizeRenderableConstraintSpread(entryState, 3);
   const nextQuestion = ensureString(entryState.nextBestQuestion, response.nextStep);
+  if (ensureArray(entryState?.candidateConstraints, 6).some((item) => /icp|сегментац/i.test(ensureString(item?.label))) &&
+    ensureArray(entryState?.candidateConstraints, 6).some((item) => /правил|квалификац|приоритет|маршрутиз|передач/i.test(ensureString(item?.label)))) {
+    return joinParagraphs([
+      "Потому что я сейчас держу не одну верхнюю версию, а две.",
+      "Либо сам ICP и сегментация выбраны неверно, и вы кормите систему лишним потоком ещё на входе. Либо сегмент в целом верный, но он не доведён до рабочих правил отбора, приоритета и передачи дальше.",
+      nextQuestion
+    ]);
+  }
+
   const contrast = spread.length >= 2
     ? `Он быстрее всего отделяет ${describeVersion(spread[0])} от ${describeVersionFrom(spread[1])}${spread[2] ? ` и не даёт потерять из виду ${describeVersionFrom(spread[2])}` : ""}.`
     : "Он быстрее всего отделяет рабочие версии друг от друга.";
@@ -1109,6 +1133,14 @@ function buildDirectionSurfaceResponse(response, entryState) {
 function buildNextSurfaceResponse(response, entryState, context) {
   const nextQuestion = ensureString(entryState.nextBestQuestion, response.nextStep);
   const spread = summarizeRenderableConstraintSpread(entryState, 2);
+  if (isLeadFlowScenarioContext(context, entryState) && strategicSplitNeeded(context, entryState)) {
+    return joinParagraphs([
+      "Дальше я бы шёл не линейно, а через две верхние версии.",
+      "Сначала отделю ошибку в самой сегментации и ICP от ошибки перевода этих правил в живую работу команды. После этого уже станет видно, мы лечим стратегию входа или конструкцию первого контура.",
+      nextQuestion
+    ]);
+  }
+
   const bridge = isLeadFlowScenarioContext(context, entryState)
     ? "Дальше я бы не расширял тему, а добил одну развилку во входящем контуре."
     : "Дальше я бы не расползался в новый список идей, а добил ту развилку, на которой мы уже стоим.";
@@ -1147,6 +1179,32 @@ function buildAnswerSurfaceResponse(response, entryState) {
   return joinParagraphs([
     firstParagraph,
     `${ensureSentence(response.whyItMatters)} ${ensureString(response.nextStep)}`
+  ]);
+}
+
+function buildRoadmapSurfaceResponse(response, entryState, context) {
+  const nextQuestion = ensureString(entryState.nextBestQuestion, response.nextStep);
+
+  if (isLeadFlowScenarioContext(context, entryState) && strategicSplitNeeded(context, entryState)) {
+    return joinParagraphs([
+      "Да. Я бы здесь шёл через две верхние версии параллельно, а не через одну линейную ветку.",
+      "Первая версия: сам ICP и сегментация выбраны слишком широко, поэтому лишний поток создаётся ещё до квалификации. Вторая версия: сегмент в целом верный, но он не доведён до живых правил отбора, приоритета и передачи дальше, поэтому команда всё равно тонет на входе.",
+      `Сначала я отделяю одно от другого. ${nextQuestion}`
+    ]);
+  }
+
+  if (isLeadFlowScenarioContext(context, entryState)) {
+    return joinParagraphs([
+      "Да. Схема тут простая: сначала отделяю проблему качества входа от проблемы конструкции первого контура.",
+      "Если поток смешанный или плохо отфильтрован, копаем в сегментацию, квалификацию и приоритет. Если поток уже чистый, а вход всё равно ломается, тогда смотрим ownership, очередь и уже потом мощность.",
+      nextQuestion
+    ]);
+  }
+
+  return joinParagraphs([
+    "Да. Я бы здесь шёл не через длинный список вопросов, а через развилки, которые быстрее всего отделяют одну рабочую версию от другой.",
+    ensureSentence(response.whyItMatters),
+    nextQuestion
   ]);
 }
 
@@ -1224,6 +1282,10 @@ function buildSurfaceResponse(decision, context) {
 
   if (routeType === "free_text_problem" && userAskedDirection(context)) {
     return buildDirectionSurfaceResponse(response, entryState);
+  }
+
+  if (routeType === "free_text_problem" && userAskedRoadmap(context)) {
+    return buildRoadmapSurfaceResponse(response, entryState, context);
   }
 
   if (routeType === "free_text_problem" && userAskedWhy(context)) {

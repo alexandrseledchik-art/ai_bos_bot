@@ -183,8 +183,15 @@ function upstreamResolutionObserved(observedSignals, extracted) {
 }
 
 function needsStrategicSplit(observedSignals, extracted) {
+  const qualificationPresent = qualificationLayerExists(observedSignals, extracted);
+  const qualificationOverloaded = qualificationLayerOverloaded(observedSignals, extracted) ||
+    observedSignals.includes("team_overload_reported");
+  const rulesAligned = rulesConsistentAcrossTeam(observedSignals, extracted);
+  const conversionAligned = conversionLooksUniformAcrossTeam(observedSignals, extracted);
+
   return strategicIcpDoubtObserved(observedSignals, extracted) ||
-    (rulesConsistentAcrossTeam(observedSignals, extracted) && conversionLooksUniformAcrossTeam(observedSignals, extracted));
+    (rulesAligned && conversionAligned) ||
+    (qualificationPresent && qualificationOverloaded && rulesAligned);
 }
 
 function buildQuestionCandidates({ candidateStates, candidateCauses, observedSignals, extracted }) {
@@ -199,7 +206,7 @@ function buildQuestionCandidates({ candidateStates, candidateCauses, observedSig
   if (leadFlowScenario && strategicSplit) {
     candidates.push({
       question:
-        "Тогда я бы уже держал две верхние версии: сегментация и ICP изначально выбраны слишком широко, или сегмент в целом верный, но не доведён до рекламы, квалификации и handoff. Что у вас ближе?",
+        "Тогда я бы уже держал две верхние версии: сегментация и ICP изначально выбраны слишком широко, или сегмент в целом верный, но не доведён до рекламы, квалификации, приоритета и передачи дальше. Что у вас ближе?",
       type: "cause",
       layer: "strategy",
       nodeId: "strategic_split",

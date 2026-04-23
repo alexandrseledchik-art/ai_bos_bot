@@ -931,5 +931,61 @@
         "expectSaved": false
       }
     }
+  },
+  {
+    "id": "lead_flow_roadmap_explains_parallel_upper_versions",
+    "turns": [
+      "Сейчас проблемы с продажами: лидов много, менеджеры не успевают их обрабатывать, но продаж мало.",
+      "У нас есть квалификаторы, они сами определяют кто целевой и передают дальше.",
+      "Они работают по одним и тем же правилам.",
+      "Конверсия у всех плюс-минус одинаковая.",
+      "А можешь сразу рассказать всю схему по которой мы пойдем?"
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["сегмент", "icp", "квалификац", "передачи"],
+        "minDiscriminatingSignals": 2,
+        "minCandidateConstraints": 4
+      },
+      "causeDepth": {
+        "requireClaimedCauseNotSelected": false,
+        "minCandidateStates": 4,
+        "minCandidateCauses": 4,
+        "minUniqueLayers": 4,
+        "minGraphConfidence": 0.5,
+        "requiredConstraintTerms": ["ICP"]
+      },
+      "uncertainty": {
+        "minResponseHypotheses": 2,
+        "minAlternativeHypotheses": 4,
+        "minConflicts": 1,
+        "forbiddenCertaintyPhrases": ["дело уже в менеджерах", "главная причина уже выбрана"]
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "forbiddenTerms": ["нанять", "расширить отдел"],
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      },
+      "surface": {
+        "mustContain": ["две верхние версии", "сегментац"],
+        "mustContainAny": ["не довед", "передачи дальше", "квалификации", "рекламы"],
+        "mustNotContain": ["сначала операционализация, потом", "одна линейная ветка"],
+        "minParagraphs": 2,
+        "maxParagraphs": 3
+      },
+      "promotion": {
+        "expectPromotion": false,
+        "expectedCaseKind": ""
+      },
+      "artifact": {
+        "expectSaved": false
+      }
+    }
   }
 ]
