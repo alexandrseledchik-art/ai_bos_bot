@@ -80,6 +80,58 @@ export const CAUSAL_GRAPH_NODES = [
     ]
   },
   {
+    id: "mixed_inbound_confirmed",
+    type: "symptom",
+    label: "В работу идёт смешанный или неразобранный поток",
+    description: "Пользователь прямо подтверждает, что в продажи попадает всё подряд или смешанный поток.",
+    domains: ["growth", "sales", "sale_prep"],
+    layer: "commercial",
+    evidencePatterns: [/всё\s+подряд/i, /смешанн/i, /неразобран/i, /руками\s+разбира/i],
+    contradictionPatterns: [],
+    relatedQuestions: [
+      "Если в работу идёт всё подряд, где этот поток вообще должен отсеиваться: до продавца есть квалификация и приоритет, или этот слой у вас отсутствует?"
+    ]
+  },
+  {
+    id: "qualification_missing_confirmed",
+    type: "symptom",
+    label: "Квалификация до продавца отсутствует",
+    description: "Пользователь прямо подтверждает, что предквалификации нет или она формальная.",
+    domains: ["sales", "sale_prep", "ops"],
+    layer: "commercial",
+    evidencePatterns: [/нет\s+квалификац/i, /без\s+квалификац/i, /квалификац[ияи].*нет/i, /предквалификац[ияи].*нет/i],
+    contradictionPatterns: [],
+    relatedQuestions: [
+      "Если квалификации до продавца нет, тогда вопрос уже не в найме сам по себе: где у вас вообще должен отделяться ICP-лид от вторичного шума?"
+    ]
+  },
+  {
+    id: "priority_rules_missing",
+    type: "symptom",
+    label: "Нет правил приоритета входящих",
+    description: "Пользователь прямо подтверждает, что приоритетные и неприоритетные лиды обрабатываются одинаково.",
+    domains: ["growth", "sales", "sale_prep"],
+    layer: "commercial",
+    evidencePatterns: [/приоритета?\s+нет/i, /нет\s+приоритета/i, /все\s+одинаков/i, /одинаковая\s+логика/i],
+    contradictionPatterns: [],
+    relatedQuestions: [
+      "Если приоритета нет, то как у вас вообще отделяются лучшие лиды от остального потока до первого ответа?"
+    ]
+  },
+  {
+    id: "target_leads_confirmed",
+    type: "symptom",
+    label: "Поток в основном целевой",
+    description: "Пользователь прямо подтверждает, что входящие лиды в основном соответствуют ICP.",
+    domains: ["growth", "sales", "strategy"],
+    layer: "commercial",
+    evidencePatterns: [/почти\s+все\s+целев/i, /лиды?\s+целев/i, /все\s+лиды?\s+целев/i, /почти\s+все\s+подход/i],
+    contradictionPatterns: [],
+    relatedQuestions: [
+      "Если поток в основном целевой, тогда где ломается уже конструкция обработки: ownership, очередь, приоритет или реальная мощность?"
+    ]
+  },
+  {
     id: "hiring_without_relief",
     type: "symptom",
     label: "Наняли людей, но легче не стало",
@@ -568,6 +620,13 @@ export const CAUSAL_GRAPH_EDGES = [
   { from: "warm_inbound_demand", to: "no_prequalification_layer", relation: "suggests", weight: 0.72, confidence: "high", domainCross: ["sales", "sale_prep"] },
   { from: "warm_inbound_demand", to: "uniform_sla_for_mixed_leads", relation: "suggests", weight: 0.69, confidence: "medium", domainCross: ["sales", "growth"] },
   { from: "warm_inbound_demand", to: "inbound_noise_mixed_with_target_demand", relation: "suggests", weight: 0.55, confidence: "medium", domainCross: ["growth", "strategy"] },
+  { from: "mixed_inbound_confirmed", to: "inbound_noise_mixed_with_target_demand", relation: "supports", weight: 0.93, confidence: "high", domainCross: ["growth", "strategy"] },
+  { from: "mixed_inbound_confirmed", to: "no_prequalification_layer", relation: "supports", weight: 0.87, confidence: "high", domainCross: ["sales", "sale_prep"] },
+  { from: "qualification_missing_confirmed", to: "no_prequalification_layer", relation: "supports", weight: 0.95, confidence: "high", domainCross: ["sales", "sale_prep"] },
+  { from: "priority_rules_missing", to: "uniform_sla_for_mixed_leads", relation: "supports", weight: 0.91, confidence: "high", domainCross: ["growth", "sales"] },
+  { from: "priority_rules_missing", to: "no_inbound_routing", relation: "supports", weight: 0.72, confidence: "medium", domainCross: ["sales", "ops"] },
+  { from: "target_leads_confirmed", to: "capacity_model_missing", relation: "supports", weight: 0.71, confidence: "medium", domainCross: ["people", "ops"] },
+  { from: "target_leads_confirmed", to: "ownership_of_first_contact_blurred", relation: "supports", weight: 0.64, confidence: "medium", domainCross: ["sales", "ops"] },
   { from: "hiring_without_relief", to: "unclear_role_boundaries", relation: "suggests", weight: 0.73, confidence: "medium", domainCross: ["people", "ops"] },
   { from: "hiring_without_relief", to: "no_sales_operating_model", relation: "suggests", weight: 0.66, confidence: "medium", domainCross: ["sales", "ops"] },
   { from: "hiring_without_relief", to: "capacity_model_missing", relation: "suggests", weight: 0.69, confidence: "medium", domainCross: ["people", "ops"] },

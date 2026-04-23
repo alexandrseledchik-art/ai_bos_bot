@@ -80,6 +80,12 @@
         "requireNoActionWave": true,
         "requireNoArtifact": true
       },
+      "surface": {
+        "mustContainAny": ["три версии", "не покупал", "нехватку продавцов"],
+        "mustNotContain": ["снова возвращаешь"],
+        "minParagraphs": 2,
+        "maxParagraphs": 3
+      },
       "promotion": {
         "expectPromotion": false,
         "expectedCaseKind": ""
@@ -128,6 +134,12 @@
         "forbiddenTerms": ["нанять", "расширить отдел", "назначьте SLA"],
         "requireNoActionWave": true,
         "requireNoArtifact": true
+      },
+      "surface": {
+        "mustContainAny": ["ручную предквалификацию", "целевых лидов", "квалифицируют тёплый вход"],
+        "mustNotContain": ["кто должен", "кто отвечает", "SLA", "сколько минут"],
+        "minParagraphs": 2,
+        "maxParagraphs": 3
       },
       "promotion": {
         "expectPromotion": false,

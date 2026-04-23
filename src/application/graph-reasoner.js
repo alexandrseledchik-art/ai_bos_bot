@@ -94,12 +94,22 @@ function questionLooksUpstream(question) {
 }
 
 function questionLooksLocal(question) {
-  return /sla|владелец|кто отвечает|минут|час|перв[ао]й|очеред|срок|звон/i.test(question);
+  return /sla|владелец|кто отвечает|кто должен|очеред|сколько.*минут|сколько.*час|срок|перв[ао]й\s+(звон|ответ|контакт|касани)|ownership/i.test(question);
+}
+
+function upstreamResolutionObserved(observedSignals, extracted) {
+  const text = normalizeText(extracted?.claimedProblem || extracted?.observations?.map((item) => item?.evidence).join(" ") || "");
+  return observedSignals.includes("mixed_inbound_confirmed") ||
+    observedSignals.includes("qualification_missing_confirmed") ||
+    observedSignals.includes("priority_rules_missing") ||
+    observedSignals.includes("target_leads_confirmed") ||
+    /icp|квалификац|предквалификац|приоритет|сегмент|всё подряд|смешан|неразобран|целев/i.test(text);
 }
 
 function buildQuestionCandidates({ candidateStates, candidateCauses, observedSignals, extracted }) {
   const leadFlowScenario = isLeadFlowScenario(observedSignals, extracted);
   const localClaimedCause = claimedCauseLooksLocal(extracted);
+  const upstreamResolved = upstreamResolutionObserved(observedSignals, extracted);
   const candidates = [];
 
   const pushQuestion = (item, type, index, separates) => {
@@ -117,13 +127,13 @@ function buildQuestionCandidates({ candidateStates, candidateCauses, observedSig
       priority += 0.04;
     }
     if (leadFlowScenario && questionLooksUpstream(question)) {
-      priority += 0.18;
+      priority += upstreamResolved ? 0.06 : 0.24;
     }
     if (leadFlowScenario && localClaimedCause && (item.layer === "strategy" || item.layer === "commercial")) {
-      priority += 0.1;
+      priority += 0.14;
     }
     if (leadFlowScenario && questionLooksLocal(question)) {
-      priority -= 0.08;
+      priority -= upstreamResolved ? 0.05 : 0.18;
     }
 
     candidates.push({
