@@ -9,6 +9,40 @@ export const SYSTEM_LAYERS = [
   "management"
 ];
 
+export const BUSINESS_LAYER_CLASSES = ["A", "B", "C", "D"];
+
+export const BUSINESS_LAYERS = [
+  "owner_context",
+  "external_environment",
+  "strategy",
+  "product",
+  "commercial",
+  "operations",
+  "finance",
+  "team",
+  "governance",
+  "technology",
+  "data_analytics"
+];
+
+export const FLOW_TYPES = [
+  "demand",
+  "leads",
+  "deals",
+  "delivery",
+  "cash",
+  "decisions"
+];
+
+export const CONSTRAINT_TYPES = [
+  "supply",
+  "quality",
+  "throughput",
+  "capacity",
+  "control",
+  "visibility"
+];
+
 export const ENTRY_PROMOTION_STATES = [
   "keep_in_entry",
   "ready_for_diagnostic_case",
@@ -33,6 +67,17 @@ export function emptyEntryState() {
     symptoms: [],
     observedSignals: [],
     systemLayers: [],
+    businessLayers: [],
+    layerClasses: [],
+    flowTypes: [],
+    primaryFlow: "",
+    constraintType: "",
+    higherLayerCheck: {
+      currentClass: "",
+      betterExplainedAbove: false,
+      highestUnrejectedClass: "",
+      whyNotHigher: ""
+    },
     candidateConstraints: [],
     candidateStates: [],
     candidateCauses: [],

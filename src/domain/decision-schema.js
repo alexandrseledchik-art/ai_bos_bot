@@ -274,6 +274,12 @@ export const DECISION_SCHEMA = {
         "symptoms",
         "observedSignals",
         "systemLayers",
+        "businessLayers",
+        "layerClasses",
+        "flowTypes",
+        "primaryFlow",
+        "constraintType",
+        "higherLayerCheck",
         "candidateConstraints",
         "candidateStates",
         "candidateCauses",
@@ -319,6 +325,71 @@ export const DECISION_SCHEMA = {
           items: {
             type: "string",
             enum: ["strategy", "commercial", "operations", "finance", "people", "management"]
+          }
+        },
+        businessLayers: {
+          type: "array",
+          maxItems: 11,
+          items: {
+            type: "string",
+            enum: [
+              "owner_context",
+              "external_environment",
+              "strategy",
+              "product",
+              "commercial",
+              "operations",
+              "finance",
+              "team",
+              "governance",
+              "technology",
+              "data_analytics"
+            ]
+          }
+        },
+        layerClasses: {
+          type: "array",
+          maxItems: 4,
+          items: {
+            type: "string",
+            enum: ["A", "B", "C", "D"]
+          }
+        },
+        flowTypes: {
+          type: "array",
+          maxItems: 6,
+          items: {
+            type: "string",
+            enum: ["demand", "leads", "deals", "delivery", "cash", "decisions"]
+          }
+        },
+        primaryFlow: {
+          type: "string",
+          enum: ["", "demand", "leads", "deals", "delivery", "cash", "decisions"]
+        },
+        constraintType: {
+          type: "string",
+          enum: ["", "supply", "quality", "throughput", "capacity", "control", "visibility"]
+        },
+        higherLayerCheck: {
+          type: "object",
+          additionalProperties: false,
+          required: ["currentClass", "betterExplainedAbove", "highestUnrejectedClass", "whyNotHigher"],
+          properties: {
+            currentClass: {
+              type: "string",
+              enum: ["", "A", "B", "C", "D"]
+            },
+            betterExplainedAbove: {
+              type: "boolean"
+            },
+            highestUnrejectedClass: {
+              type: "string",
+              enum: ["", "A", "B", "C", "D"]
+            },
+            whyNotHigher: {
+              type: "string"
+            }
           }
         },
         candidateConstraints: {

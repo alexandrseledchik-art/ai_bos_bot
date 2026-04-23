@@ -1,4 +1,12 @@
-import { ENTRY_PROMOTION_STATES, SYSTEM_LAYERS, emptyEntryState } from "../domain/entities.js";
+import {
+  BUSINESS_LAYERS,
+  BUSINESS_LAYER_CLASSES,
+  CONSTRAINT_TYPES,
+  ENTRY_PROMOTION_STATES,
+  FLOW_TYPES,
+  SYSTEM_LAYERS,
+  emptyEntryState
+} from "../domain/entities.js";
 
 function ensureArray(value, maxItems = 6) {
   if (!Array.isArray(value)) {
@@ -1261,6 +1269,209 @@ function inferGenericConstraints(context) {
   return constraints;
 }
 
+function normalizeBusinessLayer(value, fallback = "commercial") {
+  const normalized = ensureString(value, fallback).toLowerCase();
+  return BUSINESS_LAYERS.includes(normalized) ? normalized : fallback;
+}
+
+function businessLayerToClass(layer) {
+  const mapping = {
+    owner_context: "A",
+    external_environment: "A",
+    strategy: "B",
+    product: "B",
+    commercial: "B",
+    operations: "C",
+    finance: "C",
+    team: "D",
+    governance: "D",
+    technology: "D",
+    data_analytics: "D"
+  };
+
+  return mapping[normalizeBusinessLayer(layer, "commercial")] || "B";
+}
+
+function systemLayerToBusinessLayer(layer) {
+  const mapping = {
+    strategy: "strategy",
+    commercial: "commercial",
+    operations: "operations",
+    finance: "finance",
+    people: "team",
+    management: "governance"
+  };
+
+  return mapping[normalizeLayer(layer)] || "commercial";
+}
+
+function deriveBusinessLayers(context, entryState) {
+  const text = ensureString(
+    [
+      context.userText,
+      ...(entryState.symptoms || []),
+      ...(entryState.candidateConstraints || []).map((item) => item?.label),
+      ...(entryState.candidateStates || []).map((item) => item?.label),
+      ...(entryState.candidateCauses || []).map((item) => item?.label)
+    ].join(" ")
+  ).toLowerCase();
+
+  const layers = [
+    ...(entryState.systemLayers || []).map((item) => systemLayerToBusinessLayer(item))
+  ];
+
+  if (/собственник|партнер|партн[её]р|горизонт|цель|роль\s+в\s+бизнесе/.test(text)) {
+    layers.push("owner_context");
+  }
+  if (/рынок|спрос|конкуренц|макро|экосистем/.test(text)) {
+    layers.push("external_environment");
+  }
+  if (/стратег|позиционир|выбор\s+рынка|источник\s+преимуществ/.test(text)) {
+    layers.push("strategy");
+  }
+  if (/продукт|ценност|удержан|не\s+удерж|решени[ея]\s+проблем|product/.test(text)) {
+    layers.push("product");
+  }
+  if (/icp|сегмент|канал|лид|заяв|gtm|коммерц|упаковк|квалификац|маршрутиз/.test(text)) {
+    layers.push("commercial");
+  }
+  if (/операц|процесс|delivery|исполн|срыв|очеред|handoff|первый\s+ответ|контакт/.test(text)) {
+    layers.push("operations");
+  }
+  if (/прибыл|марж|cash|деньг|кассов|экономик/.test(text)) {
+    layers.push("finance");
+  }
+  if (/команд|люд|capacity|штат|рол/.test(text)) {
+    layers.push("team");
+  }
+  if (/управл|govern|решени|контрол|owner|ритм|хаос/.test(text)) {
+    layers.push("governance");
+  }
+  if (/техн|it|crm|автомат|система|инструмент/.test(text)) {
+    layers.push("technology");
+  }
+  if (/данн|аналит|метрик|отч[её]т|не видно|прозрачност/.test(text)) {
+    layers.push("data_analytics");
+  }
+
+  return ensureArray(layers, 11).map((item) => normalizeBusinessLayer(item)).filter((item, index, items) => items.indexOf(item) === index);
+}
+
+function deriveLayerClasses(businessLayers) {
+  const ordered = ["A", "B", "C", "D"];
+  const classes = ensureArray(businessLayers, 11).map((item) => businessLayerToClass(item));
+  return ordered.filter((item) => classes.includes(item));
+}
+
+function deriveFlowTypes(context, entryState) {
+  const text = ensureString(
+    [
+      context.userText,
+      ...(entryState.symptoms || []),
+      ...(entryState.observedSignals || []),
+      ...(entryState.candidateConstraints || []).map((item) => item?.label)
+    ].join(" ")
+  ).toLowerCase();
+  const scores = new Map(FLOW_TYPES.map((item) => [item, 0]));
+
+  if (/рынок|спрос|интерес|нет\s+клиент/.test(text)) {
+    scores.set("demand", scores.get("demand") + 3);
+  }
+  if (/лид|заяв|входящ|трафик|мало\s+входа|перегруз.*поток/.test(text)) {
+    scores.set("leads", scores.get("leads") + 3);
+  }
+  if (/сделк|конверс|не\s+покуп|кп|встреч|дожим|воронк/.test(text)) {
+    scores.set("deals", scores.get("deals") + 3);
+  }
+  if (/исполн|delivery|срыв|не\s+выполня|перегруз.*исполн|выполнение/.test(text)) {
+    scores.set("delivery", scores.get("delivery") + 3);
+  }
+  if (/деньг|прибыл|марж|кассов|cash|экономик/.test(text)) {
+    scores.set("cash", scores.get("cash") + 3);
+  }
+  if (/хаос|решени|собственник|всё\s+завис|управл|контрол/.test(text)) {
+    scores.set("decisions", scores.get("decisions") + 3);
+  }
+
+  for (const item of entryState.businessLayers || []) {
+    if (item === "commercial") {
+      scores.set("leads", scores.get("leads") + 1);
+      scores.set("deals", scores.get("deals") + 1);
+    }
+    if (item === "operations") {
+      scores.set("delivery", scores.get("delivery") + 1);
+      scores.set("deals", scores.get("deals") + 1);
+    }
+    if (item === "finance") {
+      scores.set("cash", scores.get("cash") + 1);
+    }
+    if (item === "governance" || item === "owner_context") {
+      scores.set("decisions", scores.get("decisions") + 1);
+    }
+  }
+
+  return [...scores.entries()]
+    .filter(([, score]) => score > 0)
+    .sort((left, right) => right[1] - left[1])
+    .map(([item]) => item)
+    .slice(0, 2);
+}
+
+function deriveConstraintType(entryState) {
+  const label = ensureString(
+    entryState.selectedConstraint || entryState.candidateConstraints?.[0]?.label
+  ).toLowerCase();
+  const primaryFlow = ensureString(entryState.primaryFlow).toLowerCase();
+  const businessLayers = entryState.businessLayers || [];
+
+  if (/данн|аналит|метрик|видимост|прозрачност|не видно/.test(label) || businessLayers.includes("data_analytics")) {
+    return "visibility";
+  }
+  if (/управл|контрол|ownership|owner|решени|govern|ритм/.test(label) || businessLayers.includes("governance") || businessLayers.includes("owner_context")) {
+    return "control";
+  }
+  if (/мощност|capacity|штат|не хватает|ресурс/.test(label) || businessLayers.includes("team")) {
+    return "capacity";
+  }
+  if (/icp|сегмент|квалификац|нецелев|приоритет|смешан|шум|качество\s+входа/.test(label)) {
+    return "quality";
+  }
+  if (/процесс|воронк|этап|маршрутизац|handoff|первый\s+ответ|контакт|delivery|очеред/.test(label) || businessLayers.includes("operations")) {
+    return "throughput";
+  }
+  if (primaryFlow === "demand" || businessLayers.includes("strategy") || businessLayers.includes("product") || businessLayers.includes("commercial")) {
+    return "supply";
+  }
+
+  return "";
+}
+
+function deriveHigherLayerCheck(entryState) {
+  const order = { A: 1, B: 2, C: 3, D: 4 };
+  const classes = deriveLayerClasses(entryState.businessLayers || []);
+  const currentConstraintLayer = ensureString(entryState.candidateConstraints?.[0]?.layer || "").toLowerCase();
+  const currentClass = currentConstraintLayer ? businessLayerToClass(systemLayerToBusinessLayer(currentConstraintLayer)) : (classes[0] || "");
+  const highestUnrejectedClass = classes[0] || currentClass || "";
+  const betterExplainedAbove = Boolean(
+    currentClass &&
+    highestUnrejectedClass &&
+    order[highestUnrejectedClass] < order[currentClass]
+  );
+
+  const whyNotHigher = betterExplainedAbove
+    ? `Выше по системе ещё живы версии класса ${highestUnrejectedClass}, поэтому фиксировать корень в ${currentClass} рано.`
+    : currentClass
+      ? `Сейчас самый сильный неотброшенный слой — ${currentClass}; более верхние объяснения слабее или уже частично проверены.`
+      : "";
+
+  return {
+    currentClass,
+    betterExplainedAbove,
+    highestUnrejectedClass,
+    whyNotHigher
+  };
+}
+
 function normalizeEntryState(rawEntryState, context, decision) {
   const fallback = emptyEntryState();
   const entryState = rawEntryState && typeof rawEntryState === "object" ? structuredClone(rawEntryState) : {};
@@ -1318,6 +1529,41 @@ function normalizeEntryState(rawEntryState, context, decision) {
     entryState.hypothesisConflicts = ensureArray(context.graphPacket?.hypothesisConflicts, 6);
   }
   entryState.candidateConstraints = ensureMultiLayerSpread(entryState.candidateConstraints, context, entryState);
+  entryState.businessLayers = ensureArray(entryState.businessLayers, 11)
+    .map((item) => normalizeBusinessLayer(item))
+    .filter((item, index, items) => items.indexOf(item) === index);
+  if (!entryState.businessLayers.length) {
+    entryState.businessLayers = deriveBusinessLayers(context, entryState);
+  }
+  entryState.layerClasses = ensureArray(entryState.layerClasses, 4)
+    .map((item) => ensureString(item))
+    .filter((item) => BUSINESS_LAYER_CLASSES.includes(item));
+  if (!entryState.layerClasses.length) {
+    entryState.layerClasses = deriveLayerClasses(entryState.businessLayers);
+  }
+  entryState.flowTypes = ensureArray(entryState.flowTypes, 6)
+    .map((item) => ensureString(item))
+    .filter((item) => FLOW_TYPES.includes(item));
+  if (!entryState.flowTypes.length) {
+    entryState.flowTypes = deriveFlowTypes(context, entryState);
+  }
+  entryState.primaryFlow = ensureString(entryState.primaryFlow, entryState.flowTypes[0] || "");
+  if (entryState.primaryFlow && !FLOW_TYPES.includes(entryState.primaryFlow)) {
+    entryState.primaryFlow = entryState.flowTypes[0] || "";
+  }
+  entryState.constraintType = ensureString(entryState.constraintType, deriveConstraintType(entryState));
+  if (entryState.constraintType && !CONSTRAINT_TYPES.includes(entryState.constraintType)) {
+    entryState.constraintType = deriveConstraintType(entryState);
+  }
+  entryState.higherLayerCheck = {
+    currentClass: ensureString(entryState.higherLayerCheck?.currentClass),
+    betterExplainedAbove: Boolean(entryState.higherLayerCheck?.betterExplainedAbove),
+    highestUnrejectedClass: ensureString(entryState.higherLayerCheck?.highestUnrejectedClass),
+    whyNotHigher: ensureString(entryState.higherLayerCheck?.whyNotHigher)
+  };
+  if (!entryState.higherLayerCheck.currentClass && !entryState.higherLayerCheck.highestUnrejectedClass) {
+    entryState.higherLayerCheck = deriveHigherLayerCheck(entryState);
+  }
   entryState.signalSufficiency = ensureString(
     entryState.signalSufficiency,
     ensureString(decision.decision?.signalSufficiency, fallback.signalSufficiency)
