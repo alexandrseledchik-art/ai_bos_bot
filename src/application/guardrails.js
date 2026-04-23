@@ -218,7 +218,8 @@ function looksMechanicalResponse(text) {
     /^почему это важно:/i,
     /^следующий шаг:/i,
     /сейчас вижу две рабочие версии/i,
-    /сейчас вижу рабочую версию/i
+    /сейчас вижу рабочую версию/i,
+    /^похоже,\s*тебе нужен/i
   ];
 
   return patterns.some((pattern) => pattern.test(normalized));
@@ -236,6 +237,108 @@ function isOpeningMessageContext(context) {
   const text = ensureString(context.userText).toLowerCase();
   const historyLength = Array.isArray(context.history) ? context.history.length : 0;
   return historyLength === 0 && /^\/start$|^(привет|здравствуй|здравствуйте|добрый день|добрый вечер)$/i.test(text);
+}
+
+function currentWordCount(context) {
+  return ensureString(context.userText)
+    .split(/\s+/)
+    .filter(Boolean)
+    .length;
+}
+
+function isShortFollowUpContext(context) {
+  return currentWordCount(context) <= 5 && Array.isArray(context.history) && context.history.length > 0;
+}
+
+function userAskedWhy(context) {
+  return /почему|зачем|с чего|на каком основании/i.test(ensureString(context.userText).toLowerCase());
+}
+
+function userAskedHow(context) {
+  return /как это|как понять|как проверить|что делать с этим|что с этим делать/i.test(
+    ensureString(context.userText).toLowerCase()
+  );
+}
+
+function latestLeadScenarioOpener(context, entryState, claimedCause) {
+  if (latestTextSuggestsWarmInbound(context)) {
+    return "Ок, это уже сужает поле.";
+  }
+
+  if (latestTextSuggestsEarlyFunnelStage(context)) {
+    return "Хорошо, это уже полезно: поломка сидит до первого касания.";
+  }
+
+  if (latestTextRestatesCapacityClaim(context) && claimedCause) {
+    return `Слышу версию про ${claimedCause}, но я бы пока не делал её главной.`;
+  }
+
+  if (userLikelyClaimedCause(context, entryState) && claimedCause) {
+    return `Я бы пока не спешил покупать версию про ${claimedCause} как главную.`;
+  }
+
+  if (isShortFollowUpContext(context)) {
+    return "Ок, это уже двигает картину вперёд.";
+  }
+
+  return ensureSentence(entryState.claimedProblem ? "Сейчас я бы смотрел на это так" : "Картина пока складывается так");
+}
+
+function buildSpreadLine(spread, context) {
+  if (latestTextSuggestsWarmInbound(context)) {
+    return `Тогда я бы держал три версии: ${spread[0]}; ${spread[1]}; ${spread[2]}.`;
+  }
+
+  if (latestTextRestatesCapacityClaim(context)) {
+    return `Для меня здесь пока три версии: ${spread[0]}; ${spread[1]}; ${spread[2]}.`;
+  }
+
+  if (isShortFollowUpContext(context)) {
+    return `Пока поле такое: ${spread[0]}; ${spread[1]}; ${spread[2]}.`;
+  }
+
+  return `Сейчас я бы держал три версии: ${spread[0]}; ${spread[1]}; ${spread[2]}.`;
+}
+
+function buildWhyAndQuestion(response, context) {
+  const why = ensureSentence(response.whyItMatters);
+  const next = ensureString(response.nextStep);
+
+  if (userAskedWhy(context)) {
+    return joinParagraphs([
+      why,
+      next
+    ]);
+  }
+
+  if (userAskedHow(context)) {
+    return joinParagraphs([
+      `${why} Я бы сейчас не расползался в длинный план, а быстро отделил одну версию от другой.`,
+      next
+    ]);
+  }
+
+  return `${why} ${next}`.trim();
+}
+
+function buildMetaWhySurfaceResponse(response, entryState, context) {
+  const claimedCause = ensureString(entryState.claimedCause);
+  const spread = summarizeConstraintSpread(entryState.candidateConstraints || [], 3);
+  const opening = claimedCause
+    ? `Потому что версия про ${claimedCause} здесь пока только одна из рабочих, а не самая сильная.`
+    : "Потому что здесь рано фиксировать одну причину как главную.";
+
+  const middle = isLeadFlowScenarioContext(context, entryState)
+    ? "Сначала мне нужно отделить реальную нехватку мощности от двух других версий: в продавцов летит смешанный поток, или ICP и приоритеты вообще не доведены до живой обработки."
+    : spread.length >= 3
+      ? `Сейчас мне важнее отделить ${spread[2]} от версий про ${spread[0]} и ${spread[1]}.`
+      : ensureSentence(response.whyItMatters);
+
+  return joinParagraphs([
+    opening,
+    middle,
+    ensureString(response.nextStep)
+  ]);
 }
 
 function isLeadFlowScenarioContext(context, entryState) {
@@ -443,22 +546,20 @@ function buildDiagnosticClarifySurfaceResponse(response, entryState, context) {
   const spread = summarizeConstraintSpread(constraints, 3);
 
   if (isLeadFlowScenarioContext(context, entryState) && spread.length >= 3) {
-    const opening = userLikelyClaimedCause(context, entryState) && claimedCause
-      ? `Версия про то, что ${claimedCause}, возможна, но пока вторична.`
-      : ensureSentence(response.whatIUnderstood);
+    const opening = latestLeadScenarioOpener(context, entryState, claimedCause);
 
     return joinParagraphs([
       opening,
-      `Пока вижу три версии: ${spread[0]}; ${spread[1]}; ${spread[2]}.`,
-      `${ensureSentence(response.whyItMatters)} ${ensureString(response.nextStep)}`
+      buildSpreadLine(spread, context),
+      buildWhyAndQuestion(response, context)
     ]);
   }
 
   if (userLikelyClaimedCause(context, entryState) && claimedCause && spread.length >= 3) {
     return joinParagraphs([
-      `Версия про то, что ${claimedCause}, возможна, но пока рано покупать её как главную.`,
-      `Пока поле выглядит шире: ${spread[0]}; ${spread[1]}; ${spread[2]}.`,
-      `${ensureSentence(response.whyItMatters)} ${ensureString(response.nextStep)}`
+      `Я бы пока не спешил делать версию про ${claimedCause} главной.`,
+      buildSpreadLine(spread, context),
+      buildWhyAndQuestion(response, context)
     ]);
   }
 
@@ -469,29 +570,31 @@ function buildDiagnosticClarifySurfaceResponse(response, entryState, context) {
       : ensureSentence(response.whyItMatters);
 
     return joinParagraphs([
-      `Я бы пока не фиксировал причину в том, что ${claimedCause}. Это пока версия пользователя, а не доказанное ограничение системы. ${ensureSentence(response.whyItMatters)}`,
+      `Я бы пока не фиксировал причину в том, что ${claimedCause}. Это пока версия, а не доказанное ограничение системы.`,
       alternativesLine,
-      ensureString(response.nextStep)
+      buildWhyAndQuestion(response, context)
     ]);
   }
 
   if (spread.length >= 3) {
     return joinParagraphs([
-      `${ensureSentence(response.whatIUnderstood)} Пока поле выглядит так: ${spread[0]}; ${spread[1]}; ${spread[2]}.`,
-      `${ensureSentence(response.whyItMatters)} ${ensureString(response.nextStep)}`
+      ensureSentence(response.whatIUnderstood),
+      buildSpreadLine(spread, context),
+      buildWhyAndQuestion(response, context)
     ]);
   }
 
   if (strongestAlternative && secondAlternative) {
     return joinParagraphs([
-      `${ensureSentence(response.whatIUnderstood)} Пока сильнее всего выглядят версии, что ${strongestAlternative} или что ${secondAlternative}${thirdAlternative ? `, а рядом остаётся и версия, что ${thirdAlternative}` : ""}.`,
-      `${ensureSentence(response.whyItMatters)} ${ensureString(response.nextStep)}`
+      ensureSentence(response.whatIUnderstood),
+      `Сейчас сильнее всего выглядят версии, что ${strongestAlternative} или что ${secondAlternative}${thirdAlternative ? `, а рядом остаётся и версия, что ${thirdAlternative}` : ""}.`,
+      buildWhyAndQuestion(response, context)
     ]);
   }
 
   return joinParagraphs([
     ensureSentence(response.whatIUnderstood),
-    `${ensureSentence(response.whyItMatters)} ${ensureString(response.nextStep)}`
+    buildWhyAndQuestion(response, context)
   ]);
 }
 
@@ -537,6 +640,10 @@ function buildSurfaceResponse(decision, context) {
 
   if (decision.selectedMode === "website_screening_mode") {
     return buildWebsiteSurfaceResponse(response);
+  }
+
+  if (routeType === "free_text_problem" && userAskedWhy(context)) {
+    return buildMetaWhySurfaceResponse(response, entryState, context);
   }
 
   if (action === "answer" || action === "diagnose") {

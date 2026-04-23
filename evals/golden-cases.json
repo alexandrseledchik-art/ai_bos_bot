@@ -7,7 +7,7 @@
     "expectedAction": "clarify",
     "artifactExpected": false,
     "mustContain": ["Привет"],
-    "mustContainAny": ["системному ограничению", "ограничению, которое держит результат"],
+    "mustContainAny": ["главное ограничение", "системному ограничению", "ограничению, которое держит результат"],
     "mustNotContain": ["просто открыл чат", "чтобы не гадать"]
   },
   {
@@ -27,7 +27,8 @@
     "expectedMode": "clarification_mode",
     "expectedAction": "clarify",
     "artifactExpected": false,
-    "mustContain": ["звучать умно, но останется случайным", "прибыль"],
+    "mustContainAny": ["красивый разговор про всё сразу", "звучать умно, но останется случайным"],
+    "mustContain": ["прибыль"],
     "mustNotContain": ["вот точная причина"]
   },
   {
@@ -57,8 +58,8 @@
     "expectedMode": "diagnostic_mode",
     "expectedAction": "clarify",
     "artifactExpected": false,
-    "mustContain": ["доказанное ограничение системы"],
-    "mustContainAny": ["Что менеджер или руководитель может решить без эскалации к собственнику", "решить без эскалации"],
+    "mustContain": ["решить без эскалации"],
+    "mustContainAny": ["пока не покупал ближайшую причину", "доказанное ограничение системы"],
     "mustNotContain": ["точная причина уже понятна"]
   },
   {
@@ -118,7 +119,7 @@
     "expectedMode": "clarification_mode",
     "expectedAction": "clarify",
     "artifactExpected": false,
-    "mustContain": ["Пока вижу только общее напряжение"],
+    "mustContainAny": ["Пока вижу напряжение", "Пока вижу только общее напряжение"],
     "mustNotContain": ["точная причина"]
   },
   {
