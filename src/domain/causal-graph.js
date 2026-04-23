@@ -168,6 +168,64 @@ export const CAUSAL_GRAPH_NODES = [
     ]
   },
   {
+    id: "qualification_rules_consistent",
+    type: "symptom",
+    label: "Квалификаторы опираются на одинаковые правила",
+    description: "Пользователь подтверждает, что у команды не разные личные версии, а общая логика отбора.",
+    domains: ["sales", "sale_prep", "strategy"],
+    layer: "commercial",
+    evidencePatterns: [
+      /одни\s+и\s+те\s+же\s+правил/i,
+      /по\s+одн(?:им|ой)\s+и\s+тем\s+же\s+правил/i,
+      /правил[а-я]*\s+у\s+всех\s+одинаков/i,
+      /у\s+всех\s+одинаков[а-я]*\s+правил/i
+    ],
+    contradictionPatterns: [],
+    relatedQuestions: [
+      "Если правила у всех одинаковые, тогда верхняя развилка уже не в людях: сами критерии отбора стратегически верны, или одинаково применяют слишком широкий фильтр?"
+    ]
+  },
+  {
+    id: "conversion_uniform_across_team",
+    type: "symptom",
+    label: "Конверсия у команды плюс-минус одинаковая",
+    description: "Пользователь подтверждает, что проблема не выглядит как разница в качестве конкретных менеджеров.",
+    domains: ["sales", "people", "strategy"],
+    layer: "commercial",
+    evidencePatterns: [
+      /конверси[яиюе].*у\s+всех.*одинаков/i,
+      /у\s+всех.*конверси[яиюе].*одинаков/i,
+      /конверси[яиюе].*плюс-минус\s+одинаков/i,
+      /плюс-минус\s+одинаков[а-я]*\s+конверси/i
+    ],
+    contradictionPatterns: [],
+    relatedQuestions: [
+      "Если конверсия у всех похожая, тогда вопрос уже выше людей: поток стратегически тот, или вы одинаково обрабатываете слишком широкий сегмент?"
+    ]
+  },
+  {
+    id: "strategic_icp_doubt",
+    type: "symptom",
+    label: "Появилось сомнение в самом ICP, сегментации или JTBD",
+    description: "Пользователь прямо поднимает версию, что проблема может сидеть в выборе сегмента и стратегической рамке.",
+    domains: ["strategy", "growth", "sales"],
+    layer: "strategy",
+    evidencePatterns: [
+      /неправильн[а-я]*\s+.*icp/i,
+      /неверн[а-я]*\s+.*icp/i,
+      /ошиб[а-я]*\s+.*icp/i,
+      /неправильн[а-я]*\s+сегментац/i,
+      /неверн[а-я]*\s+сегментац/i,
+      /jtbd/i,
+      /job\s+to\s+be\s+done/i,
+      /утп/i
+    ],
+    contradictionPatterns: [],
+    relatedQuestions: [
+      "Если подняться выше операционки, что сейчас ближе: сегментация и ICP выбраны слишком широко, или сегмент верный, но не доведён до маркетинга, квалификации и handoff?"
+    ]
+  },
+  {
     id: "target_leads_confirmed",
     type: "symptom",
     label: "Поток в основном целевой",
@@ -697,6 +755,16 @@ export const CAUSAL_GRAPH_EDGES = [
   { from: "qualification_stage_overloaded", to: "icp_defined_but_not_operationalized", relation: "supports", weight: 0.61, confidence: "medium", domainCross: ["strategy", "sale_prep"] },
   { from: "priority_rules_missing", to: "uniform_sla_for_mixed_leads", relation: "supports", weight: 0.91, confidence: "high", domainCross: ["growth", "sales"] },
   { from: "priority_rules_missing", to: "no_inbound_routing", relation: "supports", weight: 0.72, confidence: "medium", domainCross: ["sales", "ops"] },
+  { from: "qualification_rules_consistent", to: "icp_defined_but_not_operationalized", relation: "supports", weight: 0.63, confidence: "medium", domainCross: ["strategy", "sale_prep"] },
+  { from: "qualification_rules_consistent", to: "traffic_not_aligned_with_icp", relation: "supports", weight: 0.72, confidence: "high", domainCross: ["strategy", "growth"] },
+  { from: "qualification_rules_consistent", to: "gtm_not_synced_with_sales_capacity", relation: "supports", weight: 0.68, confidence: "medium", domainCross: ["strategy", "ops"] },
+  { from: "conversion_uniform_across_team", to: "traffic_not_aligned_with_icp", relation: "supports", weight: 0.8, confidence: "high", domainCross: ["strategy", "growth"] },
+  { from: "conversion_uniform_across_team", to: "gtm_not_synced_with_sales_capacity", relation: "supports", weight: 0.73, confidence: "medium", domainCross: ["strategy", "ops"] },
+  { from: "conversion_uniform_across_team", to: "icp_not_defined", relation: "supports", weight: 0.66, confidence: "medium", domainCross: ["strategy", "sales"] },
+  { from: "strategic_icp_doubt", to: "inbound_noise_mixed_with_target_demand", relation: "suggests", weight: 0.72, confidence: "medium", domainCross: ["strategy", "growth"] },
+  { from: "strategic_icp_doubt", to: "icp_not_defined", relation: "supports", weight: 0.9, confidence: "high", domainCross: ["strategy", "sales"] },
+  { from: "strategic_icp_doubt", to: "traffic_not_aligned_with_icp", relation: "supports", weight: 0.82, confidence: "high", domainCross: ["strategy", "growth"] },
+  { from: "strategic_icp_doubt", to: "gtm_not_synced_with_sales_capacity", relation: "supports", weight: 0.8, confidence: "high", domainCross: ["strategy", "ops"] },
   { from: "target_leads_confirmed", to: "capacity_model_missing", relation: "supports", weight: 0.71, confidence: "medium", domainCross: ["people", "ops"] },
   { from: "target_leads_confirmed", to: "ownership_of_first_contact_blurred", relation: "supports", weight: 0.64, confidence: "medium", domainCross: ["sales", "ops"] },
   { from: "hiring_without_relief", to: "unclear_role_boundaries", relation: "suggests", weight: 0.73, confidence: "medium", domainCross: ["people", "ops"] },

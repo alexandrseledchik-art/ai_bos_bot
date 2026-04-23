@@ -79,8 +79,23 @@ function layerPriority(layer) {
 
 function isLeadFlowScenario(observedSignals, extracted) {
   const text = normalizeText(extracted?.claimedProblem || extracted?.observations?.[0]?.evidence || "");
-  return observedSignals.includes("lead_overload") ||
-    observedSignals.includes("slow_first_response") ||
+  const persistentLeadSignals = new Set([
+    "lead_overload",
+    "slow_first_response",
+    "team_overload_reported",
+    "qualification_stage_exists",
+    "qualification_stage_overloaded",
+    "mixed_inbound_confirmed",
+    "qualification_missing_confirmed",
+    "priority_rules_missing",
+    "qualification_rules_consistent",
+    "conversion_uniform_across_team",
+    "strategic_icp_doubt",
+    "target_leads_confirmed",
+    "warm_inbound_demand"
+  ]);
+
+  return observedSignals.some((item) => persistentLeadSignals.has(item)) ||
     (/лид|заяв|входящ|продаж/.test(text) && /не усп|долго|ответ|очеред|перегруж|не хватает/.test(text));
 }
 
@@ -121,6 +136,24 @@ function qualificationLayerOverloaded(observedSignals, extracted) {
     /квалификац[ияи].*зашива|квалификац[ияи].*перегруж|менеджер.*квалификац.*зашива/i.test(text);
 }
 
+function rulesConsistentAcrossTeam(observedSignals, extracted) {
+  const text = normalizeText(extracted?.claimedProblem || extracted?.observations?.map((item) => item?.evidence).join(" ") || "");
+  return observedSignals.includes("qualification_rules_consistent") ||
+    /одни\s+и\s+те\s+же\s+правил|по\s+одн(?:им|ой)\s+и\s+тем\s+же\s+правил|правил[а-я]*\s+у\s+всех\s+одинаков|у\s+всех\s+одинаков[а-я]*\s+правил/i.test(text);
+}
+
+function conversionLooksUniformAcrossTeam(observedSignals, extracted) {
+  const text = normalizeText(extracted?.claimedProblem || extracted?.observations?.map((item) => item?.evidence).join(" ") || "");
+  return observedSignals.includes("conversion_uniform_across_team") ||
+    /конверси[яиюе].*у\s+всех.*одинаков|у\s+всех.*конверси[яиюе].*одинаков|конверси[яиюе].*плюс-минус\s+одинаков|плюс-минус\s+одинаков[а-я]*\s+конверси/i.test(text);
+}
+
+function strategicIcpDoubtObserved(observedSignals, extracted) {
+  const text = normalizeText(extracted?.claimedProblem || extracted?.observations?.map((item) => item?.evidence).join(" ") || "");
+  return observedSignals.includes("strategic_icp_doubt") ||
+    /неправильн[а-я]*\s+.*icp|неверн[а-я]*\s+.*icp|ошиб[а-я]*\s+.*icp|неправильн[а-я]*\s+сегментац|неверн[а-я]*\s+сегментац|jtbd|job\s+to\s+be\s+done|утп/i.test(text);
+}
+
 function hasUpstreamLeadNoiseSignals(observedSignals, extracted) {
   const text = normalizeText(extracted?.claimedProblem || extracted?.observations?.map((item) => item?.evidence).join(" ") || "");
   return observedSignals.includes("mixed_inbound_confirmed") ||
@@ -142,8 +175,16 @@ function upstreamResolutionObserved(observedSignals, extracted) {
   return observedSignals.includes("mixed_inbound_confirmed") ||
     observedSignals.includes("qualification_missing_confirmed") ||
     observedSignals.includes("priority_rules_missing") ||
+    observedSignals.includes("qualification_rules_consistent") ||
+    observedSignals.includes("conversion_uniform_across_team") ||
+    observedSignals.includes("strategic_icp_doubt") ||
     observedSignals.includes("target_leads_confirmed") ||
     /icp|квалификац|предквалификац|приоритет|сегмент|всё подряд|смешан|неразобран|целев/i.test(text);
+}
+
+function needsStrategicSplit(observedSignals, extracted) {
+  return strategicIcpDoubtObserved(observedSignals, extracted) ||
+    (rulesConsistentAcrossTeam(observedSignals, extracted) && conversionLooksUniformAcrossTeam(observedSignals, extracted));
 }
 
 function buildQuestionCandidates({ candidateStates, candidateCauses, observedSignals, extracted }) {
@@ -152,7 +193,25 @@ function buildQuestionCandidates({ candidateStates, candidateCauses, observedSig
   const upstreamResolved = upstreamResolutionObserved(observedSignals, extracted);
   const staffingAllowed = pureStaffingHypothesisAllowed(observedSignals, extracted);
   const qualificationExists = qualificationLayerExists(observedSignals, extracted);
+  const strategicSplit = needsStrategicSplit(observedSignals, extracted);
   const candidates = [];
+
+  if (leadFlowScenario && strategicSplit) {
+    candidates.push({
+      question:
+        "Тогда я бы уже держал две верхние версии: сегментация и ICP изначально выбраны слишком широко, или сегмент в целом верный, но не доведён до рекламы, квалификации и handoff. Что у вас ближе?",
+      type: "cause",
+      layer: "strategy",
+      nodeId: "strategic_split",
+      label: "Стратегическая развилка между качеством ICP и его operationalization",
+      priority: 1.28,
+      separates: [
+        "Сегментация и ICP выбраны слишком широко",
+        "ICP в целом верный, но не доведён до правил маркетинга, квалификации и handoff"
+      ],
+      whyUseful: "Этот вопрос отделяет ошибку в самой стратегической рамке от ошибки перевода стратегии в коммерческий поток."
+    });
+  }
 
   const pushQuestion = (item, type, index, separates) => {
     const question = nodeById.get(item.id)?.relatedQuestions?.[0];
@@ -185,6 +244,12 @@ function buildQuestionCandidates({ candidateStates, candidateCauses, observedSig
     }
     if (leadFlowScenario && qualificationExists && /целев|приоритет|размеченн|вручную|квалификац/i.test(question)) {
       priority += 0.16;
+    }
+    if (leadFlowScenario && strategicSplit && item.layer === "strategy") {
+      priority += 0.22;
+    }
+    if (leadFlowScenario && strategicSplit && item.layer === "operations") {
+      priority -= 0.08;
     }
 
     candidates.push({
@@ -308,6 +373,9 @@ export function analyzeWithGraph({ extracted, entryState, memorySummary }) {
   const leadFlowScenario = isLeadFlowScenario(observedSignals, extracted);
   const qualificationExists = qualificationLayerExists(observedSignals, extracted);
   const qualificationOverloaded = qualificationLayerOverloaded(observedSignals, extracted);
+  const sameRules = rulesConsistentAcrossTeam(observedSignals, extracted);
+  const sameConversion = conversionLooksUniformAcrossTeam(observedSignals, extracted);
+  const strategicDoubt = strategicIcpDoubtObserved(observedSignals, extracted);
 
   if (leadFlowScenario && !pureStaffingHypothesisAllowed(observedSignals, extracted)) {
     if (stateScores.has("capacity_model_missing")) {
@@ -338,6 +406,36 @@ export function analyzeWithGraph({ extracted, entryState, memorySummary }) {
   }
   if (qualificationOverloaded && stateScores.has("weak_lead_qualification")) {
     stateScores.set("weak_lead_qualification", stateScores.get("weak_lead_qualification") * 1.1);
+  }
+  if (sameRules && causeScores.has("traffic_not_aligned_with_icp")) {
+    causeScores.set("traffic_not_aligned_with_icp", causeScores.get("traffic_not_aligned_with_icp") * 1.22);
+  }
+  if (sameRules && causeScores.has("gtm_not_synced_with_sales_capacity")) {
+    causeScores.set("gtm_not_synced_with_sales_capacity", causeScores.get("gtm_not_synced_with_sales_capacity") * 1.18);
+  }
+  if (sameRules && causeScores.has("rule_exists_but_execution_loop_missing")) {
+    causeScores.set("rule_exists_but_execution_loop_missing", causeScores.get("rule_exists_but_execution_loop_missing") * 1.08);
+  }
+  if (sameConversion && causeScores.has("traffic_not_aligned_with_icp")) {
+    causeScores.set("traffic_not_aligned_with_icp", causeScores.get("traffic_not_aligned_with_icp") * 1.28);
+  }
+  if (sameConversion && causeScores.has("icp_not_defined")) {
+    causeScores.set("icp_not_defined", causeScores.get("icp_not_defined") * 1.18);
+  }
+  if (sameConversion && causeScores.has("staffing_not_tied_to_lead_load")) {
+    causeScores.set("staffing_not_tied_to_lead_load", causeScores.get("staffing_not_tied_to_lead_load") * 0.68);
+  }
+  if (strategicDoubt && causeScores.has("icp_not_defined")) {
+    causeScores.set("icp_not_defined", causeScores.get("icp_not_defined") * 1.35);
+  }
+  if (strategicDoubt && causeScores.has("traffic_not_aligned_with_icp")) {
+    causeScores.set("traffic_not_aligned_with_icp", causeScores.get("traffic_not_aligned_with_icp") * 1.28);
+  }
+  if (strategicDoubt && causeScores.has("gtm_not_synced_with_sales_capacity")) {
+    causeScores.set("gtm_not_synced_with_sales_capacity", causeScores.get("gtm_not_synced_with_sales_capacity") * 1.2);
+  }
+  if (strategicDoubt && causeScores.has("icp_defined_but_not_operationalized")) {
+    causeScores.set("icp_defined_but_not_operationalized", causeScores.get("icp_defined_but_not_operationalized") * 1.16);
   }
 
   const candidateStates = scoreMapToRankedList(stateScores, stateSupport, 5);

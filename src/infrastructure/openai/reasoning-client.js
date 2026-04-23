@@ -41,6 +41,11 @@ function uniqueConstraints(items, maxItems = 5) {
   return result;
 }
 
+function isGenericPlaceholderConstraintLabel(label) {
+  const normalized = normalizeText(label).toLowerCase();
+  return /пользователь видит локальную боль|сло[^,]*, который пока не назван прямо/.test(normalized);
+}
+
 function detectFocus(text) {
   const normalized = normalizeText(text).toLowerCase();
 
@@ -260,8 +265,23 @@ function isOpeningMessage(context) {
 function isLeadOverloadScenario(text, graphPacket) {
   const normalized = normalizeText(text).toLowerCase();
   const observedSignals = graphPacket?.observedSignals || [];
-  return observedSignals.includes("lead_overload") ||
-    observedSignals.includes("slow_first_response") ||
+  const persistentLeadSignals = new Set([
+    "lead_overload",
+    "slow_first_response",
+    "team_overload_reported",
+    "qualification_stage_exists",
+    "qualification_stage_overloaded",
+    "mixed_inbound_confirmed",
+    "qualification_missing_confirmed",
+    "priority_rules_missing",
+    "qualification_rules_consistent",
+    "conversion_uniform_across_team",
+    "strategic_icp_doubt",
+    "target_leads_confirmed",
+    "warm_inbound_demand"
+  ]);
+
+  return observedSignals.some((item) => persistentLeadSignals.has(item)) ||
     (/заяв|лид|входящ/.test(normalized) && /не усп|люд|ответ|очеред|обработ|перегруж/.test(normalized));
 }
 
@@ -407,6 +427,13 @@ function genericConstraintsByFocus(focus, text, graphPacket) {
 
   if (/заяв|лид/.test(normalized) && /не усп|люд|ответ|очеред|обработ/.test(normalized)) {
     const constraints = [
+      buildConstraint(
+        "ICP и сегментация могут быть заданы слишком широко, поэтому рынок приводит лишний спрос ещё до квалификации",
+        "strategy",
+        0.61,
+        "Если перегруз общий, а команда работает по похожим правилам, корень может сидеть выше операционки — в самой рамке целевого сегмента.",
+        "Если сегмент выбран узко и корректно, а проблема остаётся только в переводе правил в квалификацию и handoff."
+      ),
       buildConstraint(
         "Поток перегружен нецелевыми или слабо квалифицированными лидами",
         "commercial",
@@ -590,7 +617,7 @@ function buildEntryState(context, focus, signalSufficiency, selectedConstraint =
   );
   const graphConstraints = constraintsFromGraphPacket(context.graphPacket);
   const shouldPreservePreviousSpread = Boolean(context.classification?.inferredFollowUp) || isMetaFollowUpText(text);
-  const candidateConstraints = uniqueConstraints(
+  let candidateConstraints = uniqueConstraints(
     shouldPreservePreviousSpread
       ? [
           ...(previous.candidateConstraints || []),
@@ -604,6 +631,13 @@ function buildEntryState(context, focus, signalSufficiency, selectedConstraint =
         ]
   );
   let nextBestQuestion = buildNextQuestion(focus, text, candidateConstraints, context.graphPacket);
+
+  if (context.classification?.type === "free_text_problem") {
+    const specificConstraints = candidateConstraints.filter((item) => !isGenericPlaceholderConstraintLabel(item.label));
+    if (specificConstraints.length >= 3) {
+      candidateConstraints = uniqueConstraints(specificConstraints, 5);
+    }
+  }
 
   if (
     /заяв|лид|входящ/.test(text.toLowerCase()) &&

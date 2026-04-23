@@ -822,5 +822,114 @@
         "minCandidateConstraintBullets": 3
       }
     }
+  },
+  {
+    "id": "lead_flow_raises_strategic_icp_branch_proactively",
+    "turns": [
+      "Сейчас проблемы с продажами: лидов много, менеджеры не успевают их обрабатывать, но продаж мало.",
+      "У нас есть квалификаторы, они сами определяют кто целевой и передают дальше.",
+      "Они работают по одним и тем же правилам.",
+      "Конверсия у всех плюс-минус одинаковая."
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["сегмент", "маркетинг", "icp", "jtbd"],
+        "mustNotContain": ["кто берет", "кому он идет", "кто свободен"],
+        "minDiscriminatingSignals": 2,
+        "minCandidateConstraints": 4
+      },
+      "causeDepth": {
+        "requireClaimedCauseNotSelected": false,
+        "minCandidateStates": 4,
+        "minCandidateCauses": 4,
+        "minUniqueLayers": 4,
+        "minGraphConfidence": 0.5,
+        "requiredConstraintTerms": ["ICP"]
+      },
+      "uncertainty": {
+        "minResponseHypotheses": 2,
+        "minAlternativeHypotheses": 4,
+        "minConflicts": 1,
+        "forbiddenCertaintyPhrases": ["главная причина уже в менеджерах", "дело только в найме"]
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "forbiddenTerms": ["нанять", "расширить отдел"],
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      },
+      "surface": {
+        "mustContainAny": ["две", "ICP", "сегментац"],
+        "mustNotContain": ["кто берет лид первым", "кому он идет дальше"],
+        "minParagraphs": 2,
+        "maxParagraphs": 3
+      },
+      "promotion": {
+        "expectPromotion": false,
+        "expectedCaseKind": ""
+      },
+      "artifact": {
+        "expectSaved": false
+      }
+    }
+  },
+  {
+    "id": "lead_flow_uniform_conversion_keeps_strategic_split",
+    "turns": [
+      "Сейчас проблемы с продажами, лиды приходят, их даже много, менеджеры не успевают их обрабатывать, но при всем при этом нет продаж. Мне кажется, дело в том, что менеджеры плохо отрабатывают лиды.",
+      "У меня есть менеджеры-квалификаторы, они делают первичную квалификацию, а потом передают продавцам.",
+      "Менеджеры все опираются на одни и те же правила, которые я им дал. Если смотреть на конверсию, то она у всех плюс-минус одинаковая."
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["сегмент", "маркетинг", "icp", "jtbd"],
+        "mustNotContain": ["главный рычаг", "проверь ограничение", "первый шаг"],
+        "minDiscriminatingSignals": 2,
+        "minCandidateConstraints": 4
+      },
+      "causeDepth": {
+        "requireClaimedCauseNotSelected": true,
+        "minCandidateStates": 4,
+        "minCandidateCauses": 4,
+        "minUniqueLayers": 4,
+        "minGraphConfidence": 0.5,
+        "requiredConstraintTerms": ["ICP"]
+      },
+      "uncertainty": {
+        "minResponseHypotheses": 2,
+        "minAlternativeHypotheses": 4,
+        "minConflicts": 1,
+        "forbiddenCertaintyPhrases": ["главный рычаг", "ограничение уже выбрано", "дело уже в"]
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "forbiddenTerms": ["нанять", "расширить отдел", "первый шаг: проверь ограничение"],
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      },
+      "surface": {
+        "mustContainAny": ["две", "ICP", "сегментац"],
+        "mustNotContain": ["главный рычаг", "проверь ограничение", "сигнала хватает, чтобы выбрать рабочее ограничение"],
+        "minParagraphs": 2,
+        "maxParagraphs": 3
+      },
+      "promotion": {
+        "expectPromotion": false,
+        "expectedCaseKind": ""
+      },
+      "artifact": {
+        "expectSaved": false
+      }
+    }
   }
 ]

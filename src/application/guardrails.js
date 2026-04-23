@@ -451,6 +451,11 @@ function buildLeadScenarioField(spread, context, entryState) {
   const hasWarmInbound = signals.has("warm_inbound_demand") || latestTextSuggestsWarmInbound(context);
   const hasSlowFirstResponse = signals.has("slow_first_response") || latestTextSuggestsEarlyFunnelStage(context);
   const hasLeadOverload = signals.has("lead_overload");
+  const strategicSplit = strategicSplitNeeded(context, entryState);
+
+  if (strategicSplit) {
+    return "Сейчас я бы уже держал не одну верхнюю версию, а две. Либо ICP и сегментация изначально выбраны слишком широко и рынок несёт вам лишний поток, либо сегмент в целом верный, но это не доведено до правил квалификации, приоритета и handoff.";
+  }
 
   if (latestTextSuggestsWarmInbound(context)) {
     return "Тёплый поток отрезает только самую грубую версию про совсем случайный спрос. Но тёплый ещё не значит целевой. Для меня здесь остаются три версии: продавцы руками разбирают смешанный вход; ICP и приоритеты не переведены в живую обработку; или сам первый контур не держит ownership и очередь.";
@@ -497,6 +502,10 @@ function buildWhyAndQuestion(response, context) {
 }
 
 function buildLeadScenarioWhy(response, context, entryState) {
+  if (strategicSplitNeeded(context, entryState)) {
+    return "Одинаковые правила и похожая конверсия у команды ослабляют версию про конкретных людей. Значит сейчас важнее отделить ошибку в самой сегментации и ICP от ошибки перевода этих правил в живую коммерческую работу.";
+  }
+
   if (latestTextSuggestsWarmInbound(context)) {
     return "Тёплый вход убирает только самую простую отговорку про слабый спрос. Теперь важно не перепутать локальный перегруз с тем, что до продавца вообще не работает фильтр, приоритет и нормальная квалификация.";
   }
@@ -551,7 +560,9 @@ function buildMetaWhySurfaceResponse(response, entryState, context) {
     : "Потому что здесь рано фиксировать одну причину как главную.";
 
   const middle = isLeadFlowScenarioContext(context, entryState)
-    ? signals.has("warm_inbound_demand")
+    ? strategicSplitNeeded(context, entryState)
+      ? "Сейчас мне нужно не выбрать красивую верхнюю историю, а отделить две сильные стратегические версии: сам ICP и сегментация заданы неверно, или они в целом верны, но не превращены в рабочее правило отбора и handoff."
+      : signals.has("warm_inbound_demand")
       ? "На тёплом входе суточный провал до первого касания всё ещё не доказывает, что корень уже точно в ресурсе. Сначала мне нужно отделить локальный перегруз от версии, что поток плохо фильтруется и приоритеты до продавца просто не доведены."
       : "Сначала мне нужно отделить локальный перегруз от двух других версий: в продавцов летит смешанный поток, или ICP и приоритеты вообще не доведены до живой обработки."
     : spread.length >= 3
@@ -572,8 +583,23 @@ function isLeadFlowScenarioContext(context, entryState) {
     ...(context.graphPacket?.observedSignals || [])
   ], 12);
 
-  return observedSignals.includes("lead_overload") ||
-    observedSignals.includes("slow_first_response") ||
+  const persistentLeadSignals = new Set([
+    "lead_overload",
+    "slow_first_response",
+    "team_overload_reported",
+    "qualification_stage_exists",
+    "qualification_stage_overloaded",
+    "mixed_inbound_confirmed",
+    "qualification_missing_confirmed",
+    "priority_rules_missing",
+    "qualification_rules_consistent",
+    "conversion_uniform_across_team",
+    "strategic_icp_doubt",
+    "target_leads_confirmed",
+    "warm_inbound_demand"
+  ]);
+
+  return observedSignals.some((item) => persistentLeadSignals.has(item)) ||
     (/заяв|лид|входящ/.test(text) && /не усп|люд|ответ|очеред|обработ|перегруж|продавц|менеджер|штат/.test(text));
 }
 
@@ -640,9 +666,32 @@ function latestTextResolvesQualificationMechanics(context) {
   return /всё\s+подряд|сам.*рук|вручную|целев|приоритет|размеченн|маркиров|отбира/i.test(text);
 }
 
+function latestTextMentionsUniformRules(context) {
+  const text = ensureString(context.userText).toLowerCase();
+  return /одни\s+и\s+те\s+же\s+правил|по\s+одн(?:им|ой)\s+и\s+тем\s+же\s+правил|правил[а-я]*\s+у\s+всех\s+одинаков|у\s+всех\s+одинаков[а-я]*\s+правил/i.test(text);
+}
+
+function latestTextMentionsUniformConversion(context) {
+  const text = ensureString(context.userText).toLowerCase();
+  return /конверси[яиюе].*у\s+всех.*одинаков|у\s+всех.*конверси[яиюе].*одинаков|конверси[яиюе].*плюс-минус\s+одинаков|плюс-минус\s+одинаков[а-я]*\s+конверси/i.test(text);
+}
+
+function latestTextRaisesStrategicIcpDoubt(context) {
+  const text = ensureString(context.userText).toLowerCase();
+  return /неправильн[а-я]*\s+.*icp|неверн[а-я]*\s+.*icp|ошиб[а-я]*\s+.*icp|неправильн[а-я]*\s+сегментац|неверн[а-я]*\s+сегментац|jtbd|job\s+to\s+be\s+done|утп/i.test(text);
+}
+
 function qualificationLayerExistsInContext(context, entryState) {
   const signals = observedSignalSet(context, entryState);
   return signals.has("qualification_stage_exists") || signals.has("qualification_stage_overloaded") || latestTextMentionsQualificationLayer(context);
+}
+
+function strategicSplitNeeded(context, entryState) {
+  const signals = observedSignalSet(context, entryState);
+  return latestTextRaisesStrategicIcpDoubt(context) ||
+    signals.has("strategic_icp_doubt") ||
+    ((signals.has("qualification_rules_consistent") || latestTextMentionsUniformRules(context)) &&
+      (signals.has("conversion_uniform_across_team") || latestTextMentionsUniformConversion(context)));
 }
 
 function userExplicitlyClaimedStaffing(context) {
@@ -694,6 +743,10 @@ function shouldHoldLeadFlowInClarify(context, entryState) {
     return false;
   }
 
+  if (strategicSplitNeeded(context, entryState)) {
+    return true;
+  }
+
   if (latestTextAlreadyResolvesUpstreamLayer(context)) {
     return false;
   }
@@ -709,6 +762,13 @@ function shouldHoldLeadFlowInClarify(context, entryState) {
 function buildLeadScenarioSpread(context, entryState) {
   const spread = [
     {
+      label: "ICP или сегментация могут быть стратегически выбраны слишком широко, поэтому в систему изначально приходит лишний спрос",
+      layer: "strategy",
+      confidence: 0.63,
+      whyPossible: "Если перегруз общий, а конверсия у команды похожая, корень может сидеть не в людях и не только в операционке, а в самой рамке сегмента и обещания рынку.",
+      whatWouldDisprove: "Если сегмент выбран узко и корректно, а проблема остаётся только в переводе правил в квалификацию и handoff."
+    },
+    {
       label: "Входящий поток смешивает целевых и нецелевых лидов, поэтому продавцы тонут не в спросе, а в шуме",
       layer: "commercial",
       confidence: 0.62,
@@ -721,6 +781,13 @@ function buildLeadScenarioSpread(context, entryState) {
       confidence: 0.6,
       whyPossible: "Когда стратегия не превращена в ICP, квалификацию и маршрутизацию, продавцы забирают в работу всё подряд.",
       whatWouldDisprove: "Если сегменты и критерии приоритета уже жёстко работают в маркетинге, квалификации и handoff."
+    },
+    {
+      label: "Даже хорошие правила не собраны в устойчивый контур исполнения: не закреплены ownership, handoff и контроль по входу",
+      layer: "management",
+      confidence: 0.56,
+      whyPossible: "Даже при вменяемом ICP система может захлёбываться, если правило не превращено в управляемый контур с понятным владельцем и контролем исполнения.",
+      whatWouldDisprove: "Если ownership, handoff и контроль по входу уже жёстко закреплены и одинаково держатся без ручного вмешательства."
     },
     {
       label: "Первый отклик и ownership не держатся как устойчивая операционная конструкция",
@@ -779,8 +846,13 @@ function pickBestNextQuestion(context, entryState, graphAnalysis) {
   const qualificationLayerExists = qualificationLayerExistsInContext(context, entryState);
   const previousAssistantWasLocal = assistantAskedLocalLeadQuestion(context);
   const previousAssistantWasUpstream = assistantAskedUpstreamLeadQuestion(context);
+  const strategicSplit = strategicSplitNeeded(context, entryState);
 
   if (isLeadFlowScenarioContext(context, entryState)) {
+    if (strategicSplit) {
+      return "Тогда разведу две верхние версии: у вас изначально в маркетинг и вход идёт слишком широкий сегмент, или сегмент в целом верный, но ICP не доведён до правил квалификации, приоритета и handoff. Что у вас ближе?";
+    }
+
     if (qualificationLayerExists && !latestTextResolvesQualificationMechanics(context)) {
       return hasWarmInbound
         ? "Если этап квалификации уже есть, тогда вопрос не в его наличии, а в его роли: он получает уже размеченный тёплый поток или сам руками решает, кто вообще целевой и кому идти первым?"
@@ -1164,6 +1236,14 @@ function buildSurfaceResponse(decision, context) {
 
   if (routeType === "free_text_problem" && userExpressesDoubt(context)) {
     return buildDoubtSurfaceResponse(response, entryState);
+  }
+
+  if (
+    routeType === "free_text_problem" &&
+    isLeadFlowScenarioContext(context, entryState) &&
+    (strategicSplitNeeded(context, entryState) || shouldHoldLeadFlowInClarify(context, entryState))
+  ) {
+    return buildDiagnosticClarifySurfaceResponse(response, entryState, context);
   }
 
   if (visibleResponse && !looksMechanicalResponse(visibleResponse) && !visibleResponseMissesDepth(visibleResponse, entryState, context)) {
@@ -1821,12 +1901,16 @@ export function applyGuardrails(rawDecision, context) {
     decision.memory.actionWave.whyThisFirst = "";
     decision.memory.artifact.shouldSave = false;
     decision.response.nextStep = ensureString(decision.entryState.nextBestQuestion, decision.response.nextStep);
-    decision.response.whatIUnderstood = latestTextSuggestsWarmInbound(context)
-      ? "Тёплый вход уже сужает поле, но ещё не доказывает, что проблема только в скорости первого ответа или в чистой мощности команды."
-      : latestTextRestatesCapacityClaim(context)
-        ? "Перегруз команды виден, но сам по себе он ещё не доказывает, что узкое место именно в чистой мощности."
-        : "Узкое место уже видно во входе в продажи, но причина всё ещё может лежать в разных слоях системы.";
-    decision.response.whyItMatters = "Если сейчас схлопнуться в версию про найм или SLA, можно пропустить более глубокую поломку в квалификации, сегментации и конструкции первого контура.";
+    decision.response.whatIUnderstood = strategicSplitNeeded(context, decision.entryState)
+      ? "Теперь уже видно не одну, а две верхние версии: либо сам ICP и сегментация заданы неверно, либо они в целом верны, но не превращены в живые правила отбора и маршрута."
+      : latestTextSuggestsWarmInbound(context)
+        ? "Тёплый вход уже сужает поле, но ещё не доказывает, что проблема только в скорости первого ответа или в чистой мощности команды."
+        : latestTextRestatesCapacityClaim(context)
+          ? "Перегруз команды виден, но сам по себе он ещё не доказывает, что узкое место именно в чистой мощности."
+          : "Узкое место уже видно во входе в продажи, но причина всё ещё может лежать в разных слоях системы.";
+    decision.response.whyItMatters = strategicSplitNeeded(context, decision.entryState)
+      ? "Если слишком рано выбрать только операционную версию, можно пропустить более верхний разрыв: саму сегментацию спроса или несвязку между стратегией и живым маршрутом входа."
+      : "Если сейчас схлопнуться в версию про найм или SLA, можно пропустить более глубокую поломку в квалификации, сегментации и конструкции первого контура.";
   }
 
   decision.memory.companyName = ensureString(decision.memory.companyName);
