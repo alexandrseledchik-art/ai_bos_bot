@@ -194,6 +194,159 @@
     }
   },
   {
+    "id": "meta_explains_framing_without_template",
+    "turns": [
+      "продажи не растут, все держится на мне",
+      "что ты имеешь в виду?"
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["решить без эскалации", "собственнику"],
+        "minDiscriminatingSignals": 1,
+        "minCandidateConstraints": 3
+      },
+      "causeDepth": {
+        "requireClaimedCauseNotSelected": false,
+        "minCandidateStates": 3,
+        "minCandidateCauses": 3,
+        "minUniqueLayers": 3,
+        "minGraphConfidence": 0.5
+      },
+      "uncertainty": {
+        "minResponseHypotheses": 2,
+        "minAlternativeHypotheses": 3,
+        "minConflicts": 1,
+        "forbiddenCertaintyPhrases": ["точная причина уже понятна"]
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "forbiddenTerms": ["нанять", "назначьте SLA"],
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      },
+      "surface": {
+        "mustContainAny": ["Имею в виду", "это ещё не диагноз", "ты описываешь боль"],
+        "mustNotContain": ["пользователь видит локальную боль", "слой, который пока не назван прямо", "Что я понял"],
+        "minParagraphs": 2,
+        "maxParagraphs": 3
+      },
+      "promotion": {
+        "expectPromotion": false,
+        "expectedCaseKind": ""
+      },
+      "artifact": {
+        "expectSaved": false
+      }
+    }
+  },
+  {
+    "id": "meta_doubt_keeps_trust_and_moves_forward",
+    "turns": [
+      "продажи не растут, все держится на мне",
+      "я не уверен"
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["решить без эскалации", "собственнику"],
+        "minDiscriminatingSignals": 1,
+        "minCandidateConstraints": 3
+      },
+      "causeDepth": {
+        "requireClaimedCauseNotSelected": false,
+        "minCandidateStates": 3,
+        "minCandidateCauses": 3,
+        "minUniqueLayers": 3,
+        "minGraphConfidence": 0.5
+      },
+      "uncertainty": {
+        "minResponseHypotheses": 2,
+        "minAlternativeHypotheses": 3,
+        "minConflicts": 1,
+        "forbiddenCertaintyPhrases": ["точная причина уже понятна"]
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "forbiddenTerms": ["нанять", "назначьте SLA"],
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      },
+      "surface": {
+        "mustContainAny": ["Это нормально", "не прошу сейчас верить мне на слово", "не покупал вывод без проверки"],
+        "mustNotContain": ["пользователь видит локальную боль", "слой, который пока не назван прямо", "Что я понял"],
+        "minParagraphs": 2,
+        "maxParagraphs": 3
+      },
+      "promotion": {
+        "expectPromotion": false,
+        "expectedCaseKind": ""
+      },
+      "artifact": {
+        "expectSaved": false
+      }
+    }
+  },
+  {
+    "id": "meta_next_turn_keeps_continuity",
+    "turns": [
+      "продажи не растут, все держится на мне",
+      "ок, а дальше?"
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["решить без эскалации", "собственнику"],
+        "minDiscriminatingSignals": 1,
+        "minCandidateConstraints": 3
+      },
+      "causeDepth": {
+        "requireClaimedCauseNotSelected": false,
+        "minCandidateStates": 3,
+        "minCandidateCauses": 3,
+        "minUniqueLayers": 3,
+        "minGraphConfidence": 0.5
+      },
+      "uncertainty": {
+        "minResponseHypotheses": 2,
+        "minAlternativeHypotheses": 3,
+        "minConflicts": 1,
+        "forbiddenCertaintyPhrases": ["точная причина уже понятна"]
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "forbiddenTerms": ["нанять", "назначьте SLA"],
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      },
+      "surface": {
+        "mustContainAny": ["Дальше я бы", "добил ту развилку", "мне важно отделить"],
+        "mustNotContain": ["пользователь видит локальную боль", "слой, который пока не назван прямо", "Что я понял"],
+        "minParagraphs": 2,
+        "maxParagraphs": 3
+      },
+      "promotion": {
+        "expectPromotion": false,
+        "expectedCaseKind": ""
+      },
+      "artifact": {
+        "expectSaved": false
+      }
+    }
+  },
+  {
     "id": "owner_bottleneck_vs_people_fix",
     "turns": [
       "Продажи не растут, менеджеров наняли, но собственник всё равно влезает во все сделки."

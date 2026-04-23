@@ -284,6 +284,30 @@ function userAskedHow(context) {
   );
 }
 
+function userAskedMeaning(context) {
+  return /что ты имеешь в виду|что именно ты имеешь в виду|в смысле|что ты хочешь сказать|объясни, что ты имеешь в виду/i.test(
+    ensureString(context.userText).toLowerCase()
+  );
+}
+
+function userAskedDirection(context) {
+  return /почему мы идем именно сюда|почему ид[её]м именно сюда|почему ид[её]м сюда|почему именно этот вопрос|почему именно в эту сторону/i.test(
+    ensureString(context.userText).toLowerCase()
+  );
+}
+
+function userAskedNext(context) {
+  return /^((ну )?ок|хорошо|ладно)[, ]*(и )?а дальше\??$|^что дальше\??$|^и дальше\??$|^что потом\??$/i.test(
+    ensureString(context.userText).toLowerCase()
+  );
+}
+
+function userExpressesDoubt(context) {
+  return /не уверен|сомневаюсь|не думаю|не похоже|мне не очень верится|не факт|не уверен, что/i.test(
+    ensureString(context.userText).toLowerCase()
+  );
+}
+
 function latestLeadScenarioOpener(context, entryState, claimedCause) {
   const claimedCauseForAbout = humanizeClaimedCauseForAbout(claimedCause);
 
@@ -474,7 +498,7 @@ function questionLooksDirectFlowSplit(question) {
 }
 
 function isGenericPlaceholderConstraint(label) {
-  return /пользователь видит локальную боль|слой, который пока не назван прямо|нет системной модели продаж и понятных стадий воронки/i.test(
+  return /пользователь видит локальную боль|сло[^,]*, который пока не назван прямо/i.test(
     ensureString(label).toLowerCase()
   );
 }
@@ -630,6 +654,58 @@ function summarizeConstraintSpread(constraints, maxItems = 3) {
     .filter(Boolean);
 }
 
+function summarizeRenderableConstraintSpread(entryState, maxItems = 3) {
+  const specificConstraints = (entryState?.candidateConstraints || [])
+    .filter((item) => !isGenericPlaceholderConstraint(item?.label))
+    .map((item) => humanizeConstraintLabel(item?.label))
+    .filter(Boolean);
+
+  if (specificConstraints.length >= 2) {
+    return specificConstraints.slice(0, maxItems);
+  }
+
+  const graphLabels = [
+    ...((entryState?.candidateCauses || []).map((item) => humanizeConstraintLabel(item?.label))),
+    ...((entryState?.candidateStates || []).map((item) => humanizeConstraintLabel(item?.label)))
+  ].filter(Boolean);
+
+  return [...new Set([...specificConstraints, ...graphLabels])].slice(0, maxItems);
+}
+
+function explainSpread(spread) {
+  if (spread.length >= 3) {
+    return `Для меня здесь пока живы три версии: ${spread[0]}; ${spread[1]}; ${spread[2]}.`;
+  }
+
+  if (spread.length === 2) {
+    return `Для меня здесь пока живы две версии: ${spread[0]} и ${spread[1]}.`;
+  }
+
+  if (spread.length === 1) {
+    return `Сейчас у меня на столе сильнее всего лежит версия, что ${spread[0]}.`;
+  }
+
+  return "";
+}
+
+function describeVersion(label) {
+  const normalized = humanizeConstraintLabel(label);
+  if (!normalized) {
+    return "";
+  }
+
+  return `версию, что ${normalized}`;
+}
+
+function describeVersionFrom(label) {
+  const normalized = humanizeConstraintLabel(label);
+  if (!normalized) {
+    return "";
+  }
+
+  return `версии, что ${normalized}`;
+}
+
 function buildWebsiteSurfaceResponse(response) {
   return joinParagraphs([
     `${ensureSentence(response.whatIUnderstood)} ${ensureSentence(response.whyItMatters)}`,
@@ -657,7 +733,7 @@ function buildDiagnosticClarifySurfaceResponse(response, entryState, context) {
   const strongestAlternative = humanizeConstraintLabel(constraints[0]?.label);
   const secondAlternative = humanizeConstraintLabel(constraints[1]?.label);
   const thirdAlternative = humanizeConstraintLabel(constraints[2]?.label);
-  const spread = summarizeConstraintSpread(constraints, 3);
+  const spread = summarizeRenderableConstraintSpread(entryState, 3);
 
   if (isLeadFlowScenarioContext(context, entryState) && spread.length >= 3) {
     const opening = latestLeadScenarioOpener(context, entryState, claimedCause);
@@ -712,6 +788,63 @@ function buildDiagnosticClarifySurfaceResponse(response, entryState, context) {
   ]);
 }
 
+function buildMeaningSurfaceResponse(response, entryState) {
+  const spread = summarizeRenderableConstraintSpread(entryState, 3);
+  const nextQuestion = ensureString(entryState.nextBestQuestion, response.nextStep);
+
+  return joinParagraphs([
+    "Имею в виду вот что: ты описываешь боль на поверхности, но это ещё не диагноз.",
+    explainSpread(spread) || "У меня здесь пока больше одной рабочей версии, поэтому я не хочу притворяться, что причина уже доказана.",
+    `Поэтому я и иду в этот вопрос: ${nextQuestion}`
+  ]);
+}
+
+function buildDirectionSurfaceResponse(response, entryState) {
+  const spread = summarizeRenderableConstraintSpread(entryState, 3);
+  const nextQuestion = ensureString(entryState.nextBestQuestion, response.nextStep);
+  const contrast = spread.length >= 2
+    ? `Он быстрее всего отделяет ${describeVersion(spread[0])} от ${describeVersionFrom(spread[1])}${spread[2] ? ` и не даёт потерять из виду ${describeVersionFrom(spread[2])}` : ""}.`
+    : "Он быстрее всего отделяет рабочие версии друг от друга.";
+
+  return joinParagraphs([
+    "Потому что я сейчас не выбираю красивое объяснение, а ищу вопрос с максимальным информационным выигрышем.",
+    contrast,
+    nextQuestion
+  ]);
+}
+
+function buildNextSurfaceResponse(response, entryState, context) {
+  const nextQuestion = ensureString(entryState.nextBestQuestion, response.nextStep);
+  const spread = summarizeRenderableConstraintSpread(entryState, 2);
+  const bridge = isLeadFlowScenarioContext(context, entryState)
+    ? "Дальше я бы не расширял тему, а добил одну развилку во входящем контуре."
+    : "Дальше я бы не расползался в новый список идей, а добил ту развилку, на которой мы уже стоим.";
+
+  const focus = spread.length >= 2
+    ? `Сейчас мне важно отделить ${describeVersion(spread[0])} от ${describeVersionFrom(spread[1])}.`
+    : "Сейчас мне важно добрать один факт, который реально меняет картину.";
+
+  return joinParagraphs([
+    bridge,
+    focus,
+    nextQuestion
+  ]);
+}
+
+function buildDoubtSurfaceResponse(response, entryState) {
+  const nextQuestion = ensureString(entryState.nextBestQuestion, response.nextStep);
+  const spread = summarizeRenderableConstraintSpread(entryState, 2);
+  const focus = spread.length >= 2
+    ? `Я как раз не прошу сейчас верить мне на слово. Мне нужно быстро отделить ${describeVersion(spread[0])} от ${describeVersionFrom(spread[1])}.`
+    : "Я как раз не прошу сейчас верить мне на слово. Мне нужен один факт, который либо подтвердит ход мысли, либо сломает его.";
+
+  return joinParagraphs([
+    "Это нормально. На этом месте я бы тоже не покупал вывод без проверки.",
+    focus,
+    nextQuestion
+  ]);
+}
+
 function buildAnswerSurfaceResponse(response, entryState) {
   const selectedConstraint = humanizeConstraintLabel(entryState.selectedConstraint);
   const firstParagraph = selectedConstraint
@@ -756,8 +889,24 @@ function buildSurfaceResponse(decision, context) {
     return buildWebsiteSurfaceResponse(response);
   }
 
+  if (routeType === "free_text_problem" && userAskedMeaning(context)) {
+    return buildMeaningSurfaceResponse(response, entryState);
+  }
+
+  if (routeType === "free_text_problem" && userAskedDirection(context)) {
+    return buildDirectionSurfaceResponse(response, entryState);
+  }
+
   if (routeType === "free_text_problem" && userAskedWhy(context)) {
     return buildMetaWhySurfaceResponse(response, entryState, context);
+  }
+
+  if (routeType === "free_text_problem" && userAskedNext(context)) {
+    return buildNextSurfaceResponse(response, entryState, context);
+  }
+
+  if (routeType === "free_text_problem" && userExpressesDoubt(context)) {
+    return buildDoubtSurfaceResponse(response, entryState);
   }
 
   if (action === "answer" || action === "diagnose") {

@@ -104,6 +104,13 @@ function detectHardSignal(text) {
   return /\d|%|₽|руб|mrr|cac|ltv|маржа|конверс/i.test(normalizeText(text));
 }
 
+function isMetaFollowUpText(text) {
+  const normalized = normalizeText(text).toLowerCase();
+  return /что ты имеешь в виду|что именно ты имеешь в виду|в смысле|почему мы идем именно сюда|почему ид[её]м сюда|ок[, ]*а дальше|что дальше|и дальше|что потом|я не уверен|сомневаюсь|не думаю|не похоже/i.test(
+    normalized
+  );
+}
+
 function suggestionPack(focus, text) {
   const normalized = normalizeText(text).toLowerCase();
   const common = {
@@ -519,11 +526,20 @@ function buildEntryState(context, focus, signalSufficiency, selectedConstraint =
   const previous = context.entryState || {};
   const claimedCause = extractClaimedCause(text) || normalizeText(previous.claimedCause);
   const graphConstraints = constraintsFromGraphPacket(context.graphPacket);
-  const candidateConstraints = uniqueConstraints([
-    ...graphConstraints,
-    ...genericConstraintsByFocus(focus, text),
-    ...(previous.candidateConstraints || [])
-  ]);
+  const shouldPreservePreviousSpread = Boolean(context.classification?.inferredFollowUp) || isMetaFollowUpText(text);
+  const candidateConstraints = uniqueConstraints(
+    shouldPreservePreviousSpread
+      ? [
+          ...(previous.candidateConstraints || []),
+          ...graphConstraints,
+          ...genericConstraintsByFocus(focus, text)
+        ]
+      : [
+          ...graphConstraints,
+          ...genericConstraintsByFocus(focus, text),
+          ...(previous.candidateConstraints || [])
+        ]
+  );
   const nextBestQuestion = buildNextQuestion(focus, text, candidateConstraints, context.graphPacket);
 
   const symptoms = uniqueStrings([
