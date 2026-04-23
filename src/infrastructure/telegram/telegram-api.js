@@ -1,19 +1,58 @@
-export function extractTelegramTextMessage(update) {
+function buildUserMeta(message) {
+  return {
+    username: message.from?.username || "",
+    chatTitle: message.chat.title || message.chat.username || "",
+    firstName: message.from?.first_name || ""
+  };
+}
+
+function inferAudioFileName(kind, media) {
+  if (media?.file_name) {
+    return media.file_name;
+  }
+
+  if (kind === "voice") {
+    return "voice-message.ogg";
+  }
+
+  return "audio-message.mp3";
+}
+
+export function extractTelegramMessagePayload(update) {
   const message = update?.message || update?.edited_message || null;
 
-  if (!message?.text) {
+  if (!message) {
+    return null;
+  }
+
+  if (message.text) {
+    return {
+      kind: "text",
+      chatId: message.chat.id,
+      text: message.text,
+      userMeta: buildUserMeta(message)
+    };
+  }
+
+  const media = message.voice || message.audio || null;
+  if (!media?.file_id) {
     return null;
   }
 
   return {
+    kind: message.voice ? "voice" : "audio",
     chatId: message.chat.id,
-    text: message.text,
-    userMeta: {
-      username: message.from?.username || "",
-      chatTitle: message.chat.title || message.chat.username || "",
-      firstName: message.from?.first_name || ""
-    }
+    userMeta: buildUserMeta(message),
+    fileId: media.file_id,
+    mimeType: media.mime_type || "",
+    fileName: inferAudioFileName(message.voice ? "voice" : "audio", media),
+    durationSeconds: Number(media.duration || 0)
   };
+}
+
+export function extractTelegramTextMessage(update) {
+  const payload = extractTelegramMessagePayload(update);
+  return payload?.kind === "text" ? payload : null;
 }
 
 export class TelegramApiClient {
@@ -59,6 +98,21 @@ export class TelegramApiClient {
       chat_id: chatId,
       action
     });
+  }
+
+  async getFile(fileId) {
+    return this.api("getFile", {
+      file_id: fileId
+    });
+  }
+
+  async downloadFile(filePath) {
+    const response = await fetch(`${this.apiBaseUrl}/file/bot${this.token}/${filePath}`);
+    if (!response.ok) {
+      throw new Error(`Telegram file download failed: ${response.status}`);
+    }
+
+    return Buffer.from(await response.arrayBuffer());
   }
 
   startTyping(chatId, { intervalMs = 4000 } = {}) {

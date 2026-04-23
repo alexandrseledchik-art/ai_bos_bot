@@ -2,7 +2,7 @@ import { getServices } from "./create-services.js";
 import { TelegramBotRunner } from "./infrastructure/telegram/telegram-bot.js";
 
 async function main() {
-  const { config, conversationService } = getServices();
+  const { config, conversationService, audioTranscriber } = getServices();
 
   if (!config.telegramToken) {
     console.log("TELEGRAM_BOT_TOKEN is missing. Run `npm run smoke` for a local demo.");
@@ -12,7 +12,8 @@ async function main() {
   const bot = new TelegramBotRunner({
     token: config.telegramToken,
     apiBaseUrl: config.telegramApiBaseUrl,
-    pollingTimeoutSeconds: config.pollingTimeoutSeconds
+    pollingTimeoutSeconds: config.pollingTimeoutSeconds,
+    audioTranscriber
   });
 
   console.log("Business diagnostic bot is running.");

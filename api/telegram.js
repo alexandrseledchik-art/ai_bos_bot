@@ -1,5 +1,6 @@
 import { getServices } from "../src/create-services.js";
-import { extractTelegramTextMessage } from "../src/infrastructure/telegram/telegram-api.js";
+import { extractTelegramMessagePayload } from "../src/infrastructure/telegram/telegram-api.js";
+import { resolveTelegramPayloadToText } from "../src/infrastructure/telegram/resolve-telegram-input.js";
 
 function json(payload, init = {}) {
   return new Response(JSON.stringify(payload), {
@@ -19,7 +20,7 @@ function validateWebhookSecret(request, expectedSecret) {
 }
 
 async function handleTelegramWebhook(request) {
-  const { config, conversationService, telegramApi } = getServices();
+  const { config, conversationService, telegramApi, audioTranscriber } = getServices();
 
   if (!config.telegramToken) {
     return json({ ok: false, error: "TELEGRAM_BOT_TOKEN is missing" }, { status: 500 });
@@ -30,7 +31,7 @@ async function handleTelegramWebhook(request) {
   }
 
   const update = await request.json();
-  const payload = extractTelegramTextMessage(update);
+  const payload = extractTelegramMessagePayload(update);
 
   if (!payload) {
     return json({ ok: true, ignored: true });
@@ -40,10 +41,21 @@ async function handleTelegramWebhook(request) {
   let result;
 
   try {
+    const resolved = await resolveTelegramPayloadToText({
+      payload,
+      telegramApi,
+      audioTranscriber
+    });
+
+    if (resolved.replyOnly) {
+      await telegramApi.sendMessage(payload.chatId, resolved.replyOnly);
+      return json({ ok: true, handled: payload.kind });
+    }
+
     result = await conversationService.handleUserMessage({
       telegramChatId: String(payload.chatId),
-      text: payload.text,
-      userMeta: payload.userMeta
+      text: resolved.text,
+      userMeta: resolved.userMeta
     });
   } finally {
     stopTyping();

@@ -82,6 +82,11 @@ export function loadConfig() {
     openaiBaseUrl: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
     reasoningModel: process.env.OPENAI_REASONING_MODEL || "gpt-5.4-mini",
     reasoningEffort: process.env.OPENAI_REASONING_EFFORT || "medium",
+    transcriptionModel: process.env.OPENAI_TRANSCRIPTION_MODEL || "gpt-4o-mini-transcribe",
+    transcriptionFallbackModels: (process.env.OPENAI_TRANSCRIPTION_FALLBACK_MODELS || "whisper-1")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean),
     pollingTimeoutSeconds: Number(process.env.TELEGRAM_POLLING_TIMEOUT_SECONDS || 20),
     screenTimeoutMs: Number(process.env.SCREEN_TIMEOUT_MS || 6000),
     maxHistoryMessages: Number(process.env.MAX_HISTORY_MESSAGES || 12),

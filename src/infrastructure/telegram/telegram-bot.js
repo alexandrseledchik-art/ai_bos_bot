@@ -1,17 +1,19 @@
-import { extractTelegramTextMessage, TelegramApiClient } from "./telegram-api.js";
+import { extractTelegramMessagePayload, TelegramApiClient } from "./telegram-api.js";
+import { resolveTelegramPayloadToText } from "./resolve-telegram-input.js";
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export class TelegramBotRunner {
-  constructor({ token, apiBaseUrl, pollingTimeoutSeconds = 20 }) {
+  constructor({ token, apiBaseUrl, pollingTimeoutSeconds = 20, audioTranscriber = null }) {
     this.api = new TelegramApiClient({
       token,
       apiBaseUrl
     });
     this.pollingTimeoutSeconds = pollingTimeoutSeconds;
     this.offset = 0;
+    this.audioTranscriber = audioTranscriber;
   }
 
   async getUpdates() {
@@ -33,7 +35,7 @@ export class TelegramBotRunner {
 
         for (const update of updates) {
           this.offset = update.update_id + 1;
-          const payload = extractTelegramTextMessage(update);
+          const payload = extractTelegramMessagePayload(update);
 
           if (!payload) {
             continue;
@@ -43,10 +45,21 @@ export class TelegramBotRunner {
           let result;
 
           try {
+            const resolved = await resolveTelegramPayloadToText({
+              payload,
+              telegramApi: this.api,
+              audioTranscriber: this.audioTranscriber
+            });
+
+            if (resolved.replyOnly) {
+              await this.sendMessage(payload.chatId, resolved.replyOnly);
+              continue;
+            }
+
             result = await onMessage({
               telegramChatId: String(payload.chatId),
-              text: payload.text,
-              userMeta: payload.userMeta
+              text: resolved.text,
+              userMeta: resolved.userMeta
             });
           } finally {
             stopTyping();

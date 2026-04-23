@@ -3,6 +3,7 @@ import path from "node:path";
 import { ConversationService } from "../application/conversation-service.js";
 import { ReasoningClient } from "../infrastructure/openai/reasoning-client.js";
 import { FileMemoryStore } from "../infrastructure/storage/file-store.js";
+import { extractTelegramMessagePayload } from "../infrastructure/telegram/telegram-api.js";
 
 class StubWebsiteScreener {
   async screen(url) {
@@ -33,6 +34,22 @@ class StubWebsiteScreener {
 }
 
 async function run() {
+  const voicePayload = extractTelegramMessagePayload({
+    message: {
+      chat: { id: 42 },
+      from: { username: "voice_user", first_name: "Voice" },
+      voice: {
+        file_id: "voice-file-id",
+        mime_type: "audio/ogg",
+        duration: 7
+      }
+    }
+  });
+
+  if (!voicePayload || voicePayload.kind !== "voice") {
+    throw new Error("Voice payload should be extracted instead of ignored.");
+  }
+
   const cwd = process.cwd();
   const store = new FileMemoryStore({
     filePath: path.join(cwd, "data", "smoke-state.json"),

@@ -118,6 +118,8 @@ npm run telegram:webhook
 - `OPENAI_API_KEY` — ключ OpenAI
 - `OPENAI_REASONING_MODEL` — по умолчанию `gpt-5.4-mini`
 - `OPENAI_REASONING_EFFORT` — `low|medium|high`
+- `OPENAI_TRANSCRIPTION_MODEL` — модель для транскрибации голосовых, по умолчанию `gpt-4o-mini-transcribe`
+- `OPENAI_TRANSCRIPTION_FALLBACK_MODELS` — запасные модели через запятую, по умолчанию `whisper-1`
 - `SCREEN_TIMEOUT_MS` — таймаут для скрининга сайтов
 - `MAX_HISTORY_MESSAGES` — сколько последних сообщений давать в reasoning context
 - `DATA_ROOT` — опциональный путь для локального state/artifacts; на serverless по умолчанию используется writable `/tmp/aibosbot`
@@ -208,5 +210,7 @@ npm run workspace:membership -- grant --user-id <auth-user-uuid> --workspace-slu
 - локально можно продолжать использовать long polling через `npm start`
 - на Vercel Telegram должен ходить в `/api/telegram`
 - после первого деплоя нужно вызвать `npm run telegram:webhook`
+- бот теперь принимает не только текст, но и `voice`/`audio` сообщения; голосовые сначала транскрибируются через OpenAI, а потом идут в тот же диагностический pipeline
+- если транскрибация не настроена или не удалась, бот честно просит прислать ту же мысль текстом вместо молчаливого игнора
 
 Это уже не просто чат с промптом: здесь есть routing, decision engine, скрытый `entryState`, promotion в `diagnostic_case`, разделение screening/diagnostic и сохраняемые артефакты.

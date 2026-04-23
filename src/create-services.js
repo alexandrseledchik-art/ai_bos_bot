@@ -1,5 +1,6 @@
 import { ConversationService } from "./application/conversation-service.js";
 import { loadConfig } from "./config.js";
+import { AudioTranscriber } from "./infrastructure/openai/audio-transcriber.js";
 import { ReasoningClient } from "./infrastructure/openai/reasoning-client.js";
 import { WebsiteScreener } from "./infrastructure/screening/website-screener.js";
 import { createMemoryStore } from "./infrastructure/storage/create-store.js";
@@ -20,12 +21,19 @@ export function getServices() {
     model: config.reasoningModel,
     reasoningEffort: config.reasoningEffort
   });
+  const audioTranscriber = new AudioTranscriber({
+    apiKey: config.openaiApiKey,
+    baseUrl: config.openaiBaseUrl,
+    model: config.transcriptionModel,
+    fallbackModels: config.transcriptionFallbackModels
+  });
   const screener = new WebsiteScreener({
     timeoutMs: config.screenTimeoutMs
   });
 
   services = {
     config,
+    audioTranscriber,
     telegramApi: new TelegramApiClient({
       token: config.telegramToken,
       apiBaseUrl: config.telegramApiBaseUrl
