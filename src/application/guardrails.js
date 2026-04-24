@@ -944,7 +944,7 @@ function pickBestNextQuestion(context, entryState, graphAnalysis) {
 
   if (isLeadFlowScenarioContext(context, entryState)) {
     if (strategicSplit) {
-      return "Тогда я бы уже развёл две верхние версии: у вас изначально слишком широко выбран сегмент и обещание рынку, или сегмент в целом верный, но ICP не доведён до рекламы, квалификации, приоритета и передачи дальше. Что у вас ближе?";
+      return "Тогда мне нужен не выбор версии, а факт из системы: где у вас уже жёстко закреплены правила отбора и приоритета — в рекламе, в квалификации, в маршрутизации дальше, а где команда до сих пор решает это вручную?";
     }
 
     if (qualificationLayerExists && !latestTextResolvesQualificationMechanics(context)) {
@@ -967,9 +967,9 @@ function pickBestNextQuestion(context, entryState, graphAnalysis) {
 
     if (latestTextRestatesCapacityClaim(context) && !upstreamResolved) {
       if (hasWarmInbound) {
-        return "Этот перегруз у вас из-за объёма уже целевых лидов или из-за того, что продавцы ещё и руками квалифицируют тёплый вход?";
+        return "Возьми последние 20 тёплых входящих и скажи по факту: сколько из них продавец мог взять в работу сразу, а сколько ему всё равно пришлось руками квалифицировать и решать, стоит ли вести дальше?";
       }
-      return "Этот перегруз у вас из-за объёма уже целевых лидов или из-за того, что команда вручную разбирает смешанный поток без предквалификации и приоритета?";
+      return "Возьми последние 20 входящих и скажи по факту: сколько из них дошли до продавца уже с понятным приоритетом, а сколько команда сначала руками разбирала и решала, кто вообще целевой?";
     }
 
     if (previousAssistantWasLocal && latestTextRestatesCapacityClaim(context) && !upstreamResolved) {

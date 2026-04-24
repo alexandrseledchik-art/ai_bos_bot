@@ -56,8 +56,8 @@
       "nextBestQuestion": {
         "required": true,
         "requireQuestionMark": true,
-        "mustContainAny": ["целев", "всё подряд", "этап квалификации", "сегмент"],
-        "mustNotContain": ["сколько минут", "кто отвечает", "SLA"],
+        "mustContainAny": ["последни", "по факту", "вручную", "целев", "всё подряд", "этап квалификации", "сегмент"],
+        "mustNotContain": ["сколько минут", "кто отвечает", "SLA", "что у вас ближе", "из-за объёма уже целевых лидов или"],
         "minDiscriminatingSignals": 2,
         "minCandidateConstraints": 4
       },
@@ -107,8 +107,8 @@
       "nextBestQuestion": {
         "required": true,
         "requireQuestionMark": true,
-        "mustContainAny": ["целев", "всё подряд", "квалификац", "приоритет"],
-        "mustNotContain": ["сколько минут", "SLA", "кто отвечает", "кто должен"],
+        "mustContainAny": ["последни", "по факту", "вручную", "целев", "всё подряд", "квалификац", "приоритет"],
+        "mustNotContain": ["сколько минут", "SLA", "кто отвечает", "кто должен", "что у вас ближе", "из-за объёма уже целевых лидов или"],
         "minDiscriminatingSignals": 2,
         "minCandidateConstraints": 4
       },
@@ -159,8 +159,8 @@
       "nextBestQuestion": {
         "required": true,
         "requireQuestionMark": true,
-        "mustContainAny": ["целевые", "квалификац", "маршрутизац", "приоритет"],
-        "mustNotContain": ["нехватк", "не хватает людей", "не хватает менеджеров"],
+        "mustContainAny": ["последни", "по факту", "вручную", "целевые", "квалификац", "маршрутизац", "приоритет"],
+        "mustNotContain": ["нехватк", "не хватает людей", "не хватает менеджеров", "что у вас ближе"],
         "minDiscriminatingSignals": 2,
         "minCandidateConstraints": 4
       },
@@ -211,8 +211,8 @@
       "nextBestQuestion": {
         "required": true,
         "requireQuestionMark": true,
-        "mustContainAny": ["целевых", "смешанный", "квалификац", "приоритет"],
-        "mustNotContain": ["когда говорите, что люди не справляются", "нехватк", "не хватает менеджеров"],
+        "mustContainAny": ["последни", "по факту", "вручную", "целевых", "смешанный", "квалификац", "приоритет"],
+        "mustNotContain": ["когда говорите, что люди не справляются", "нехватк", "не хватает менеджеров", "что у вас ближе"],
         "minDiscriminatingSignals": 2,
         "minCandidateConstraints": 4
       },
@@ -246,8 +246,8 @@
       "nextBestQuestion": {
         "required": true,
         "requireQuestionMark": true,
-        "mustContainAny": ["ICP", "квалификации", "всё подряд", "приоритета", "целевых"],
-        "mustNotContain": ["кто отвечает", "SLA", "сколько минут"],
+        "mustContainAny": ["ICP", "квалификации", "всё подряд", "приоритета", "целевых", "последни", "по факту", "вручную"],
+        "mustNotContain": ["кто отвечает", "SLA", "сколько минут", "что у вас ближе"],
         "minDiscriminatingSignals": 2,
         "minCandidateConstraints": 4
       },
@@ -838,7 +838,7 @@
       "nextBestQuestion": {
         "required": true,
         "requireQuestionMark": true,
-        "mustContainAny": ["сегмент", "маркетинг", "icp", "jtbd"],
+        "mustContainAny": ["сегмент", "маркетинг", "icp", "jtbd", "закреплены", "правила отбора", "квалификации", "маршрутизации"],
         "mustNotContain": ["кто берет", "кому он идет", "кто свободен"],
         "minDiscriminatingSignals": 2,
         "minCandidateConstraints": 4
@@ -892,7 +892,7 @@
       "nextBestQuestion": {
         "required": true,
         "requireQuestionMark": true,
-        "mustContainAny": ["сегмент", "маркетинг", "icp", "jtbd"],
+        "mustContainAny": ["сегмент", "маркетинг", "icp", "jtbd", "закреплены", "правила отбора", "квалификации", "маршрутизации"],
         "mustNotContain": ["главный рычаг", "проверь ограничение", "первый шаг"],
         "minDiscriminatingSignals": 2,
         "minCandidateConstraints": 4
