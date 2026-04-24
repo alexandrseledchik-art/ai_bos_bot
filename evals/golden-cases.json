@@ -6,7 +6,7 @@
     "expectedMode": "clarification_mode",
     "expectedAction": "clarify",
     "artifactExpected": false,
-    "mustContain": ["Привет", "3-7 сообщений"],
+    "mustContain": ["Привет", "3-7 сообщений", "текстом, голосом или ссылкой на сайт"],
     "mustContainAny": ["бизнес-диагноста", "главное ограничение", "ограничению, которое держит результат"],
     "mustNotContain": ["просто открыл чат", "чтобы не гадать"]
   },
