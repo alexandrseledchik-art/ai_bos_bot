@@ -127,6 +127,10 @@ async function run() {
       issues.push(`route expected=${testCase.expectedRoute} actual=${classification.type}`);
     }
 
+    if (testCase.expectedEntryMode && classification.entryMode !== testCase.expectedEntryMode) {
+      issues.push(`entryMode expected=${testCase.expectedEntryMode} actual=${classification.entryMode}`);
+    }
+
     if (run.decision.selectedMode !== testCase.expectedMode) {
       issues.push(
         `mode expected=${testCase.expectedMode} actual=${run.decision.selectedMode}`

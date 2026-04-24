@@ -198,6 +198,10 @@ function looksDiagnosticMetaFollowUp(text) {
 }
 
 function contextualizeClassification(classification, thread, history) {
+  if (classification.entryMode === "tool_discovery" || classification.entryMode === "specific_tool_request") {
+    return classification;
+  }
+
   if (classification.type !== "free_text_vague" && classification.type !== "unknown") {
     return classification;
   }
@@ -335,6 +339,7 @@ function mergeEntryState(currentState, incomingState, routeType) {
 
   return createEntryState({
     routeType: routeType || incoming.routeType || current.routeType,
+    entryMode: incoming.entryMode || current.entryMode || "unclear",
     claimedProblem: incoming.claimedProblem || current.claimedProblem,
     claimedCause: incoming.claimedCause || current.claimedCause,
     knownFacts: uniqueStrings([...(current.knownFacts || []), ...(incoming.knownFacts || [])], 8),
@@ -436,6 +441,7 @@ function buildArtifactBody({ company, activeCase, decision, classification, user
     `- Mode: ${decision.selectedMode}`,
     `- Action: ${decision.decision.action}`,
     `- Input type: ${classification.type}`,
+    `- Entry mode: ${classification.entryMode || entryState.entryMode || "unclear"}`,
     `- Artifact ID: ${artifactId}`,
     "",
     "## User input",
@@ -625,6 +631,7 @@ export class ConversationService {
       );
 
       thread.entryState = mergeEntryState(thread.entryState, decision.entryState, classification.type);
+      thread.entryState.entryMode = classification.entryMode || thread.entryState.entryMode || "unclear";
       thread.updatedAt = nowIso();
 
       if (decision.memory.companyName && normalizeText(decision.memory.companyName) !== normalizeText(company.name)) {

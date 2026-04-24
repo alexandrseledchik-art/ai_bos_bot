@@ -103,6 +103,30 @@
     "mustNotContain": ["корень проблемы уже доказан"]
   },
   {
+    "id": "specific_tool_request",
+    "input": "Мне нужен RACI для ролей",
+    "expectedRoute": "free_text_vague",
+    "expectedEntryMode": "specific_tool_request",
+    "expectedMode": "clarification_mode",
+    "expectedAction": "clarify",
+    "artifactExpected": false,
+    "mustContain": ["матрица ответственности", "для какого процесса"],
+    "mustContainAny": ["не как пустой шаблон", "под реальный кейс"],
+    "mustNotContain": ["что сейчас тормозит бизнес", "главное ограничение уже"]
+  },
+  {
+    "id": "tool_discovery",
+    "input": "Подбери инструмент для подготовки бизнеса к продаже",
+    "expectedRoute": "free_text_vague",
+    "expectedEntryMode": "tool_discovery",
+    "expectedMode": "clarification_mode",
+    "expectedAction": "clarify",
+    "artifactExpected": false,
+    "mustContain": ["нужен инструмент", "под задачу"],
+    "mustContainAny": ["продажи", "роли", "финансы", "процессы", "подготовка бизнеса к продаже"],
+    "mustNotContain": ["причина уже доказана", "пройдем диагностику сначала"]
+  },
+  {
     "id": "unknown_short",
     "input": "помоги",
     "expectedRoute": "free_text_vague",

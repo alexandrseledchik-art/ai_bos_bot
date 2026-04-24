@@ -2,6 +2,7 @@ import {
   BUSINESS_LAYERS,
   BUSINESS_LAYER_CLASSES,
   CONSTRAINT_TYPES,
+  ENTRY_MODES,
   ENTRY_PROMOTION_STATES,
   FLOW_TYPES,
   SYSTEM_LAYERS,
@@ -292,6 +293,16 @@ function explainBusinessTerms(text, context) {
       test: /JTBD/i,
       alreadyExplained: /(JTBD\s*[—-]|задач[а-я]+\s+клиента,\s+ради\s+которой\s+он\s+покупает)/i,
       replace: "задача клиента, ради которой он покупает (JTBD)"
+    },
+    {
+      test: /RACI/i,
+      alreadyExplained: /(RACI\s*[—-]|матриц[а-я]+\s+ответственност)/i,
+      replace: "матрица ответственности (RACI)"
+    },
+    {
+      test: /SIPOC/i,
+      alreadyExplained: /(SIPOC\s*[—-]|схем[а-я]+\s+процесс)/i,
+      replace: "схема процесса (SIPOC)"
     },
     {
       test: /\bSLA\b/i,
@@ -1076,6 +1087,22 @@ function buildWebsiteSurfaceResponse(response) {
   ]);
 }
 
+function isToolFirstContext(context) {
+  return context.classification?.entryMode === "tool_discovery" ||
+    context.classification?.entryMode === "specific_tool_request";
+}
+
+function buildToolFirstSurfaceResponse(response, visibleResponse) {
+  if (visibleResponse && !looksMechanicalResponse(visibleResponse)) {
+    return visibleResponse;
+  }
+
+  return joinParagraphs([
+    ensureSentence(response.whatIUnderstood),
+    `${ensureSentence(response.whyItMatters)} ${ensureString(response.nextStep)}`
+  ]);
+}
+
 function buildVagueSurfaceResponse(response, context) {
   const understood = ensureSentence(response.whatIUnderstood);
   const language = inferUserLanguage(context);
@@ -1361,6 +1388,11 @@ function buildSurfaceResponse(decision, context) {
 
   if (isOpeningMessageContext(context)) {
     reply = buildVagueSurfaceResponse(response, context);
+    return explainBusinessTerms(reply, context);
+  }
+
+  if (isToolFirstContext(context)) {
+    reply = buildToolFirstSurfaceResponse(response, visibleResponse);
     return explainBusinessTerms(reply, context);
   }
 
@@ -1730,6 +1762,10 @@ function normalizeEntryState(rawEntryState, context, decision) {
   const screen = context.screening?.[0];
   const inferredConstraints = inferGenericConstraints(context);
 
+  entryState.entryMode = ensureString(entryState.entryMode, context.classification.entryMode || "unclear");
+  if (!ENTRY_MODES.includes(entryState.entryMode)) {
+    entryState.entryMode = "unclear";
+  }
   entryState.claimedProblem = ensureString(
     entryState.claimedProblem,
     routeType === "url_only" ? "Понять внешний контур сайта." : context.classification.cleanText

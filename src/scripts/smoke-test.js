@@ -1,4 +1,5 @@
 import path from "node:path";
+import fs from "node:fs/promises";
 
 import { ConversationService } from "../application/conversation-service.js";
 import { ReasoningClient } from "../infrastructure/openai/reasoning-client.js";
@@ -60,9 +61,14 @@ async function run() {
   }
 
   const cwd = process.cwd();
+  const filePath = path.join(cwd, "data", "smoke-state.json");
+  const artifactDir = path.join(cwd, "data", "artifacts");
+  await fs.rm(filePath, { force: true });
+  await fs.rm(artifactDir, { recursive: true, force: true });
+
   const store = new FileMemoryStore({
-    filePath: path.join(cwd, "data", "smoke-state.json"),
-    artifactDir: path.join(cwd, "data", "artifacts")
+    filePath,
+    artifactDir
   });
   const reasoner = new ReasoningClient({
     apiKey: "",
@@ -79,6 +85,7 @@ async function run() {
 
   const inputs = [
     "Хочу разобрать бизнес",
+    "Мне нужен RACI для ролей",
     "Выручка есть, а прибыль почти не остаётся. Маржа упала с 22% до 11% за 3 месяца.",
     "https://acme.example"
   ];
@@ -95,6 +102,7 @@ async function run() {
     console.log("\n==============================");
     console.log(`INPUT: ${input}`);
     console.log(`ROUTE: ${result.classification.type}`);
+    console.log(`ENTRY MODE: ${result.classification.entryMode}`);
     console.log(`MODE: ${result.decision.selectedMode}`);
     console.log(`ACTION: ${result.decision.decision.action}`);
     console.log("\nREPLY:\n");

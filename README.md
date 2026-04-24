@@ -123,22 +123,40 @@ npm run telegram:webhook
 - `SCREEN_TIMEOUT_MS` — таймаут для скрининга сайтов
 - `MAX_HISTORY_MESSAGES` — сколько последних сообщений давать в reasoning context
 - `DATA_ROOT` — опциональный путь для локального state/artifacts; на serverless по умолчанию используется writable `/tmp/aibosbot`
-- `MEMORY_BACKEND` — текущий backend памяти, пока по умолчанию `file`
+- `MEMORY_BACKEND` — backend памяти: `file` для локальной разработки, `supabase` для production
+- `SUPABASE_STATE_MODE` — режим Supabase-памяти: `primary` на Vercel/production или `replicated` для локального file + sync
+- `SUPABASE_STATE_KEY` — ключ runtime-state строки в Supabase, по умолчанию `project_state`
 - `SUPABASE_URL` — база для следующего этапа миграции
 - `SUPABASE_SERVICE_ROLE_KEY` — ключ для серверной синхронизации в Supabase
 
-## Как включить Supabase sync
+## Как включить Supabase memory
 
 Создай `.env` в корне проекта и укажи:
 
 ```env
 MEMORY_BACKEND=supabase
+SUPABASE_STATE_MODE=primary
 SUPABASE_URL=...
 SUPABASE_SERVICE_ROLE_KEY=...
 SUPABASE_SYNC_TRANSPORT=auto
 ```
 
-После этого приложение продолжит писать локально в `data/state.json`, а на serverless перейдёт в writable runtime-каталог. При этом structured memory будет best-effort синхронизироваться в Supabase.
+В production на Vercel Supabase должен быть source of truth: runtime state читается и пишется в таблицу `runtime_states`, а relational tables остаются проекцией для аналитики, артефактов и будущего интерфейса.
+
+Для локальной разработки можно оставить:
+
+```env
+MEMORY_BACKEND=file
+```
+
+Или использовать гибридный режим:
+
+```env
+MEMORY_BACKEND=supabase
+SUPABASE_STATE_MODE=replicated
+```
+
+В `replicated` приложение пишет локально в `data/state.json` и best-effort синхронизирует structured memory в Supabase. Этот режим удобен для dev, но не должен быть source of truth на Vercel.
 
 `SUPABASE_SYNC_TRANSPORT`:
 
@@ -166,7 +184,7 @@ npm run workspace:membership -- grant --user-id <auth-user-uuid> --workspace-slu
 
 ## Что хранится
 
-- Диалог и решения — локально в `data/state.json`, а на serverless в `/tmp/aibosbot/state.json`
+- Диалог и решения — локально в `data/state.json` при `MEMORY_BACKEND=file`; в production при `MEMORY_BACKEND=supabase` и `SUPABASE_STATE_MODE=primary` source of truth хранится в `public.runtime_states`
 - На уровне `thread` хранится скрытый `entryState`:
   - `claimedProblem`
   - `claimedCause`

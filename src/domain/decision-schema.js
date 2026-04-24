@@ -268,6 +268,7 @@ export const DECISION_SCHEMA = {
       type: "object",
       additionalProperties: false,
       required: [
+        "entryMode",
         "claimedProblem",
         "claimedCause",
         "knownFacts",
@@ -295,6 +296,17 @@ export const DECISION_SCHEMA = {
         "promotionReadiness"
       ],
       properties: {
+        entryMode: {
+          type: "string",
+          enum: [
+            "problem_first",
+            "tool_discovery",
+            "specific_tool_request",
+            "url_only",
+            "url_plus_problem",
+            "unclear"
+          ]
+        },
         claimedProblem: {
           type: "string"
         },

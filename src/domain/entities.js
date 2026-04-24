@@ -50,6 +50,15 @@ export const ENTRY_PROMOTION_STATES = [
   "promoted"
 ];
 
+export const ENTRY_MODES = [
+  "problem_first",
+  "tool_discovery",
+  "specific_tool_request",
+  "url_only",
+  "url_plus_problem",
+  "unclear"
+];
+
 export function createId(prefix) {
   return `${prefix}_${crypto.randomUUID()}`;
 }
@@ -61,6 +70,7 @@ export function nowIso() {
 export function emptyEntryState() {
   return {
     routeType: "unknown",
+    entryMode: "unclear",
     claimedProblem: "",
     claimedCause: "",
     knownFacts: [],

@@ -1,5 +1,6 @@
 import { FileMemoryStore } from "./file-store.js";
 import { SupabaseCliSyncClient } from "./supabase-cli-sync.js";
+import { SupabasePrimaryMemoryStore } from "./supabase-primary-store.js";
 import { ReplicatedMemoryStore, SupabaseSyncClient } from "./supabase-sync.js";
 
 export function createMemoryStore(config) {
@@ -16,6 +17,14 @@ export function createMemoryStore(config) {
     url: config.supabaseUrl,
     serviceRoleKey: config.supabaseServiceRoleKey
   });
+
+  if (config.supabaseStateMode === "primary") {
+    return new SupabasePrimaryMemoryStore({
+      syncClient,
+      stateKey: config.supabaseStateKey
+    });
+  }
+
   const fallbackSyncClient =
     config.supabaseSyncTransport === "rest"
       ? null

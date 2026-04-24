@@ -659,6 +659,7 @@ function buildEntryState(context, focus, signalSufficiency, selectedConstraint =
   ], 8);
 
   return {
+    entryMode: context.classification?.entryMode || "unclear",
     claimedProblem:
       context.classification?.type === "free_text_problem" || context.classification?.type === "url_plus_problem"
         ? text
@@ -756,6 +757,7 @@ function buildWebsiteDecision(context, linkedProblem = false) {
     },
     graphAnalysis: buildGraphAnalysisPacket(context.graphPacket),
     entryState: {
+      entryMode: context.classification?.entryMode || (linkedProblem ? "url_plus_problem" : "url_only"),
       claimedProblem: linkedProblem ? normalizeText(context.classification.cleanText) : "Понять, что можно увидеть по внешнему контуру сайта.",
       claimedCause: "",
       knownFacts: screen?.knownFacts || [],
@@ -806,6 +808,126 @@ function buildWebsiteDecision(context, linkedProblem = false) {
           ? "Сохранён предварительный внешний скрининг сайта с привязкой к бизнес-проблеме."
           : "Сохранён внешний скрининг сайта с разделением на факты, наблюдения и гипотезы.",
         kind: "screening"
+      }
+    }
+  };
+}
+
+function detectRequestedTool(text) {
+  const normalized = normalizeText(text).toLowerCase();
+
+  if (/\braci\b|рас[иi]|матриц[ау]\s+ответственност/.test(normalized)) {
+    return {
+      name: "RACI",
+      explanation: "матрица ответственности: кто делает, кто утверждает, кого нужно спросить и кого держать в курсе"
+    };
+  }
+  if (/\bsipoc\b/.test(normalized)) {
+    return {
+      name: "SIPOC",
+      explanation: "схема процесса: поставщики, входы, сам процесс, выходы и клиенты процесса"
+    };
+  }
+  if (/\bswot\b/.test(normalized)) {
+    return {
+      name: "SWOT",
+      explanation: "карта сильных и слабых сторон, возможностей и угроз"
+    };
+  }
+  if (/\bjtbd\b|job\s+to\s+be\s+done/.test(normalized)) {
+    return {
+      name: "JTBD",
+      explanation: "логика задачи клиента: ради какого прогресса он покупает продукт"
+    };
+  }
+  if (/юнит-?экономик|unit\s+economics/.test(normalized)) {
+    return {
+      name: "юнит-экономика",
+      explanation: "проверка, сколько бизнес зарабатывает и теряет на одной продаже или клиенте"
+    };
+  }
+
+  return {
+    name: "инструмент",
+    explanation: "рабочий шаблон или схема, которая помогает принять решение, а не просто красиво оформить мысли"
+  };
+}
+
+function buildToolFirstDecision(context) {
+  const requestedTool = detectRequestedTool(context.userText);
+  const entryState = buildEntryState(context, "operations", "weak", "", "keep_in_entry");
+  const isSpecific = context.classification.entryMode === "specific_tool_request";
+  const nextStep = isSpecific
+    ? "Скажи, для какого процесса, решения или зоны сейчас нужен этот инструмент, чтобы я дал его под реальный кейс, а не пустую таблицу?"
+    : "В какой зоне нужен инструмент: продажи, роли и ответственность, финансы, процессы или подготовка бизнеса к продаже?";
+  const responseText = isSpecific
+    ? `Понял, ты пришёл за конкретным инструментом, а не за разбором с нуля. ${requestedTool.name} — это ${requestedTool.explanation}.\n\nЧтобы дать его в рабочем виде, а не как пустой шаблон, скажи: для какого процесса, решения или зоны он сейчас нужен?`
+    : "Понял, тебе сейчас нужен инструмент, а не общие советы. Я подберу его под задачу, но сначала нужно понять, какой контур он должен закрыть.\n\nВ какой зоне нужен инструмент: продажи, роли и ответственность, финансы, процессы или подготовка бизнеса к продаже?";
+
+  return {
+    selectedMode: "clarification_mode",
+    decision: {
+      action: "clarify",
+      signalSufficiency: "weak",
+      confidence: 0.7,
+      rationale: "Пользователь пришёл tool-first, поэтому сначала нужно понять контекст применения инструмента, а не запускать problem-first диагностику."
+    },
+    response: {
+      whatIUnderstood: isSpecific
+        ? `Пользователь просит конкретный инструмент: ${requestedTool.name}.`
+        : "Пользователь просит подобрать инструмент или шаблон.",
+      hypotheses: [
+        "Нужен рабочий инструмент под конкретный процесс или решение.",
+        "Без контекста есть риск выдать красивый шаблон, который не поможет изменить систему."
+      ],
+      whyItMatters: "Инструмент полезен только тогда, когда понятно, какую развилку или ограничение он должен закрыть.",
+      nextStep,
+      responseText
+    },
+    guardrails: {
+      knownFacts: [isSpecific ? `Запрошен инструмент: ${requestedTool.name}.` : "Пользователь пришёл с tool-first запросом."],
+      observations: ["Это не problem-first вход, поэтому нельзя насильно вести пользователя через диагностику."],
+      workingHypotheses: ["Нужен контекст применения инструмента."],
+      canNotAssert: ["Нельзя выбрать точный шаблон без понимания зоны применения."],
+      confidenceNote: "Сейчас это маршрутизация tool-first запроса, а не бизнес-диагноз."
+    },
+    graphAnalysis: buildGraphAnalysisPacket(context.graphPacket),
+    entryState: {
+      ...entryState,
+      entryMode: context.classification.entryMode,
+      claimedProblem: normalizeText(context.classification.cleanText),
+      nextBestQuestion: nextStep,
+      nextBestStep: "Уточнить контур применения инструмента и затем выдать рабочий шаблон.",
+      whyThisStep: "Так инструмент будет привязан к задаче, а не станет декоративной таблицей."
+    },
+    memory: {
+      companyName: "",
+      caseKind: "diagnostic_case",
+      goal: "Подобрать или выдать инструмент под конкретный управленческий контур.",
+      symptoms: [],
+      hypotheses: ["Нужен инструмент под конкретную зону применения."],
+      constraint: "",
+      situation: "Пользователь пришёл с tool-first запросом.",
+      actionWave: {
+        enabled: false,
+        firstStep: "",
+        notNow: "",
+        whyThisFirst: ""
+      },
+      toolRecommendations: [
+        {
+          name: requestedTool.name,
+          reason: isSpecific
+            ? `Пользователь прямо запросил ${requestedTool.name}; нужно привязать инструмент к рабочему процессу.`
+            : "Нужно подобрать инструмент после уточнения зоны применения.",
+          usageMoment: "После одного контекстного уточнения."
+        }
+      ],
+      artifact: {
+        shouldSave: false,
+        title: "",
+        summary: "",
+        kind: "snapshot"
       }
     }
   };
@@ -1070,6 +1192,10 @@ function buildProblemDecision(context) {
 function buildHeuristicDecision(context) {
   const { classification, userText } = context;
   const focus = detectFocus(userText);
+
+  if (classification.entryMode === "specific_tool_request" || classification.entryMode === "tool_discovery") {
+    return buildToolFirstDecision(context);
+  }
 
   if (classification.type === "url_only") {
     return buildWebsiteDecision(context, false);
