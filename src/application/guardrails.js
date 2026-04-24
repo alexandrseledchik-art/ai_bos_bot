@@ -250,14 +250,93 @@ function polishSurfaceText(text) {
   return ensureString(text)
     .replace(/чтобы не гадать/gi, "чтобы не перепутать симптом с конструкцией")
     .replace(/похоже,\s*ты\s*просто\s*открыл\s*чат\./gi, "Привет. Давай сразу зацепимся за реальный бизнес-сигнал.")
+    .replace(/в юнит-экономика\s*\(unit economics\)/gi, "в юнит-экономике (unit economics)")
+    .replace(/ломается в юнит-экономика\s*\(unit economics\)/gi, "ломается в юнит-экономике (unit economics)")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function inferUserLanguage(context) {
+  const sample = [
+    ensureString(context.userText),
+    ...((Array.isArray(context.history) ? context.history : []).slice(-6).map((item) => ensureString(item?.text)))
+  ]
+    .join(" ")
+    .replace(/\/[a-z0-9_]+/gi, " ")
+    .trim();
+
+  if (!sample) {
+    return "ru";
+  }
+
+  const cyrillicCount = (sample.match(/[А-Яа-яЁё]/g) || []).length;
+  const latinCount = (sample.match(/[A-Za-z]/g) || []).length;
+  return cyrillicCount >= latinCount ? "ru" : "en";
+}
+
+function explainBusinessTerms(text, context) {
+  let result = ensureString(text);
+  const language = inferUserLanguage(context);
+
+  if (language !== "ru") {
+    return result;
+  }
+
+  const replacements = [
+    {
+      test: /ICP/i,
+      alreadyExplained: /(ICP\s*[—-]|профиль\s+целевого\s+клиента)/i,
+      replace: "профиль целевого клиента (ICP)"
+    },
+    {
+      test: /JTBD/i,
+      alreadyExplained: /(JTBD\s*[—-]|задач[а-я]+\s+клиента,\s+ради\s+которой\s+он\s+покупает)/i,
+      replace: "задача клиента, ради которой он покупает (JTBD)"
+    },
+    {
+      test: /\bSLA\b/i,
+      alreadyExplained: /(SLA\s*[—-]|норматив\s+по\s+скорости\s+реакции)/i,
+      replace: "норматив по скорости реакции (SLA)"
+    },
+    {
+      test: /GTM/i,
+      alreadyExplained: /(GTM\s*[—-]|модел[ья]\s+выхода\s+на\s+рынок)/i,
+      replace: "модель выхода на рынок (GTM)"
+    },
+    {
+      test: /unit economics/i,
+      alreadyExplained: /(юнит-экономик|unit economics\s*[—-])/i,
+      replace: "юнит-экономика (unit economics)"
+    }
+  ];
+
+  for (const item of replacements) {
+    if (item.test.test(result) && !item.alreadyExplained.test(result)) {
+      result = result.replace(item.test, item.replace);
+    }
+  }
+
+  result = result
+    .replace(/\bв unit economics\b/gi, "в юнит-экономике (unit economics)")
+    .replace(/в юнит-экономика\s*\(unit economics\)/gi, "в юнит-экономике (unit economics)")
+    .replace(/ломается в юнит-экономика\s*\(unit economics\)/gi, "ломается в юнит-экономике (unit economics)")
+    .replace(/\bhandoff\b/gi, "передачу лида дальше по этапам")
+    .replace(/\bownership\b/gi, "закреплённую ответственность")
+    .replace(/\brouting\b/gi, "маршрутизацию лида")
+    .replace(/\bowner'?ов\b/gi, "закреплённых ответственных")
+    .replace(/\bowner\b/gi, "ответственного");
+
+  return result;
 }
 
 function isOpeningMessageContext(context) {
   const text = ensureString(context.userText).toLowerCase();
   const historyLength = Array.isArray(context.history) ? context.history.length : 0;
-  return historyLength === 0 && /^\/start$|^(привет|здравствуй|здравствуйте|добрый день|добрый вечер)$/i.test(text);
+  if (/^\/start$/i.test(text)) {
+    return true;
+  }
+
+  return historyLength <= 1 && /^(привет|здравствуй|здравствуйте|добрый день|добрый вечер)$/i.test(text);
 }
 
 function currentWordCount(context) {
@@ -999,6 +1078,17 @@ function buildWebsiteSurfaceResponse(response) {
 
 function buildVagueSurfaceResponse(response, context) {
   const understood = ensureSentence(response.whatIUnderstood);
+  const language = inferUserLanguage(context);
+
+  if (isOpeningMessageContext(context) && language === "ru") {
+    const greeting = `Привет${context.userMeta?.firstName ? `, ${ensureString(context.userMeta.firstName)}` : ""}.`;
+    return joinParagraphs([
+      `${greeting} Ты попал в бизнес-диагноста. Здесь мы не заполняем анкету и не бросаемся советами вслепую: я помогаю понять, где у бизнеса главное ограничение и что действительно стоит делать первым.`,
+      "Обычно логика такая: сначала я быстро сужаю поле по 2-4 коротким ответам, потом собираю 2-3 рабочие версии причины, отделяю симптом от корня и вывожу тебя к первой внятной гипотезе и следующему шагу. В простом кейсе это занимает примерно 3-7 сообщений, в сложном — чуть дольше.",
+      ensureString(response.nextStep)
+    ]);
+  }
+
   const opening = isOpeningMessageContext(context)
     ? (understood.toLowerCase().startsWith("привет")
         ? ""
@@ -1090,8 +1180,8 @@ function buildHowToDefineIcpSurfaceResponse(entryState) {
     : "В твоём кейсе я бы смотрел на это не как на термин, а как на фильтр между целевым спросом и шумом.";
 
   return joinParagraphs([
-    "ICP лучше определять не из головы и не красивым портретом, а по факту лучших сделок. Я бы взял последние 20-30 лидов, которые быстрее всего дошли до денег, и посмотрел, что у них повторяется: сегмент, размер, задача, бюджет, срочность и кто принимает решение.",
-    `${focus} Потом сравни это с теми лидами, которые сейчас забивают квалификацию: кого менеджер отсеивает, на ком вязнет и кто съедает время без движения дальше. Если хочешь, я следующим сообщением дам тебе короткий шаблон на 5 полей, по которому ICP можно собрать за 15 минут.`
+    "Профиль целевого клиента (ICP) лучше определять не из головы и не красивым портретом, а по факту лучших сделок. Я бы взял последние 20-30 лидов, которые быстрее всего дошли до денег, и посмотрел, что у них повторяется: сегмент, размер, задача, бюджет, срочность и кто принимает решение.",
+    `${focus} Потом сравни это с теми лидами, которые сейчас забивают квалификацию: кого менеджер отсеивает, на ком вязнет и кто съедает время без движения дальше. Если хочешь, я следующим сообщением дам тебе короткий шаблон на 5 полей, по которому профиль целевого клиента можно собрать за 15 минут.`
   ]);
 }
 
@@ -1102,7 +1192,7 @@ function buildWhatIsIcpSurfaceResponse(entryState) {
     : "В твоём кейсе это важно не как красивый термин, а как правило отбора между целевым спросом и шумом.";
 
   return joinParagraphs([
-    "Если совсем по-простому, ICP — это правило, кто для вас свой клиент, а кто только создаёт шум на входе. Не портрет «идеального клиента», а рабочий фильтр: кому даём приоритет, а кого должны отрезать раньше.",
+    "Если совсем по-простому, профиль целевого клиента (ICP) — это правило, кто для вас свой клиент, а кто только создаёт шум на входе. Не портрет «идеального клиента», а рабочий фильтр: кому даём приоритет, а кого должны отрезать раньше.",
     `${focus} То есть вопрос не в слове, а в том, превращается ли это правило в рекламу, квалификацию, приоритет и маршрутизацию.`
   ]);
 }
@@ -1258,46 +1348,59 @@ function buildSurfaceResponse(decision, context) {
   const entryState = decision.entryState || emptyEntryState();
   const routeType = context.classification.type;
   const action = ensureString(decision.decision?.action);
-  const visibleResponse = sanitizeLeadFlowStaffingSurface(
-    polishSurfaceText(stripVisibleTemplateLabels(response.responseText)),
-    context,
-    entryState
+  const visibleResponse = explainBusinessTerms(
+    sanitizeLeadFlowStaffingSurface(
+      polishSurfaceText(stripVisibleTemplateLabels(response.responseText)),
+      context,
+      entryState
+    ),
+    context
   );
+  let reply = "";
 
   if (isOpeningMessageContext(context)) {
-    return buildVagueSurfaceResponse(response, context);
+    reply = buildVagueSurfaceResponse(response, context);
+    return explainBusinessTerms(reply, context);
   }
 
   if (routeType === "free_text_problem" && userAskedMeaning(context)) {
-    return buildMeaningSurfaceResponse(response, entryState);
+    reply = buildMeaningSurfaceResponse(response, entryState);
+    return explainBusinessTerms(reply, context);
   }
 
   if (routeType === "free_text_problem" && userAskedWhatIsICP(context)) {
-    return buildWhatIsIcpSurfaceResponse(entryState);
+    reply = buildWhatIsIcpSurfaceResponse(entryState);
+    return explainBusinessTerms(reply, context);
   }
 
   if (routeType === "free_text_problem" && userAskedHowToDefineICP(context)) {
-    return buildHowToDefineIcpSurfaceResponse(entryState);
+    reply = buildHowToDefineIcpSurfaceResponse(entryState);
+    return explainBusinessTerms(reply, context);
   }
 
   if (routeType === "free_text_problem" && userAskedDirection(context)) {
-    return buildDirectionSurfaceResponse(response, entryState);
+    reply = buildDirectionSurfaceResponse(response, entryState);
+    return explainBusinessTerms(reply, context);
   }
 
   if (routeType === "free_text_problem" && userAskedRoadmap(context)) {
-    return buildRoadmapSurfaceResponse(response, entryState, context);
+    reply = buildRoadmapSurfaceResponse(response, entryState, context);
+    return explainBusinessTerms(reply, context);
   }
 
   if (routeType === "free_text_problem" && userAskedWhy(context)) {
-    return buildMetaWhySurfaceResponse(response, entryState, context);
+    reply = buildMetaWhySurfaceResponse(response, entryState, context);
+    return explainBusinessTerms(reply, context);
   }
 
   if (routeType === "free_text_problem" && userAskedNext(context)) {
-    return buildNextSurfaceResponse(response, entryState, context);
+    reply = buildNextSurfaceResponse(response, entryState, context);
+    return explainBusinessTerms(reply, context);
   }
 
   if (routeType === "free_text_problem" && userExpressesDoubt(context)) {
-    return buildDoubtSurfaceResponse(response, entryState);
+    reply = buildDoubtSurfaceResponse(response, entryState);
+    return explainBusinessTerms(reply, context);
   }
 
   if (
@@ -1305,26 +1408,31 @@ function buildSurfaceResponse(decision, context) {
     isLeadFlowScenarioContext(context, entryState) &&
     (strategicSplitNeeded(context, entryState) || shouldHoldLeadFlowInClarify(context, entryState))
   ) {
-    return buildDiagnosticClarifySurfaceResponse(response, entryState, context);
+    reply = buildDiagnosticClarifySurfaceResponse(response, entryState, context);
+    return explainBusinessTerms(reply, context);
   }
 
   if (visibleResponse && !looksMechanicalResponse(visibleResponse) && !visibleResponseMissesDepth(visibleResponse, entryState, context)) {
-    return visibleResponse;
+    return explainBusinessTerms(visibleResponse, context);
   }
 
   if (decision.selectedMode === "website_screening_mode") {
-    return buildWebsiteSurfaceResponse(response);
+    reply = buildWebsiteSurfaceResponse(response);
+    return explainBusinessTerms(reply, context);
   }
 
   if (action === "answer" || action === "diagnose") {
-    return buildAnswerSurfaceResponse(response, entryState);
+    reply = buildAnswerSurfaceResponse(response, entryState);
+    return explainBusinessTerms(reply, context);
   }
 
   if (routeType === "free_text_problem") {
-    return buildDiagnosticClarifySurfaceResponse(response, entryState, context);
+    reply = buildDiagnosticClarifySurfaceResponse(response, entryState, context);
+    return explainBusinessTerms(reply, context);
   }
 
-  return buildVagueSurfaceResponse(response, context);
+  reply = buildVagueSurfaceResponse(response, context);
+  return explainBusinessTerms(reply, context);
 }
 
 function inferGenericConstraints(context) {
