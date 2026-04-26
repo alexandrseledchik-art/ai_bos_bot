@@ -475,7 +475,7 @@ export const CAUSAL_GRAPH_NODES = [
   {
     id: "sales_process_not_defined",
     type: "cause",
-    label: "Не описан sales process",
+    label: "Не описан процесс продаж",
     description: "Процесс продаж не формализован как управляемая система.",
     domains: ["sales", "ops"],
     layer: "operations",

@@ -849,7 +849,7 @@
         "minCandidateCauses": 4,
         "minUniqueLayers": 4,
         "minGraphConfidence": 0.5,
-        "requiredConstraintTerms": ["ICP"]
+        "requiredConstraintTerms": ["профиль целевого клиента"]
       },
       "uncertainty": {
         "minResponseHypotheses": 2,
@@ -864,7 +864,7 @@
         "requireNoArtifact": true
       },
       "surface": {
-        "mustContainAny": ["две", "ICP", "сегментац"],
+        "mustContainAny": ["две", "профиль целевого клиента", "сегментац"],
         "mustNotContain": ["кто берет лид первым", "кому он идет дальше"],
         "minParagraphs": 2,
         "maxParagraphs": 3
@@ -903,7 +903,7 @@
         "minCandidateCauses": 4,
         "minUniqueLayers": 4,
         "minGraphConfidence": 0.5,
-        "requiredConstraintTerms": ["ICP"]
+        "requiredConstraintTerms": ["профиль целевого клиента"]
       },
       "uncertainty": {
         "minResponseHypotheses": 2,
@@ -918,7 +918,7 @@
         "requireNoArtifact": true
       },
       "surface": {
-        "mustContainAny": ["две", "ICP", "сегментац"],
+        "mustContainAny": ["две", "профиль целевого клиента", "сегментац"],
         "mustNotContain": ["главный рычаг", "проверь ограничение", "сигнала хватает, чтобы выбрать рабочее ограничение"],
         "minParagraphs": 2,
         "maxParagraphs": 3
@@ -958,7 +958,7 @@
         "minCandidateCauses": 4,
         "minUniqueLayers": 4,
         "minGraphConfidence": 0.5,
-        "requiredConstraintTerms": ["ICP"]
+        "requiredConstraintTerms": ["профиль целевого клиента"]
       },
       "uncertainty": {
         "minResponseHypotheses": 2,
