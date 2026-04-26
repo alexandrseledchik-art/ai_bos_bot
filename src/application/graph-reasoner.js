@@ -79,10 +79,10 @@ function layerPriority(layer) {
 
 function isLeadFlowScenario(observedSignals, extracted) {
   const text = normalizeText(extracted?.claimedProblem || extracted?.observations?.[0]?.evidence || "");
+  const hasLeadContext = /лид|заяв|входящ|продаж|продавц|менеджер|воронк|квалификац/i.test(text);
   const persistentLeadSignals = new Set([
     "lead_overload",
     "slow_first_response",
-    "team_overload_reported",
     "qualification_stage_exists",
     "qualification_stage_overloaded",
     "mixed_inbound_confirmed",
@@ -96,6 +96,7 @@ function isLeadFlowScenario(observedSignals, extracted) {
   ]);
 
   return observedSignals.some((item) => persistentLeadSignals.has(item)) ||
+    (hasLeadContext && observedSignals.includes("team_overload_reported")) ||
     (/лид|заяв|входящ|продаж/.test(text) && /не усп|долго|ответ|очеред|перегруж|не хватает/.test(text));
 }
 

@@ -679,11 +679,11 @@ function isLeadFlowScenarioContext(context, entryState) {
     ...(entryState?.observedSignals || []),
     ...(context.graphPacket?.observedSignals || [])
   ], 12);
+  const hasLeadContext = /заяв|лид|входящ|продаж|продавц|менеджер|воронк|квалификац/.test(text);
 
   const persistentLeadSignals = new Set([
     "lead_overload",
     "slow_first_response",
-    "team_overload_reported",
     "qualification_stage_exists",
     "qualification_stage_overloaded",
     "mixed_inbound_confirmed",
@@ -697,6 +697,7 @@ function isLeadFlowScenarioContext(context, entryState) {
   ]);
 
   return observedSignals.some((item) => persistentLeadSignals.has(item)) ||
+    (hasLeadContext && observedSignals.includes("team_overload_reported")) ||
     (/заяв|лид|входящ/.test(text) && /не усп|люд|ответ|очеред|обработ|перегруж|продавц|менеджер|штат/.test(text));
 }
 
@@ -1766,6 +1767,9 @@ function deriveConstraintType(entryState) {
   }
   if (/icp|сегмент|квалификац|нецелев|приоритет|смешан|шум|качество\s+входа/.test(label)) {
     return "quality";
+  }
+  if (primaryFlow === "decisions" || /управляемый\s+поток|владел|ответственност|решени|собственник|ритм/.test(label)) {
+    return "control";
   }
   if (/процесс|воронк|этап|маршрутизац|handoff|первый\s+ответ|контакт|delivery|очеред|исполн|срыв|срок|качество|crm|автомат|ручн|таблиц|перенос|дублир|инструмент/.test(label)) {
     return "throughput";
