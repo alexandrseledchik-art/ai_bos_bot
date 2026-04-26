@@ -251,8 +251,8 @@ function polishSurfaceText(text) {
   return ensureString(text)
     .replace(/чтобы не гадать/gi, "чтобы не перепутать симптом с конструкцией")
     .replace(/похоже,\s*ты\s*просто\s*открыл\s*чат\./gi, "Привет. Давай сразу зацепимся за реальный бизнес-сигнал.")
-    .replace(/в юнит-экономика\s*\(unit economics\)/gi, "в юнит-экономике (unit economics)")
-    .replace(/ломается в юнит-экономика\s*\(unit economics\)/gi, "ломается в юнит-экономике (unit economics)")
+    .replace(/в юнит-экономика\s*\(unit economics\)/gi, "в юнит-экономике")
+    .replace(/ломается в юнит-экономика\s*\(unit economics\)/gi, "ломается в юнит-экономике")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -317,7 +317,7 @@ function explainBusinessTerms(text, context) {
     {
       test: /unit economics/i,
       alreadyExplained: /(юнит-экономик|unit economics\s*[—-])/i,
-      replace: "юнит-экономика (unit economics)"
+      replace: "юнит-экономика, то есть экономика одной сделки, клиента или канала"
     }
   ];
 
@@ -328,9 +328,10 @@ function explainBusinessTerms(text, context) {
   }
 
   result = result
-    .replace(/\bв unit economics\b/gi, "в юнит-экономике (unit economics)")
-    .replace(/в юнит-экономика\s*\(unit economics\)/gi, "в юнит-экономике (unit economics)")
-    .replace(/ломается в юнит-экономика\s*\(unit economics\)/gi, "ломается в юнит-экономике (unit economics)")
+    .replace(/\bв unit economics\b/gi, "в юнит-экономике, то есть в экономике одной сделки, клиента или канала")
+    .replace(/unit economics/gi, "юнит-экономика, то есть экономика одной сделки, клиента или канала")
+    .replace(/в юнит-экономика(?:,\s*то\s+есть\s+экономика\s+одной\s+сделки,\s*клиента\s+или\s+канала)?/gi, "в юнит-экономике, то есть в экономике одной сделки, клиента или канала")
+    .replace(/ломается в юнит-экономика(?:,\s*то\s+есть\s+экономика\s+одной\s+сделки,\s*клиента\s+или\s+канала)?/gi, "ломается в юнит-экономике, то есть в экономике одной сделки, клиента или канала")
     .replace(/\bhandoff\b/gi, "передачу лида дальше по этапам")
     .replace(/\bownership\b/gi, "закреплённую ответственность")
     .replace(/\brouting\b/gi, "маршрутизацию лида")
@@ -389,7 +390,7 @@ function latestAssistantQuestionText(context) {
   return ensureString(uptoQuestion);
 }
 
-function textLooksLikeLeadFlowUpstream(text) {
+function textLooksLikeLeadFlowSystemic(text) {
   return /icp|сегмент|целев|приоритет|квалификац|всё подряд|неразобран|смешанн|шум/i.test(
     ensureString(text).toLowerCase()
   );
@@ -405,8 +406,8 @@ function assistantAskedLocalLeadQuestion(context) {
   return textLooksLikeLeadFlowLocal(latestAssistantQuestionText(context));
 }
 
-function assistantAskedUpstreamLeadQuestion(context) {
-  return textLooksLikeLeadFlowUpstream(latestAssistantQuestionText(context));
+function assistantAskedSystemicLeadQuestion(context) {
+  return textLooksLikeLeadFlowSystemic(latestAssistantQuestionText(context));
 }
 
 function openingNeedsGreeting(context, visibleResponse) {
@@ -424,9 +425,9 @@ function visibleResponseRepeatsLeadQuestionFamily(visibleResponse, context) {
   }
 
   const repeatedLocal = textLooksLikeLeadFlowLocal(previous) && textLooksLikeLeadFlowLocal(visibleResponse);
-  const repeatedUpstream = textLooksLikeLeadFlowUpstream(previous) && textLooksLikeLeadFlowUpstream(visibleResponse);
+  const repeatedSystemic = textLooksLikeLeadFlowSystemic(previous) && textLooksLikeLeadFlowSystemic(visibleResponse);
 
-  return repeatedLocal || repeatedUpstream;
+  return repeatedLocal || repeatedSystemic;
 }
 
 function isShortFollowUpContext(context) {
@@ -550,7 +551,7 @@ function buildLeadScenarioField(spread, context, entryState) {
   const strategicSplit = strategicSplitNeeded(context, entryState);
 
   if (strategicSplit) {
-    return "Сейчас я бы уже держал не одну верхнюю версию, а две. Либо сам ICP и сегментация выбраны слишком широко, и рынок несёт вам лишний поток, либо сегмент в целом верный, но это не переведено в живые правила отбора, приоритета и передачи дальше.";
+    return "Сейчас я бы уже держал не одну версию, а две системные развилки. Либо сам ICP и сегментация выбраны слишком широко, и рынок несёт вам лишний поток, либо сегмент в целом верный, но это не переведено в живые правила отбора, приоритета и передачи дальше.";
   }
 
   if (latestTextSuggestsWarmInbound(context)) {
@@ -657,7 +658,7 @@ function buildMetaWhySurfaceResponse(response, entryState, context) {
 
   const middle = isLeadFlowScenarioContext(context, entryState)
     ? strategicSplitNeeded(context, entryState)
-      ? "Сейчас мне нужно не выбрать красивую верхнюю историю, а развести две сильные стратегические версии: сам ICP и сегментация заданы неверно, или они в целом верны, но не превращены в рабочее правило отбора, приоритета и передачи дальше."
+      ? "Сейчас мне нужно не выбрать красивую историю, а развести две сильные стратегические версии: сам ICP и сегментация заданы неверно, или они в целом верны, но не превращены в рабочее правило отбора, приоритета и передачи дальше."
       : signals.has("warm_inbound_demand")
       ? "На тёплом входе суточный провал до первого касания всё ещё не доказывает, что корень уже точно в ресурсе. Сначала мне нужно отделить локальный перегруз от версии, что поток плохо фильтруется и приоритеты до продавца просто не доведены."
       : "Сначала мне нужно отделить локальный перегруз от двух других версий: в продавцов летит смешанный поток, или ICP и приоритеты вообще не доведены до живой обработки."
@@ -699,7 +700,7 @@ function isLeadFlowScenarioContext(context, entryState) {
     (/заяв|лид|входящ/.test(text) && /не усп|люд|ответ|очеред|обработ|перегруж|продавц|менеджер|штат/.test(text));
 }
 
-function questionLooksUpstream(question) {
+function questionChecksSystemicCause(question) {
   return /icp|сегмент|целев|приоритет|квалификац|канал|рынк|обещан|неразобран|стратег/i.test(question);
 }
 
@@ -747,7 +748,7 @@ function latestTextLooksLikeLeadVolumeAndTiming(context) {
   return /\d/.test(text) && /(день|дня|час|минут|в месяц|в неделю|касани|контакт)/i.test(text);
 }
 
-function latestTextAlreadyResolvesUpstreamLayer(context) {
+function latestTextAlreadyResolvesSystemicLeadCause(context) {
   const text = ensureString(context.userText).toLowerCase();
   return /icp|квалификац|предквалификац|приоритет|сегмент|маршрутиз|всё подряд|смешан|неразобран|целев/i.test(text);
 }
@@ -810,13 +811,13 @@ function leadFlowAllowsPureStaffingVersion(context, entryState) {
   const targetFlowConfirmed =
     signals.has("target_leads_confirmed") ||
     /почти\s+все\s+целев|все\s+лиды?\s+целев|в\s+основном\s+целев/i.test(text);
-  const upstreamNoiseStillPossible =
+  const systemicNoiseStillPossible =
     signals.has("mixed_inbound_confirmed") ||
     signals.has("qualification_missing_confirmed") ||
     signals.has("priority_rules_missing") ||
     /всё\s+подряд|смешан|неразобран|квалификац|предквалификац|приоритет/i.test(text);
 
-  return targetFlowConfirmed && !upstreamNoiseStillPossible;
+  return targetFlowConfirmed && !systemicNoiseStillPossible;
 }
 
 function shouldSuppressStaffingSurface(context, entryState) {
@@ -852,7 +853,7 @@ function shouldHoldLeadFlowInClarify(context, entryState) {
     return true;
   }
 
-  if (latestTextAlreadyResolvesUpstreamLayer(context)) {
+  if (latestTextAlreadyResolvesSystemicLeadCause(context)) {
     return false;
   }
 
@@ -947,13 +948,17 @@ function pickBestNextQuestion(context, entryState, graphAnalysis) {
   const signals = observedSignalSet(context, entryState);
   const hasWarmInbound = signals.has("warm_inbound_demand");
   const hasSlowFirstResponse = signals.has("slow_first_response");
-  const upstreamResolved = latestTextAlreadyResolvesUpstreamLayer(context);
+  const systemicResolved = latestTextAlreadyResolvesSystemicLeadCause(context);
   const qualificationLayerExists = qualificationLayerExistsInContext(context, entryState);
   const previousAssistantWasLocal = assistantAskedLocalLeadQuestion(context);
-  const previousAssistantWasUpstream = assistantAskedUpstreamLeadQuestion(context);
+  const previousAssistantWasSystemic = assistantAskedSystemicLeadQuestion(context);
   const strategicSplit = strategicSplitNeeded(context, entryState);
 
   if (isLeadFlowScenarioContext(context, entryState)) {
+    if (!qualificationLayerExists && /понятным\s+приоритетом|целевой\/нецелевой|всё\s+подряд|квалификац/i.test(current)) {
+      return current;
+    }
+
     if (strategicSplit) {
       return "Тогда мне нужен не выбор версии, а факт из системы: где у вас уже жёстко закреплены правила отбора и приоритета — в рекламе, в квалификации, в маршрутизации дальше, а где команда до сих пор решает это вручную?";
     }
@@ -964,32 +969,32 @@ function pickBestNextQuestion(context, entryState, graphAnalysis) {
         : "Если этап квалификации уже есть, тогда вопрос не в его наличии, а в его роли: он получает уже размеченный поток или сам руками решает, кто вообще целевой, кого отсеять и кому идти первым?";
     }
 
-    if (latestTextSuggestsWarmInbound(context) && !upstreamResolved) {
+    if (latestTextSuggestsWarmInbound(context) && !systemicResolved) {
       return "Тёплый ещё не значит целевой. До продавца у вас есть слой квалификации и приоритета, который отделяет ICP-лид от просто входящего интереса, или в работу идёт всё подряд?";
     }
 
-    if (latestTextLooksLikeLeadVolumeAndTiming(context) && hasSlowFirstResponse && !upstreamResolved) {
+    if (latestTextLooksLikeLeadVolumeAndTiming(context) && hasSlowFirstResponse && !systemicResolved) {
       return "При таком объёме и сроке меня больше интересует не штат сам по себе, а фильтрация входа. До продавца у вас есть квалификация и приоритет, или в работу попадает всё подряд?";
     }
 
-    if (latestTextSuggestsEarlyFunnelStage(context) && !upstreamResolved) {
+    if (latestTextSuggestsEarlyFunnelStage(context) && !systemicResolved) {
       return "До первого контакта у вас вообще есть слой квалификации и приоритета, который отсеивает слабый поток раньше продавца, или продавцы сами разбирают всё подряд?";
     }
 
-    if (latestTextRestatesCapacityClaim(context) && !upstreamResolved) {
+    if (latestTextRestatesCapacityClaim(context) && !systemicResolved) {
       if (hasWarmInbound) {
         return "Возьми последние 20 тёплых входящих и скажи по факту: сколько из них продавец мог взять в работу сразу, а сколько ему всё равно пришлось руками квалифицировать и решать, стоит ли вести дальше?";
       }
       return "Возьми последние 20 входящих и скажи по факту: сколько из них дошли до продавца уже с понятным приоритетом, а сколько команда сначала руками разбирала и решала, кто вообще целевой?";
     }
 
-    if (previousAssistantWasLocal && latestTextRestatesCapacityClaim(context) && !upstreamResolved) {
+    if (previousAssistantWasLocal && latestTextRestatesCapacityClaim(context) && !systemicResolved) {
       return hasWarmInbound
         ? "Скажу жёстче: продавцы у вас работают уже с отобранным тёплым ICP-потоком, или они сначала сами руками отделяют живых клиентов от всего остального?"
         : "Скажу жёстче: в продавцов у вас попадает уже отобранный целевой поток, или они сначала руками разбирают всё подряд?";
     }
 
-    if (previousAssistantWasUpstream && !upstreamResolved) {
+    if (previousAssistantWasSystemic && !systemicResolved) {
       return hasWarmInbound
         ? "Тогда уточню уже в лоб: тёплый вход у вас почти весь считается целевым, или без отдельной квалификации в продажи всё равно попадает смешанный поток?"
         : "Тогда уточню в лоб: в продажи у вас идёт уже целевой поток или без отдельной квалификации команда сначала вручную разбирает всё подряд?";
@@ -1005,9 +1010,9 @@ function pickBestNextQuestion(context, entryState, graphAnalysis) {
       return fieldSeparatingQuestion.question;
     }
 
-    const upstreamQuestion = candidates.find((item) => questionLooksUpstream(item.question));
-    if (upstreamQuestion) {
-      return upstreamQuestion.question;
+    const systemicQuestion = candidates.find((item) => questionChecksSystemicCause(item.question));
+    if (systemicQuestion) {
+      return systemicQuestion.question;
     }
 
     const localQuestion = candidates.find(
@@ -1110,10 +1115,10 @@ function buildVagueSurfaceResponse(response, context) {
   if (isOpeningMessageContext(context) && language === "ru") {
     const greeting = `Привет${context.userMeta?.firstName ? `, ${ensureString(context.userMeta.firstName)}` : ""}.`;
     return joinParagraphs([
-      `${greeting} Ты попал в бизнес-диагноста. Здесь мы не заполняем анкету и не бросаемся советами вслепую: я помогаю понять, где у бизнеса главное ограничение и что действительно стоит делать первым.`,
+      `${greeting} Я помогаю смотреть на бизнес как на систему: где-то я буду бизнес-архитектором, где-то диагностом, где-то навигатором по инструментам или партнёром по следующему шагу. Здесь мы не заполняем анкету и не бросаемся советами вслепую: сначала ищем, где у бизнеса главное ограничение и что действительно стоит делать первым.`,
       "Обычно логика такая: сначала я быстро сужаю поле по 2-4 коротким ответам, потом собираю 2-3 рабочие версии причины, отделяю симптом от корня и вывожу тебя к первой внятной гипотезе и следующему шагу. В простом кейсе это занимает примерно 3-7 сообщений, в сложном — чуть дольше.",
       "Общаться со мной можно так, как тебе удобнее: текстом, голосом или ссылкой на сайт, если хочешь начать с внешнего разбора.",
-      ensureString(response.nextStep)
+      "Скажи одной фразой, что сейчас сильнее всего тормозит результат, и если можешь — добавь одну цифру или срок. Например: «лидов стало меньше на 30% за 2 месяца», «заявки есть, но не покупают» или «деньги есть, но кассовый разрыв»."
     ]);
   }
 
@@ -1195,7 +1200,7 @@ function buildMeaningSurfaceResponse(response, entryState) {
   const nextQuestion = ensureString(entryState.nextBestQuestion, response.nextStep);
 
   return joinParagraphs([
-    "Имею в виду вот что: ты описываешь боль на поверхности, но это ещё не диагноз.",
+    "Имею в виду вот что: ты описываешь боль на поверхности, но это ещё не диагноз. Как с машиной: если её тянет в сторону, дело может быть не только в руле, а в подвеске, колёсах, дороге или том, как она нагружена.",
     explainSpread(spread) || "У меня здесь пока больше одной рабочей версии, поэтому я не хочу притворяться, что причина уже доказана.",
     `Поэтому я и иду в этот вопрос: ${nextQuestion}`
   ]);
@@ -1231,7 +1236,7 @@ function buildDirectionSurfaceResponse(response, entryState) {
   if (ensureArray(entryState?.candidateConstraints, 6).some((item) => /icp|сегментац/i.test(ensureString(item?.label))) &&
     ensureArray(entryState?.candidateConstraints, 6).some((item) => /правил|квалификац|приоритет|маршрутиз|передач/i.test(ensureString(item?.label)))) {
     return joinParagraphs([
-      "Потому что я сейчас держу не одну верхнюю версию, а две.",
+      "Потому что я сейчас держу не одну версию, а две системные развилки.",
       "Либо сам ICP и сегментация выбраны неверно, и вы кормите систему лишним потоком ещё на входе. Либо сегмент в целом верный, но он не доведён до рабочих правил отбора, приоритета и передачи дальше.",
       nextQuestion
     ]);
@@ -1253,7 +1258,7 @@ function buildNextSurfaceResponse(response, entryState, context) {
   const spread = summarizeRenderableConstraintSpread(entryState, 2);
   if (isLeadFlowScenarioContext(context, entryState) && strategicSplitNeeded(context, entryState)) {
     return joinParagraphs([
-      "Дальше я бы шёл не линейно, а через две верхние версии.",
+      "Дальше я бы шёл не линейно, а через две системные развилки.",
       "Сначала отделю ошибку в самой сегментации и ICP от ошибки перевода этих правил в живую работу команды. После этого уже станет видно, мы лечим стратегию входа или конструкцию первого контура.",
       nextQuestion
     ]);
@@ -1305,7 +1310,7 @@ function buildRoadmapSurfaceResponse(response, entryState, context) {
 
   if (isLeadFlowScenarioContext(context, entryState) && strategicSplitNeeded(context, entryState)) {
     return joinParagraphs([
-      "Да. Я бы здесь шёл через две верхние версии параллельно, а не через одну линейную ветку.",
+      "Да. Я бы здесь шёл через две системные развилки параллельно, а не через одну линейную ветку.",
       "Первая версия: сам ICP и сегментация выбраны слишком широко, поэтому лишний поток создаётся ещё до квалификации. Вторая версия: сегмент в целом верный, но он не доведён до живых правил отбора, приоритета и передачи дальше, поэтому команда всё равно тонет на входе.",
       `Сначала я отделяю одно от другого. ${nextQuestion}`
     ]);
@@ -1352,15 +1357,15 @@ function visibleResponseMissesDepth(visibleResponse, entryState, context) {
   }
 
   const nextQuestion = ensureString(entryState.nextBestQuestion);
-  if (!questionLooksUpstream(nextQuestion)) {
+  if (!questionChecksSystemicCause(nextQuestion)) {
     return false;
   }
 
-  if (!questionLooksUpstream(visibleResponse)) {
+  if (!questionChecksSystemicCause(visibleResponse)) {
     return true;
   }
 
-  if (textLooksLikeLeadFlowLocal(visibleResponse) && !latestTextAlreadyResolvesUpstreamLayer(context)) {
+  if (textLooksLikeLeadFlowLocal(visibleResponse) && !latestTextAlreadyResolvesSystemicLeadCause(context)) {
     return true;
   }
 
@@ -1533,7 +1538,7 @@ function inferGenericConstraints(context) {
   } else {
     constraints.push(
       {
-        label: "Пользователь видит локальную боль, но системное ограничение лежит уровнем выше",
+        label: "Пользователь видит локальную боль, но системное ограничение может сидеть в другом классе причины",
         layer: "management",
         confidence: 0.48,
         whyPossible: "На входе пока больше жалоба, чем системная картина, поэтому ближайшее объяснение может оказаться ложным.",
@@ -1647,36 +1652,59 @@ function deriveLayerClasses(businessLayers) {
 }
 
 function deriveFlowTypes(context, entryState) {
-  const text = ensureString(
+  const rawText = ensureString(
     [
       context.userText,
       ...(entryState.symptoms || []),
-      ...(entryState.observedSignals || []),
+      ...(entryState.observedSignals || [])
+    ].join(" ")
+  ).toLowerCase();
+  const constraintText = ensureString(
+    [
       ...(entryState.candidateConstraints || []).map((item) => item?.label)
     ].join(" ")
   ).toLowerCase();
+  const text = `${rawText} ${constraintText}`;
   const scores = new Map(FLOW_TYPES.map((item) => [item, 0]));
+  const businessLayers = entryState.businessLayers || [];
+  const layerClasses = entryState.layerClasses || [];
 
-  if (/рынок|спрос|интерес|нет\s+клиент/.test(text)) {
+  if (/рынок|спрос|интерес|нет\s+клиент/.test(rawText)) {
     scores.set("demand", scores.get("demand") + 3);
   }
-  if (/лид|заяв|входящ|трафик|мало\s+входа|перегруз.*поток/.test(text)) {
+  if (/лид|заяв|входящ|трафик|мало\s+входа|перегруз.*поток/.test(rawText)) {
     scores.set("leads", scores.get("leads") + 3);
   }
-  if (/сделк|конверс|не\s+покуп|кп|встреч|дожим|воронк/.test(text)) {
+  if (/сделк|конверс|не\s+покуп|кп|встреч|дожим|воронк|демк/.test(rawText)) {
     scores.set("deals", scores.get("deals") + 3);
   }
-  if (/исполн|delivery|срыв|не\s+выполня|перегруз.*исполн|выполнение/.test(text)) {
+  if (/исполн|delivery|срыв|не\s+выполня|перегруз.*исполн|выполнение/.test(rawText)) {
     scores.set("delivery", scores.get("delivery") + 3);
   }
-  if (/деньг|прибыл|марж|кассов|cash|экономик/.test(text)) {
+  if (/деньг|прибыл|марж|кассов|cash|экономик/.test(rawText)) {
     scores.set("cash", scores.get("cash") + 3);
   }
-  if (/хаос|решени|собственник|всё\s+завис|управл|контрол/.test(text)) {
+  if (/хаос|решени|собственник|всё\s+завис|управл|контрол|ответственност|приоритет/.test(rawText)) {
     scores.set("decisions", scores.get("decisions") + 3);
   }
 
-  for (const item of entryState.businessLayers || []) {
+  if (businessLayers.includes("external_environment") && /рынок|спрос|конкуренц|отрасл|внешн|демпинг|канал.*перестал/.test(rawText)) {
+    scores.set("demand", scores.get("demand") + 4);
+  }
+  if (businessLayers.includes("commercial") && /лид|заяв|входящ|трафик|нецелев|целев|квалификац|сегмент|приоритет|шум|разные/.test(rawText)) {
+    scores.set("leads", scores.get("leads") + 3);
+  }
+  if (businessLayers.includes("team") && /команд|люд|выгора|не\s+тян|не\s+хватает|ошибк|задачи\s+висят/.test(rawText)) {
+    scores.set("delivery", scores.get("delivery") + 2);
+  }
+  if (businessLayers.includes("technology") && /crm|автомат|ручн|таблиц|перенос|дублир|систем[аы]\s+не\s+связ|инструмент/.test(rawText)) {
+    scores.set("delivery", scores.get("delivery") + 3);
+  }
+  if (businessLayers.includes("data_analytics") && /данн|аналит|метрик|отч[её]т|цифр|не\s+видим|разные\s+версии|спорят/.test(rawText)) {
+    scores.set("decisions", scores.get("decisions") + 2);
+  }
+
+  for (const item of businessLayers) {
     if (item === "commercial") {
       scores.set("leads", scores.get("leads") + 1);
       scores.set("deals", scores.get("deals") + 1);
@@ -1693,34 +1721,75 @@ function deriveFlowTypes(context, entryState) {
     }
   }
 
-  return [...scores.entries()]
+  const ranked = [...scores.entries()]
     .filter(([, score]) => score > 0)
     .sort((left, right) => right[1] - left[1])
     .map(([item]) => item)
     .slice(0, 2);
+
+  if ((businessLayers.includes("owner_context") || businessLayers.includes("governance")) && ranked.includes("decisions") && /собственник|партн[её]р|решени|ответственност|приоритет|хаос|завис/.test(rawText)) {
+    return ["decisions", ...ranked.filter((item) => item !== "decisions")].slice(0, 2);
+  }
+  if (businessLayers.includes("product") && ranked.includes("deals") && /не\s+покуп|ценност|отказыва|демк|интерес/.test(rawText)) {
+    return ["deals", ...ranked.filter((item) => item !== "deals")].slice(0, 2);
+  }
+  if (businessLayers.includes("external_environment") && layerClasses.includes("A") && ranked.includes("demand") && /рынок|спрос|конкуренц|отрасл|внешн|демпинг|канал.*перестал/.test(rawText)) {
+    return ["demand", ...ranked.filter((item) => item !== "demand")].slice(0, 2);
+  }
+  if (businessLayers.includes("commercial") && ranked.includes("leads") && /лид|заяв|входящ|трафик|нецелев|квалификац|сегмент|приоритет|шум|разные/.test(rawText)) {
+    return ["leads", ...ranked.filter((item) => item !== "leads")].slice(0, 2);
+  }
+  if (businessLayers.includes("technology") && ranked.includes("delivery")) {
+    return ["delivery", ...ranked.filter((item) => item !== "delivery")].slice(0, 2);
+  }
+
+  return ranked;
 }
 
 function deriveConstraintType(entryState) {
   const label = ensureString(
-    entryState.selectedConstraint || entryState.candidateConstraints?.[0]?.label
+    [
+      entryState.selectedConstraint || entryState.candidateConstraints?.[0]?.label,
+      entryState.candidateStates?.[0]?.label,
+      entryState.candidateCauses?.[0]?.label
+    ].filter(Boolean).join(" ")
   ).toLowerCase();
   const primaryFlow = ensureString(entryState.primaryFlow).toLowerCase();
   const businessLayers = entryState.businessLayers || [];
+  const topLayer = normalizeBusinessLayer(systemLayerToBusinessLayer(entryState.candidateConstraints?.[0]?.layer || ""));
 
-  if (/данн|аналит|метрик|видимост|прозрачност|не видно/.test(label) || businessLayers.includes("data_analytics")) {
+  if (/данн|аналит|метрик|видимост|прозрачност|не видно|единой\s+картины|разные\s+цифр/.test(label)) {
     return "visibility";
   }
-  if (/управл|контрол|ownership|owner|решени|govern|ритм/.test(label) || businessLayers.includes("governance") || businessLayers.includes("owner_context")) {
-    return "control";
-  }
-  if (/мощност|capacity|штат|не хватает|ресурс/.test(label) || businessLayers.includes("team")) {
+  if (/мощност|capacity|штат|не хватает|ресурс|команда\s+.*не\s+тян|люди\s+выгора|задачи\s+висят/.test(label)) {
     return "capacity";
   }
   if (/icp|сегмент|квалификац|нецелев|приоритет|смешан|шум|качество\s+входа/.test(label)) {
     return "quality";
   }
-  if (/процесс|воронк|этап|маршрутизац|handoff|первый\s+ответ|контакт|delivery|очеред/.test(label) || businessLayers.includes("operations")) {
+  if (/процесс|воронк|этап|маршрутизац|handoff|первый\s+ответ|контакт|delivery|очеред|исполн|срыв|срок|качество|crm|автомат|ручн|таблиц|перенос|дублир|инструмент/.test(label)) {
     return "throughput";
+  }
+  if (/управл|контрол|ownership|owner|решени|govern|ритм|ответственност|собственник/.test(label)) {
+    return "control";
+  }
+  if (businessLayers.includes("data_analytics")) {
+    return "visibility";
+  }
+  if (topLayer === "team" || (businessLayers.includes("team") && /команд|люд|выгора|не\s+тян|не\s+хватает|ошибк|задачи/.test(label))) {
+    return "capacity";
+  }
+  if (topLayer === "technology" || (businessLayers.includes("technology") && primaryFlow === "delivery")) {
+    return "throughput";
+  }
+  if (topLayer === "operations" || (businessLayers.includes("operations") && primaryFlow === "delivery")) {
+    return "throughput";
+  }
+  if (businessLayers.includes("commercial") && primaryFlow === "leads") {
+    return "quality";
+  }
+  if (businessLayers.includes("governance") || businessLayers.includes("owner_context")) {
+    return "control";
   }
   if (primaryFlow === "demand" || businessLayers.includes("strategy") || businessLayers.includes("product") || businessLayers.includes("commercial")) {
     return "supply";
@@ -1729,29 +1798,24 @@ function deriveConstraintType(entryState) {
   return "";
 }
 
-function deriveHigherLayerCheck(entryState) {
-  const order = { A: 1, B: 2, C: 3, D: 4 };
+function deriveCrossClassCheck(entryState) {
   const classes = deriveLayerClasses(entryState.businessLayers || []);
   const currentConstraintLayer = ensureString(entryState.candidateConstraints?.[0]?.layer || "").toLowerCase();
   const currentClass = currentConstraintLayer ? businessLayerToClass(systemLayerToBusinessLayer(currentConstraintLayer)) : (classes[0] || "");
-  const highestUnrejectedClass = classes[0] || currentClass || "";
-  const betterExplainedAbove = Boolean(
-    currentClass &&
-    highestUnrejectedClass &&
-    order[highestUnrejectedClass] < order[currentClass]
-  );
+  const competingClass = classes.find((item) => item && item !== currentClass) || currentClass || "";
+  const hasCompetingExplanation = Boolean(currentClass && competingClass && competingClass !== currentClass);
 
-  const whyNotHigher = betterExplainedAbove
-    ? `Выше по системе ещё живы версии класса ${highestUnrejectedClass}, поэтому фиксировать корень в ${currentClass} рано.`
+  const whySelectedClass = hasCompetingExplanation
+    ? `Ещё живо объяснение из класса ${competingClass}, поэтому фиксировать корень в ${currentClass} рано.`
     : currentClass
-      ? `Сейчас самый сильный неотброшенный слой — ${currentClass}; более верхние объяснения слабее или уже частично проверены.`
+      ? `Сейчас сильнее всего держится объяснение класса ${currentClass}; альтернативы из других классов слабее или уже частично проверены.`
       : "";
 
   return {
     currentClass,
-    betterExplainedAbove,
-    highestUnrejectedClass,
-    whyNotHigher
+    hasCompetingExplanation,
+    competingClass,
+    whySelectedClass
   };
 }
 
@@ -1842,14 +1906,21 @@ function normalizeEntryState(rawEntryState, context, decision) {
   if (entryState.constraintType && !CONSTRAINT_TYPES.includes(entryState.constraintType)) {
     entryState.constraintType = deriveConstraintType(entryState);
   }
-  entryState.higherLayerCheck = {
-    currentClass: ensureString(entryState.higherLayerCheck?.currentClass),
-    betterExplainedAbove: Boolean(entryState.higherLayerCheck?.betterExplainedAbove),
-    highestUnrejectedClass: ensureString(entryState.higherLayerCheck?.highestUnrejectedClass),
-    whyNotHigher: ensureString(entryState.higherLayerCheck?.whyNotHigher)
+  const crossClassCheck = entryState.crossClassCheck || {
+    currentClass: entryState.higherLayerCheck?.currentClass,
+    hasCompetingExplanation: entryState.higherLayerCheck?.betterExplainedAbove,
+    competingClass: entryState.higherLayerCheck?.highestUnrejectedClass,
+    whySelectedClass: entryState.higherLayerCheck?.whyNotHigher
   };
-  if (!entryState.higherLayerCheck.currentClass && !entryState.higherLayerCheck.highestUnrejectedClass) {
-    entryState.higherLayerCheck = deriveHigherLayerCheck(entryState);
+  entryState.crossClassCheck = {
+    currentClass: ensureString(crossClassCheck?.currentClass),
+    hasCompetingExplanation: Boolean(crossClassCheck?.hasCompetingExplanation),
+    competingClass: ensureString(crossClassCheck?.competingClass),
+    whySelectedClass: ensureString(crossClassCheck?.whySelectedClass)
+  };
+  delete entryState.higherLayerCheck;
+  if (!entryState.crossClassCheck.currentClass && !entryState.crossClassCheck.competingClass) {
+    entryState.crossClassCheck = deriveCrossClassCheck(entryState);
   }
   entryState.signalSufficiency = ensureString(
     entryState.signalSufficiency,
@@ -2109,14 +2180,14 @@ export function applyGuardrails(rawDecision, context) {
     decision.memory.artifact.shouldSave = false;
     decision.response.nextStep = ensureString(decision.entryState.nextBestQuestion, decision.response.nextStep);
     decision.response.whatIUnderstood = strategicSplitNeeded(context, decision.entryState)
-      ? "Теперь уже видно не одну, а две верхние версии: либо сам ICP и сегментация заданы неверно, либо они в целом верны, но не превращены в живые правила отбора и маршрута."
+      ? "Теперь уже видно не одну, а две системные развилки: либо сам ICP и сегментация заданы неверно, либо они в целом верны, но не превращены в живые правила отбора и маршрута."
       : latestTextSuggestsWarmInbound(context)
         ? "Тёплый вход уже сужает поле, но ещё не доказывает, что проблема только в скорости первого ответа или в чистой мощности команды."
         : latestTextRestatesCapacityClaim(context)
           ? "Перегруз команды виден, но сам по себе он ещё не доказывает, что узкое место именно в чистой мощности."
           : "Узкое место уже видно во входе в продажи, но причина всё ещё может лежать в разных слоях системы.";
     decision.response.whyItMatters = strategicSplitNeeded(context, decision.entryState)
-      ? "Если слишком рано выбрать только операционную версию, можно пропустить более верхний разрыв: саму сегментацию спроса или несвязку между стратегией и живым маршрутом входа."
+      ? "Если слишком рано выбрать только операционную версию, можно пропустить другой класс причины: саму сегментацию спроса или несвязку между стратегией и живым маршрутом входа."
       : "Если сейчас схлопнуться в версию про найм или SLA, можно пропустить более глубокую поломку в квалификации, сегментации и конструкции первого контура.";
   }
 

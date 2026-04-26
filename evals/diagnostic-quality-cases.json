@@ -231,7 +231,7 @@
     }
   },
   {
-    "id": "lead_flow_followups_keep_upstream_hypotheses_alive",
+    "id": "lead_flow_followups_keep_systemic_hypotheses_alive",
     "turns": [
       "много лидов и не хватает продавцов",
       "до первого контакта",
@@ -286,7 +286,7 @@
     }
   },
   {
-    "id": "lead_flow_why_reply_stays_human_and_upstream",
+    "id": "lead_flow_why_reply_stays_human_and_systemic",
     "turns": [
       "много лидов и не хватает продавцов",
       "до первого контакта",
@@ -933,7 +933,7 @@
     }
   },
   {
-    "id": "lead_flow_roadmap_explains_parallel_upper_versions",
+    "id": "lead_flow_roadmap_explains_parallel_systemic_branches",
     "turns": [
       "Сейчас проблемы с продажами: лидов много, менеджеры не успевают их обрабатывать, но продаж мало.",
       "У нас есть квалификаторы, они сами определяют кто целевой и передают дальше.",
@@ -973,7 +973,7 @@
         "requireNoArtifact": true
       },
       "surface": {
-        "mustContain": ["две верхние версии", "сегментац"],
+        "mustContain": ["две системные развилки", "сегментац"],
         "mustContainAny": ["не довед", "передачи дальше", "квалификации", "рекламы"],
         "mustNotContain": ["сначала операционализация, потом", "одна линейная ветка"],
         "minParagraphs": 2,
@@ -985,6 +985,321 @@
       },
       "artifact": {
         "expectSaved": false
+      }
+    }
+  },
+  {
+    "id": "owner_context_layer_coverage",
+    "turns": [
+      "У собственников разные цели: один хочет дивиденды сейчас, другой хочет строить бизнес на продажу. Решения постоянно меняются, команда не понимает приоритеты."
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["собственников", "единая логика", "приоритет"],
+        "minCandidateConstraints": 3
+      },
+      "causeDepth": {
+        "requiredBusinessLayers": ["owner_context"],
+        "requiredLayerClasses": ["A"],
+        "expectedPrimaryFlow": "decisions",
+        "requireCrossClassCheck": true
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "forbiddenTerms": ["нанять"],
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      }
+    }
+  },
+  {
+    "id": "external_environment_layer_coverage",
+    "turns": [
+      "Спрос на рынке резко упал, старые каналы перестали работать, конкуренты демпингуют и прежняя модель больше не даёт заявок."
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["рынку", "сегмент", "каналы", "предложение"],
+        "minCandidateConstraints": 3
+      },
+      "causeDepth": {
+        "requiredBusinessLayers": ["external_environment"],
+        "requiredLayerClasses": ["A"],
+        "expectedPrimaryFlow": "demand",
+        "requireCrossClassCheck": true
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      }
+    }
+  },
+  {
+    "id": "strategy_layer_coverage",
+    "turns": [
+      "У нас слишком много направлений и продуктов, команда занята всем сразу, роста нет и непонятно за счёт чего мы выигрываем."
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["один рынок", "один сегмент", "отказаться"],
+        "minCandidateConstraints": 3
+      },
+      "causeDepth": {
+        "requiredBusinessLayers": ["strategy"],
+        "requiredLayerClasses": ["B"],
+        "minBusinessLayers": 2,
+        "requireCrossClassCheck": true
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      }
+    }
+  },
+  {
+    "id": "product_layer_coverage",
+    "turns": [
+      "Демки есть, люди интересуются, но потом не покупают и часто говорят, что не видят ценность продукта."
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["ценность", "сегмент", "процессе сделки"],
+        "minCandidateConstraints": 3
+      },
+      "causeDepth": {
+        "requiredBusinessLayers": ["product"],
+        "requiredLayerClasses": ["B"],
+        "expectedPrimaryFlow": "deals",
+        "requireCrossClassCheck": true
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "forbiddenTerms": ["нанять"],
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      }
+    }
+  },
+  {
+    "id": "commercial_layer_coverage",
+    "turns": [
+      "Лидов много, но они очень разные и непохожие. Продавцы тратят время на тех, кто потом почти никогда не покупает."
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["целевой", "квалификац", "приоритет", "всё подряд"],
+        "minCandidateConstraints": 3
+      },
+      "causeDepth": {
+        "requiredBusinessLayers": ["commercial"],
+        "requiredLayerClasses": ["B"],
+        "expectedPrimaryFlow": "leads",
+        "expectedConstraintType": "quality",
+        "requireCrossClassCheck": true
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "forbiddenTerms": ["нанять"],
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      }
+    }
+  },
+  {
+    "id": "operations_layer_coverage",
+    "turns": [
+      "Клиенты покупают, но дальше всё срывается в исполнении: сроки плавают, качество нестабильное, команда тушит пожары."
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["исполнении", "передаче задачи", "контроле качества", "обещание"],
+        "minCandidateConstraints": 3
+      },
+      "causeDepth": {
+        "requiredBusinessLayers": ["operations"],
+        "requiredLayerClasses": ["C"],
+        "expectedPrimaryFlow": "delivery",
+        "expectedConstraintType": "throughput",
+        "requireCrossClassCheck": true
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      }
+    }
+  },
+  {
+    "id": "finance_layer_coverage",
+    "turns": [
+      "Выручка есть, но денег постоянно не хватает, прибыль не видна и кассовые разрывы повторяются почти каждый месяц."
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["прибыль", "маржа", "скидки", "себестоимость", "экономику"],
+        "minCandidateConstraints": 3
+      },
+      "causeDepth": {
+        "requiredBusinessLayers": ["finance"],
+        "requiredLayerClasses": ["C"],
+        "expectedPrimaryFlow": "cash",
+        "requireCrossClassCheck": true
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      }
+    }
+  },
+  {
+    "id": "team_layer_coverage",
+    "turns": [
+      "Поток уже целевой, правила понятные, процессы описаны, но команда всё равно не тянет объём: люди выгорают, задачи висят, ошибки повторяются."
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["ручной героизм", "передаче задач", "контроле", "исключениях", "поток"],
+        "minCandidateConstraints": 3
+      },
+      "causeDepth": {
+        "requiredBusinessLayers": ["team"],
+        "requiredLayerClasses": ["D"],
+        "expectedConstraintType": "capacity",
+        "requireCrossClassCheck": true
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "forbiddenTerms": ["сразу нанять"],
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      }
+    }
+  },
+  {
+    "id": "governance_layer_coverage",
+    "turns": [
+      "В компании хаос с решениями: все ждут собственника, ответственность размыта, задачи не доводятся и приоритеты меняются каждую неделю."
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["ручной героизм", "принятии решений", "контроле", "исключениях"],
+        "minCandidateConstraints": 3
+      },
+      "causeDepth": {
+        "requiredBusinessLayers": ["governance"],
+        "requiredLayerClasses": ["D"],
+        "expectedPrimaryFlow": "decisions",
+        "expectedConstraintType": "control",
+        "requireCrossClassCheck": true
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      }
+    }
+  },
+  {
+    "id": "technology_layer_coverage",
+    "turns": [
+      "Процессы вроде понятны, но всё делается вручную в таблицах, CRM не связана с другими системами, сотрудники постоянно переносят данные руками."
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["инструменты", "переносит", "информацию", "логика работы"],
+        "minCandidateConstraints": 3
+      },
+      "causeDepth": {
+        "requiredBusinessLayers": ["technology"],
+        "requiredLayerClasses": ["D"],
+        "expectedConstraintType": "throughput",
+        "requireCrossClassCheck": true
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
+      }
+    }
+  },
+  {
+    "id": "data_analytics_layer_coverage",
+    "turns": [
+      "Мы не видим реальную картину: нет нормальных метрик, разные отделы спорят по цифрам, непонятно где теряются лиды, маржа и загрузка."
+    ],
+    "expectedRoute": "free_text_problem",
+    "expectedMode": "diagnostic_mode",
+    "expectedAction": "clarify",
+    "metrics": {
+      "nextBestQuestion": {
+        "required": true,
+        "requireQuestionMark": true,
+        "mustContainAny": ["цифра", "воронка", "маржа", "загрузка", "каналов"],
+        "minCandidateConstraints": 3
+      },
+      "causeDepth": {
+        "requiredBusinessLayers": ["data_analytics"],
+        "requiredLayerClasses": ["D"],
+        "expectedConstraintType": "visibility",
+        "requireCrossClassCheck": true
+      },
+      "adviceDiscipline": {
+        "expectedAction": "clarify",
+        "requireNoActionWave": true,
+        "requireNoArtifact": true
       }
     }
   }

@@ -104,7 +104,7 @@ function claimedCauseLooksLocal(extracted) {
   return /не хватает|люд|продавц|перегруж|не справля|ответ|звон|sla|очеред|обработ/.test(claimedCause);
 }
 
-function questionLooksUpstream(question) {
+function questionChecksSystemicCause(question) {
   return /icp|сегмент|целев|приоритет|квалификац|канал|рынк|обещан|неразобран|стратег/i.test(question);
 }
 
@@ -154,7 +154,7 @@ function strategicIcpDoubtObserved(observedSignals, extracted) {
     /неправильн[а-я]*\s+.*icp|неверн[а-я]*\s+.*icp|ошиб[а-я]*\s+.*icp|неправильн[а-я]*\s+сегментац|неверн[а-я]*\s+сегментац|jtbd|job\s+to\s+be\s+done|утп/i.test(text);
 }
 
-function hasUpstreamLeadNoiseSignals(observedSignals, extracted) {
+function hasSystemicLeadNoiseSignals(observedSignals, extracted) {
   const text = normalizeText(extracted?.claimedProblem || extracted?.observations?.map((item) => item?.evidence).join(" ") || "");
   return observedSignals.includes("mixed_inbound_confirmed") ||
     observedSignals.includes("qualification_missing_confirmed") ||
@@ -163,14 +163,14 @@ function hasUpstreamLeadNoiseSignals(observedSignals, extracted) {
 }
 
 function pureStaffingHypothesisAllowed(observedSignals, extracted) {
-  return hasTargetFlowConfirmed(observedSignals, extracted) && !hasUpstreamLeadNoiseSignals(observedSignals, extracted);
+  return hasTargetFlowConfirmed(observedSignals, extracted) && !hasSystemicLeadNoiseSignals(observedSignals, extracted);
 }
 
 function isStaffingNode(nodeId) {
   return nodeId === "capacity_model_missing" || nodeId === "staffing_not_tied_to_lead_load";
 }
 
-function upstreamResolutionObserved(observedSignals, extracted) {
+function systemicResolutionObserved(observedSignals, extracted) {
   const text = normalizeText(extracted?.claimedProblem || extracted?.observations?.map((item) => item?.evidence).join(" ") || "");
   return observedSignals.includes("mixed_inbound_confirmed") ||
     observedSignals.includes("qualification_missing_confirmed") ||
@@ -197,7 +197,7 @@ function needsStrategicSplit(observedSignals, extracted) {
 function buildQuestionCandidates({ candidateStates, candidateCauses, observedSignals, extracted }) {
   const leadFlowScenario = isLeadFlowScenario(observedSignals, extracted);
   const localClaimedCause = claimedCauseLooksLocal(extracted);
-  const upstreamResolved = upstreamResolutionObserved(observedSignals, extracted);
+  const systemicResolved = systemicResolutionObserved(observedSignals, extracted);
   const staffingAllowed = pureStaffingHypothesisAllowed(observedSignals, extracted);
   const qualificationExists = qualificationLayerExists(observedSignals, extracted);
   const strategicSplit = needsStrategicSplit(observedSignals, extracted);
@@ -240,14 +240,14 @@ function buildQuestionCandidates({ candidateStates, candidateCauses, observedSig
     if (index === 0) {
       priority += 0.04;
     }
-    if (leadFlowScenario && questionLooksUpstream(question)) {
-      priority += upstreamResolved ? 0.06 : 0.24;
+    if (leadFlowScenario && questionChecksSystemicCause(question)) {
+      priority += systemicResolved ? 0.06 : 0.24;
     }
     if (leadFlowScenario && localClaimedCause && (item.layer === "strategy" || item.layer === "commercial")) {
       priority += 0.14;
     }
     if (leadFlowScenario && questionLooksLocal(question)) {
-      priority -= upstreamResolved ? 0.05 : 0.18;
+      priority -= systemicResolved ? 0.05 : 0.18;
     }
     if (leadFlowScenario && qualificationExists && /целев|приоритет|размеченн|вручную|квалификац/i.test(question)) {
       priority += 0.16;
@@ -269,7 +269,7 @@ function buildQuestionCandidates({ candidateStates, candidateCauses, observedSig
       separates,
       whyUseful:
         type === "cause"
-          ? "Этот вопрос проверяет более верхний слой причины и не даёт слишком рано застрять в локальной версии."
+          ? "Этот вопрос проверяет другой класс причины и не даёт слишком рано застрять в локальной версии."
           : "Этот вопрос отделяет ближайшие состояния системы и помогает не спутать перегруз с конструкцией."
     });
   };

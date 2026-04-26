@@ -82,11 +82,11 @@ export function emptyEntryState() {
     flowTypes: [],
     primaryFlow: "",
     constraintType: "",
-    higherLayerCheck: {
+    crossClassCheck: {
       currentClass: "",
-      betterExplainedAbove: false,
-      highestUnrejectedClass: "",
-      whyNotHigher: ""
+      hasCompetingExplanation: false,
+      competingClass: "",
+      whySelectedClass: ""
     },
     candidateConstraints: [],
     candidateStates: [],

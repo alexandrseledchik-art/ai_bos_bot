@@ -71,6 +71,10 @@ function countUniqueLayers(run) {
   return layers.size;
 }
 
+function countBusinessLayers(run) {
+  return new Set(run.decision.entryState?.businessLayers || []).size;
+}
+
 function buildChecks() {
   return [];
 }
@@ -196,6 +200,51 @@ function scoreCauseDepth(run, spec = {}) {
       checks,
       uniqueLayers >= spec.minUniqueLayers,
       `unique layers expected>=${spec.minUniqueLayers} actual=${uniqueLayers}`
+    );
+  }
+  if (spec.minBusinessLayers) {
+    const businessLayers = countBusinessLayers(run);
+    addCheck(
+      checks,
+      businessLayers >= spec.minBusinessLayers,
+      `business layers expected>=${spec.minBusinessLayers} actual=${businessLayers}`
+    );
+  }
+  if ((spec.requiredBusinessLayers || []).length) {
+    const businessLayers = entryState.businessLayers || [];
+    addCheck(
+      checks,
+      spec.requiredBusinessLayers.every((item) => businessLayers.includes(item)),
+      `business layers missed required layer(s): expected=${spec.requiredBusinessLayers.join(",")} actual=${businessLayers.join(",")}`
+    );
+  }
+  if ((spec.requiredLayerClasses || []).length) {
+    const layerClasses = entryState.layerClasses || [];
+    addCheck(
+      checks,
+      spec.requiredLayerClasses.every((item) => layerClasses.includes(item)),
+      `layer classes missed required class(es): expected=${spec.requiredLayerClasses.join(",")} actual=${layerClasses.join(",")}`
+    );
+  }
+  if (spec.expectedPrimaryFlow) {
+    addCheck(
+      checks,
+      entryState.primaryFlow === spec.expectedPrimaryFlow,
+      `primary flow expected=${spec.expectedPrimaryFlow} actual=${entryState.primaryFlow || "<empty>"}`
+    );
+  }
+  if (spec.expectedConstraintType) {
+    addCheck(
+      checks,
+      entryState.constraintType === spec.expectedConstraintType,
+      `constraint type expected=${spec.expectedConstraintType} actual=${entryState.constraintType || "<empty>"}`
+    );
+  }
+  if (spec.requireCrossClassCheck) {
+    addCheck(
+      checks,
+      Boolean(entryState.crossClassCheck?.currentClass || entryState.crossClassCheck?.competingClass),
+      "cross-class check was not populated"
     );
   }
   if (spec.minGraphConfidence != null) {

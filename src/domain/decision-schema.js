@@ -280,7 +280,7 @@ export const DECISION_SCHEMA = {
         "flowTypes",
         "primaryFlow",
         "constraintType",
-        "higherLayerCheck",
+        "crossClassCheck",
         "candidateConstraints",
         "candidateStates",
         "candidateCauses",
@@ -383,23 +383,23 @@ export const DECISION_SCHEMA = {
           type: "string",
           enum: ["", "supply", "quality", "throughput", "capacity", "control", "visibility"]
         },
-        higherLayerCheck: {
+        crossClassCheck: {
           type: "object",
           additionalProperties: false,
-          required: ["currentClass", "betterExplainedAbove", "highestUnrejectedClass", "whyNotHigher"],
+          required: ["currentClass", "hasCompetingExplanation", "competingClass", "whySelectedClass"],
           properties: {
             currentClass: {
               type: "string",
               enum: ["", "A", "B", "C", "D"]
             },
-            betterExplainedAbove: {
+            hasCompetingExplanation: {
               type: "boolean"
             },
-            highestUnrejectedClass: {
+            competingClass: {
               type: "string",
               enum: ["", "A", "B", "C", "D"]
             },
-            whyNotHigher: {
+            whySelectedClass: {
               type: "string"
             }
           }

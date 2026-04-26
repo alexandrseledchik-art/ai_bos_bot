@@ -336,6 +336,18 @@ function pushUniqueEntity(collection, createFn, predicate) {
 function mergeEntryState(currentState, incomingState, routeType) {
   const current = currentState && typeof currentState === "object" ? currentState : emptyEntryState();
   const incoming = incomingState && typeof incomingState === "object" ? incomingState : {};
+  const currentCrossClassCheck = current.crossClassCheck || {
+    currentClass: current.higherLayerCheck?.currentClass || "",
+    hasCompetingExplanation: Boolean(current.higherLayerCheck?.betterExplainedAbove),
+    competingClass: current.higherLayerCheck?.highestUnrejectedClass || "",
+    whySelectedClass: current.higherLayerCheck?.whyNotHigher || ""
+  };
+  const incomingCrossClassCheck = incoming.crossClassCheck || {
+    currentClass: incoming.higherLayerCheck?.currentClass || "",
+    hasCompetingExplanation: Boolean(incoming.higherLayerCheck?.betterExplainedAbove),
+    competingClass: incoming.higherLayerCheck?.highestUnrejectedClass || "",
+    whySelectedClass: incoming.higherLayerCheck?.whyNotHigher || ""
+  };
 
   return createEntryState({
     routeType: routeType || incoming.routeType || current.routeType,
@@ -351,15 +363,14 @@ function mergeEntryState(currentState, incomingState, routeType) {
     flowTypes: uniqueStrings([...(current.flowTypes || []), ...(incoming.flowTypes || [])], 6),
     primaryFlow: incoming.primaryFlow || current.primaryFlow,
     constraintType: incoming.constraintType || current.constraintType,
-    higherLayerCheck: {
-      currentClass: incoming.higherLayerCheck?.currentClass || current.higherLayerCheck?.currentClass || "",
-      betterExplainedAbove:
-        typeof incoming.higherLayerCheck?.betterExplainedAbove === "boolean"
-          ? incoming.higherLayerCheck.betterExplainedAbove
-          : Boolean(current.higherLayerCheck?.betterExplainedAbove),
-      highestUnrejectedClass:
-        incoming.higherLayerCheck?.highestUnrejectedClass || current.higherLayerCheck?.highestUnrejectedClass || "",
-      whyNotHigher: incoming.higherLayerCheck?.whyNotHigher || current.higherLayerCheck?.whyNotHigher || ""
+    crossClassCheck: {
+      currentClass: incomingCrossClassCheck.currentClass || currentCrossClassCheck.currentClass || "",
+      hasCompetingExplanation:
+        typeof incomingCrossClassCheck.hasCompetingExplanation === "boolean"
+          ? incomingCrossClassCheck.hasCompetingExplanation
+          : Boolean(currentCrossClassCheck.hasCompetingExplanation),
+      competingClass: incomingCrossClassCheck.competingClass || currentCrossClassCheck.competingClass || "",
+      whySelectedClass: incomingCrossClassCheck.whySelectedClass || currentCrossClassCheck.whySelectedClass || ""
     },
     candidateConstraints: mergeCandidateConstraints(current.candidateConstraints, incoming.candidateConstraints),
     candidateStates: mergeRankedGraphItems(current.candidateStates, incoming.candidateStates, 5),
@@ -473,11 +484,11 @@ function buildArtifactBody({ company, activeCase, decision, classification, user
     "## Constraint type",
     `- ${entryState.constraintType || "Not selected."}`,
     "",
-    "## Higher-layer check",
-    `- Current class: ${entryState.higherLayerCheck?.currentClass || "Not selected."}`,
-    `- Better explained above: ${entryState.higherLayerCheck?.betterExplainedAbove ? "yes" : "no"}`,
-    `- Highest unrejected class: ${entryState.higherLayerCheck?.highestUnrejectedClass || "Not selected."}`,
-    `- Why not higher: ${entryState.higherLayerCheck?.whyNotHigher || "Not captured."}`,
+    "## Cross-class check",
+    `- Current class: ${entryState.crossClassCheck?.currentClass || "Not selected."}`,
+    `- Competing explanation alive: ${entryState.crossClassCheck?.hasCompetingExplanation ? "yes" : "no"}`,
+    `- Competing class: ${entryState.crossClassCheck?.competingClass || "Not selected."}`,
+    `- Why selected class: ${entryState.crossClassCheck?.whySelectedClass || "Not captured."}`,
     "",
     "## Candidate constraints",
     ...(candidateConstraints.length > 0 ? candidateConstraints : ["- No candidate constraints captured."]),

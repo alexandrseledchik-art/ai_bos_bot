@@ -37,7 +37,16 @@ const PROBLEM_PATTERNS = [
   /реклам/i,
   /сайт/i,
   /лендинг/i,
-  /сервис/i
+  /сервис/i,
+  /процесс/i,
+  /crm/i,
+  /ручн/i,
+  /перенос/i,
+  /дублир/i,
+  /данн/i,
+  /метрик/i,
+  /аналитик/i,
+  /отч[её]т/i
 ];
 
 const TOOL_DISCOVERY_PATTERNS = [
@@ -88,9 +97,13 @@ export function classifyInput(text) {
   const hasSpecificToolIntent = SPECIFIC_TOOL_PATTERNS.some((pattern) => pattern.test(cleanText));
   const matchesExplicitVagueIntent = VAGUE_PATTERNS.some((pattern) => pattern.test(cleanText));
   const matchesUnknownIntent = /^(не понимаю|неясно|не знаю)$/i.test(cleanText);
+  const hasOperationalPainSignal =
+    /(ручн|перенос|дублир|crm|систем[аы]\s+не\s+связ|процесс|нет\s+метрик|не\s+видим|разные\s+цифр|отч[её]т|аналитик)/i.test(
+      cleanText
+    );
   const hasConcreteProblemSignal =
-    hasProblemMarkers &&
-    /(не\s+\S+|не хватает|не успева|не справля|перегруж|тонут|много|мало|просел|упал|падает|срыва|завис|долго|очеред|теря|дорог|буксу)/i.test(
+    (hasProblemMarkers || hasOperationalPainSignal) &&
+    /(не\s+\S+|не хватает|не успева|не справля|перегруж|тонут|много|мало|просел|упал|падает|срыва|завис|долго|очеред|теря|дорог|буксу|ручн|перенос|дублир|спорят|непонятно|нет\s+нормальн)/i.test(
       cleanText
     );
   const looksVague =
@@ -107,18 +120,18 @@ export function classifyInput(text) {
   } else if (urls.length > 0 && cleanText) {
     type = "url_plus_problem";
     entryMode = "url_plus_problem";
-  } else if (!urls.length && hasSpecificToolIntent) {
+  } else if (!urls.length && hasConcreteProblemSignal && !matchesExplicitVagueIntent) {
+    type = "free_text_problem";
+    entryMode = "problem_first";
+  } else if (!urls.length && hasSpecificToolIntent && !hasConcreteProblemSignal) {
     type = "free_text_vague";
     entryMode = "specific_tool_request";
-  } else if (!urls.length && hasToolDiscoveryIntent) {
+  } else if (!urls.length && hasToolDiscoveryIntent && !hasConcreteProblemSignal) {
     type = "free_text_vague";
     entryMode = "tool_discovery";
   } else if (!urls.length && matchesUnknownIntent) {
     type = "unknown";
     entryMode = "unclear";
-  } else if (!urls.length && hasConcreteProblemSignal && !matchesExplicitVagueIntent) {
-    type = "free_text_problem";
-    entryMode = "problem_first";
   } else if (!urls.length && looksVague) {
     type = "free_text_vague";
     entryMode = "unclear";
