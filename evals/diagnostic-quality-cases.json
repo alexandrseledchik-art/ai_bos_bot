@@ -679,7 +679,7 @@
       "nextBestQuestion": {
         "required": true,
         "requireQuestionMark": true,
-        "mustContainAny": ["экономику по каналу", "сегменту и продукту", "unit economics"],
+        "mustContainAny": ["экономику по каналу", "сегменту и продукту", "юнит-экономик"],
         "minCandidateConstraints": 3
       },
       "causeDepth": {
@@ -688,7 +688,7 @@
         "minCandidateCauses": 1,
         "minUniqueLayers": 1,
         "minGraphConfidence": 0.45,
-        "requiredConstraintTerms": ["unit economics"]
+        "requiredConstraintTerms": ["юнит-экономик"]
       },
       "uncertainty": {
         "minResponseHypotheses": 2,
@@ -717,7 +717,7 @@
           "## Discriminating signals",
           "## Next step"
         ],
-        "requiredTerms": ["unit economics"],
+        "requiredTerms": ["юнит-экономик"],
         "minCandidateConstraintBullets": 3,
         "minCandidateStateBullets": 1,
         "minCandidateCauseBullets": 1
@@ -781,7 +781,7 @@
       "nextBestQuestion": {
         "required": true,
         "requireQuestionMark": true,
-        "mustContainAny": ["экономику по каналу", "сегменту и продукту", "unit economics", "решить без эскалации"],
+        "mustContainAny": ["экономику по каналу", "сегменту и продукту", "юнит-экономик", "решить без эскалации"],
         "minCandidateConstraints": 3
       },
       "causeDepth": {
@@ -790,7 +790,7 @@
         "minCandidateCauses": 1,
         "minUniqueLayers": 2,
         "minGraphConfidence": 0.45,
-        "requiredConstraintTerms": ["unit economics"]
+        "requiredConstraintTerms": ["юнит-экономик"]
       },
       "uncertainty": {
         "minResponseHypotheses": 2,
@@ -818,7 +818,7 @@
           "## Selected constraint",
           "## Next step"
         ],
-        "requiredTerms": ["unit economics"],
+        "requiredTerms": ["юнит-экономик"],
         "minCandidateConstraintBullets": 3
       }
     }
