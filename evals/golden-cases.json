@@ -21,6 +21,18 @@
     "mustNotContain": ["главное ограничение бизнеса уже видно"]
   },
   {
+    "id": "meta_role_question",
+    "input": "Как ты понимаешь свою роль и чем можешь помочь пользователю, в каких задачах?",
+    "expectedRoute": "free_text_vague",
+    "expectedEntryMode": "meta_role",
+    "expectedMode": "clarification_mode",
+    "expectedAction": "answer",
+    "artifactExpected": false,
+    "mustContain": ["не держусь за одну фиксированную роль", "главное ограничение", "сайтом", "инструмент"],
+    "mustContainAny": ["диагност", "архитектор", "навигатор", "партнёр"],
+    "mustNotContain": ["Где у тебя сейчас самое сильное напряжение", "прибыль, рост или управляемость", "выбрал контур"]
+  },
+  {
     "id": "vague_profit_goal",
     "input": "Хочу увеличить прибыль",
     "expectedRoute": "free_text_vague",

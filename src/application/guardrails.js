@@ -2295,6 +2295,7 @@ export function applyGuardrails(rawDecision, context) {
   ], 8);
 
   if (
+    context.classification.entryMode !== "meta_role" &&
     decision.entryState.candidateConstraints.length >= 2 &&
     decision.decision.action === "answer" &&
     decision.entryState.promotionReadiness === "keep_in_entry"

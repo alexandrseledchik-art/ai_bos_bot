@@ -1788,6 +1788,74 @@ function buildToolFirstDecision(context) {
   };
 }
 
+function buildMetaRoleDecision(context) {
+  const entryState = buildEntryState(context, "general", "weak", "", "keep_in_entry");
+  const responseText = [
+    "Я не держусь за одну фиксированную роль. Я смотрю на задачу и выбираю позицию: если есть боль в бизнесе — работаю как диагност; если нужно собрать систему — как архитектор; если нужен шаблон или метод — как навигатор по инструментам; если нужно принять решение — как партнёр по следующему шагу.",
+    "Главная польза в том, чтобы не утонуть в симптомах: отделить факт от версии, увидеть 2-3 возможные причины, найти главное ограничение и понять, что проверять или делать первым.",
+    "Я могу помочь с продажами, деньгами, командой, управляемостью, продуктом, сайтом, подготовкой бизнеса к продаже, выбором инструмента и фиксацией результата как рабочего артефакта.",
+    "Если хочешь проверить это на практике, просто дай ситуацию одной фразой, голосом, ссылкой на сайт или запросом на инструмент."
+  ].join("\n\n");
+
+  return {
+    selectedMode: "clarification_mode",
+    decision: {
+      action: "answer",
+      signalSufficiency: "weak",
+      confidence: 0.82,
+      rationale: "Пользователь задал мета-вопрос о роли и возможностях; нужно ответить о способе работы, а не запускать диагностику."
+    },
+    response: {
+      whatIUnderstood: "Пользователь спрашивает, как система понимает свою роль и в каких задачах может быть полезна.",
+      hypotheses: [
+        "Нужно объяснить не один титул, а контекстную роль.",
+        "Важно показать практическую пользу и способы входа в работу."
+      ],
+      whyItMatters: "Если роль объяснить слишком узко, пользователь будет ждать только диагностики и не увидит сценарии инструментов, архитектуры и следующего шага.",
+      nextStep: "Дать реальную ситуацию, сайт, голос или запрос на инструмент.",
+      responseText
+    },
+    guardrails: {
+      knownFacts: ["Пользователь задал вопрос о роли и возможностях системы."],
+      observations: ["Это meta-role вход, а не business-problem диагностика."],
+      workingHypotheses: ["Нужно объяснить контекстную роль и практические сценарии помощи."],
+      canNotAssert: ["Нельзя диагностировать бизнес без бизнес-сигнала."],
+      confidenceNote: "Ответ описывает способ работы системы, а не ставит диагноз."
+    },
+    graphAnalysis: buildGraphAnalysisPacket(context.graphPacket),
+    entryState: {
+      ...entryState,
+      entryMode: "meta_role",
+      claimedProblem: normalizeText(context.classification.cleanText),
+      nextBestQuestion: "Что хочешь проверить первым: реальную ситуацию, сайт, голосовое описание или конкретный инструмент?",
+      nextBestStep: "Принять следующий пользовательский вход и выбрать роль под задачу.",
+      whyThisStep: "Так система остаётся живой и контекстной, а не навязывает один сценарий диагностики."
+    },
+    memory: {
+      companyName: "",
+      caseKind: "diagnostic_case",
+      goal: "Объяснить роль системы и варианты помощи пользователю.",
+      symptoms: [],
+      hypotheses: ["Роль должна выбираться по задаче пользователя."],
+      constraint: "",
+      situation: "Пользователь уточняет, как с системой работать.",
+      actionWave: {
+        enabled: false,
+        firstStep: "",
+        notNow: "",
+        whyThisFirst: ""
+      },
+      toolRecommendations: [],
+      artifact: {
+        shouldSave: false,
+        title: "",
+        summary: "",
+        kind: "snapshot"
+      }
+    }
+  };
+}
+
 function buildClarificationDecision(context, focus, claimedProblemText) {
   const entryState = buildEntryState(context, focus, "weak", "", "keep_in_entry");
   const greeting = isOpeningMessage(context)
@@ -2050,6 +2118,10 @@ function buildHeuristicDecision(context) {
 
   if (classification.entryMode === "specific_tool_request" || classification.entryMode === "tool_discovery") {
     return buildToolFirstDecision(context);
+  }
+
+  if (classification.entryMode === "meta_role") {
+    return buildMetaRoleDecision(context);
   }
 
   if (classification.type === "url_only") {

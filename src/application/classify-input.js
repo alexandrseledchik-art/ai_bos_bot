@@ -110,6 +110,17 @@ const SPECIFIC_TOOL_PATTERNS = [
   /roadmap|роадмап/i
 ];
 
+const META_ROLE_PATTERNS = [
+  /как\s+ты\s+понимаешь\s+(свою\s+)?роль/i,
+  /какая\s+у\s+тебя\s+роль/i,
+  /кто\s+ты/i,
+  /чем\s+ты\s+можешь\s+помочь/i,
+  /что\s+ты\s+умеешь/i,
+  /в\s+каких\s+задачах/i,
+  /как\s+с\s+тобой\s+работать/i,
+  /что\s+ты\s+делаешь/i
+];
+
 export function extractUrls(text) {
   const matches = text.match(URL_PATTERN) || [];
   return [...new Set(matches.map((item) => item.trim().replace(/[),.;!?]+$/, "")))];
@@ -127,6 +138,7 @@ export function classifyInput(text) {
   const hasProblemMarkers = PROBLEM_PATTERNS.some((pattern) => pattern.test(cleanText));
   const hasToolDiscoveryIntent = TOOL_DISCOVERY_PATTERNS.some((pattern) => pattern.test(cleanText));
   const hasSpecificToolIntent = SPECIFIC_TOOL_PATTERNS.some((pattern) => pattern.test(cleanText));
+  const hasMetaRoleIntent = META_ROLE_PATTERNS.some((pattern) => pattern.test(cleanText));
   const matchesExplicitVagueIntent = VAGUE_PATTERNS.some((pattern) => pattern.test(cleanText));
   const matchesUnknownIntent = /^(не понимаю|неясно|не знаю)$/i.test(cleanText);
   const hasOperationalPainSignal =
@@ -152,6 +164,9 @@ export function classifyInput(text) {
   } else if (urls.length > 0 && cleanText) {
     type = "url_plus_problem";
     entryMode = "url_plus_problem";
+  } else if (!urls.length && hasMetaRoleIntent) {
+    type = "free_text_vague";
+    entryMode = "meta_role";
   } else if (!urls.length && hasConcreteProblemSignal && !matchesExplicitVagueIntent) {
     type = "free_text_problem";
     entryMode = "problem_first";
@@ -181,6 +196,7 @@ export function classifyInput(text) {
     hasProblemMarkers,
     hasToolDiscoveryIntent,
     hasSpecificToolIntent,
+    hasMetaRoleIntent,
     looksVague,
     hasConcreteProblemSignal
   };

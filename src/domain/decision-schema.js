@@ -302,6 +302,7 @@ export const DECISION_SCHEMA = {
             "problem_first",
             "tool_discovery",
             "specific_tool_request",
+            "meta_role",
             "url_only",
             "url_plus_problem",
             "unclear"
