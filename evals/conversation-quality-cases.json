@@ -106,6 +106,45 @@
     ]
   },
   {
+    "id": "tool_context_survives_zone_followup",
+    "turns": [
+      "Я не понимаю кто и чем у меня занимается, какой инструмент можно использовать чтобы разобраться?",
+      "Продажи",
+      "А как это связано с тем кто чем занимается?"
+    ],
+    "expectedEntryMode": "tool_discovery",
+    "expectedAction": "clarify",
+    "turnChecks": [
+      {
+        "mustContainAny": ["матрица ответственности", "инструмент"],
+        "mustContain": ["инструмент"],
+        "mustNotContain": ["где именно узкое место", "заявок мало", "не покупают", "чек и маржа"],
+        "requireQuestion": true,
+        "maxParagraphs": 3,
+        "maxChars": 1100
+      },
+      {
+        "mustContain": ["продаж", "карту ролей"],
+        "mustContainAny": ["кто принимает заявку", "кто квалифицирует", "кто делает первый контакт"],
+        "mustNotContain": ["заявок мало", "заявки есть, но не покупают", "просели чек и маржа", "где именно узкое место"],
+        "requireQuestion": true,
+        "maxParagraphs": 4,
+        "maxChars": 1300
+      },
+      {
+        "mustContain": ["связано напрямую", "ответствен"],
+        "mustContainAny": ["кто принимает заявку", "кто квалифицирует", "размытой ответственности"],
+        "mustNotContain": ["большой диагностики", "\\n\\n", "заявок мало", "конверсия"],
+        "requireQuestion": true,
+        "maxParagraphs": 4,
+        "maxChars": 1300
+      }
+    ],
+    "conversationChecks": {
+      "minUniqueOpeners": 3
+    }
+  },
+  {
     "id": "site_only_does_not_become_business_diagnosis",
     "turns": [
       "https://acme.example"

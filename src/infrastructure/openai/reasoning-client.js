@@ -1671,7 +1671,7 @@ function buildWebsiteDecision(context, linkedProblem = false) {
 function detectRequestedTool(text) {
   const normalized = normalizeText(text).toLowerCase();
 
-  if (/\braci\b|рас[иi]|матриц[ау]\s+ответственност/.test(normalized)) {
+  if (/\braci\b|рас[иi]|матриц[ау]\s+ответственност|кто\s+.*чем\s+.*занима|роли?\s+и\s+ответственност|кто\s+за\s+что\s+отвеча/.test(normalized)) {
     return {
       name: "RACI",
       explanation: "матрица ответственности: кто делает, кто утверждает, кого нужно спросить и кого держать в курсе"
@@ -1708,10 +1708,158 @@ function detectRequestedTool(text) {
   };
 }
 
+function detectRequestedToolFromContext(context) {
+  const sources = [
+    context.userText,
+    context.entryState?.claimedProblem,
+    ...((context.history || []).filter((item) => item.role === "user").map((item) => item.text))
+  ];
+
+  for (const source of sources) {
+    const tool = detectRequestedTool(source);
+    if (tool.name !== "инструмент") {
+      return tool;
+    }
+  }
+
+  return detectRequestedTool(context.userText);
+}
+
+function detectToolZone(text) {
+  const normalized = normalizeText(text).toLowerCase();
+  if (/продаж|лид|заяв|воронк|кп|сделк/.test(normalized)) {
+    return "продажи";
+  }
+  if (/маркет|реклам|трафик|канал/.test(normalized)) {
+    return "маркетинг";
+  }
+  if (/доставк|исполн|операц|процесс|производ/.test(normalized)) {
+    return "исполнение";
+  }
+  if (/поддерж|сервис|клиентск/.test(normalized)) {
+    return "поддержка";
+  }
+  if (/управл|решени|руковод|менеджмент/.test(normalized)) {
+    return "управление";
+  }
+  return "";
+}
+
+function detectToolZoneFromContext(context) {
+  const sources = [
+    context.userText,
+    context.entryState?.claimedProblem,
+    ...((context.history || []).filter((item) => item.role === "user").map((item) => item.text))
+  ];
+
+  for (const source of sources) {
+    const zone = detectToolZone(source);
+    if (zone) {
+      return zone;
+    }
+  }
+
+  return "";
+}
+
+function buildToolFollowUpDecision(context, requestedTool, entryState) {
+  const text = normalizeText(context.userText);
+  const zone = detectToolZoneFromContext(context);
+  const asksConnection = /как\s+.*связан|прич[её]м|зачем|почему/i.test(text);
+  const isSales = zone === "продажи";
+  const nextStep = isSales
+    ? "У вас один человек ведёт весь путь продажи от лида до сделки, или роли разделены по этапам?"
+    : "Это один процесс с одним ответственным или несколько ролей по этапам?";
+  const responseText = asksConnection
+    ? [
+        `Связано напрямую: ${requestedTool.name === "RACI" ? "матрица ответственности (RACI)" : "этот инструмент"} нужна не для диагностики продаж, а чтобы разложить работу по людям и этапам.`,
+        isSales
+          ? "В продажах это обычно выглядит так: кто принимает заявку, кто квалифицирует, кто делает первый контакт, кто готовит предложение, кто дожимает и кто фиксирует движение в системе учёта. Если это не закреплено, проблема выглядит как «продажи буксуют», хотя корень может быть в размытой ответственности."
+          : "Если это не закреплено, задачи зависают между людьми, и бизнес видит симптом в результате, хотя корень может быть в размытой ответственности.",
+        nextStep
+      ].join("\n\n")
+    : [
+        `Ок, берём ${zone || "эту зону"}. Я бы здесь не уходил в большую диагностику, а сначала собрал карту ролей и ответственности.`,
+        isSales
+          ? "Для продаж это значит разложить путь лида по шагам: кто принимает заявку, кто квалифицирует, кто делает первый контакт, кто готовит предложение и кто дожимает до сделки."
+          : "Смысл простой: разложить процесс по шагам и понять, кто за что отвечает, где согласует и где передаёт дальше.",
+        nextStep
+      ].join("\n\n");
+
+  return {
+    selectedMode: "clarification_mode",
+    decision: {
+      action: "clarify",
+      signalSufficiency: "partial",
+      confidence: 0.74,
+      rationale: "Пользователь продолжает tool-first сценарий; нужно сохранить контекст инструмента и уточнить область применения, а не переключаться в problem-first диагностику."
+    },
+    response: {
+      whatIUnderstood: `Пользователь уточняет область применения инструмента: ${zone || "рабочий процесс"}.`,
+      hypotheses: [
+        "Нужна карта ролей и ответственности под конкретный процесс.",
+        "Если сейчас уйти в диагностику проблемы, инструментальный запрос будет потерян."
+      ],
+      whyItMatters: "Инструмент должен помочь разложить ответственность, а не подмениться общим разговором о проблеме.",
+      nextStep,
+      responseText
+    },
+    guardrails: {
+      knownFacts: [`Сохраняется tool-first сценарий: ${requestedTool.name}.`],
+      observations: [zone ? `Пользователь выбрал зону: ${zone}.` : "Пользователь уточняет применение инструмента."],
+      workingHypotheses: ["Нужно разложить процесс на роли и этапы."],
+      canNotAssert: ["Нельзя диагностировать причину продаж без бизнес-сигнала; сейчас пользователь просит инструмент."],
+      confidenceNote: "Это уточнение инструмента, а не диагноз."
+    },
+    graphAnalysis: buildGraphAnalysisPacket(context.graphPacket),
+    entryState: {
+      ...entryState,
+      entryMode: context.classification.entryMode,
+      claimedProblem: normalizeText(context.entryState?.claimedProblem || context.classification.cleanText),
+      nextBestQuestion: nextStep,
+      nextBestStep: "Собрать карту ролей по выбранной зоне.",
+      whyThisStep: "Так пользователь получает инструмент под свою задачу, а не новый диагностический сценарий."
+    },
+    memory: {
+      companyName: "",
+      caseKind: "diagnostic_case",
+      goal: `Подготовить ${requestedTool.name === "инструмент" ? "инструмент" : requestedTool.name} под выбранную зону.`,
+      symptoms: [],
+      hypotheses: ["Нужна карта ролей по этапам процесса."],
+      constraint: "",
+      situation: "Пользователь уточняет tool-first запрос.",
+      actionWave: {
+        enabled: false,
+        firstStep: "",
+        notNow: "",
+        whyThisFirst: ""
+      },
+      toolRecommendations: [
+        {
+          name: requestedTool.name,
+          reason: "Инструмент нужен, чтобы разложить ответственность по шагам процесса.",
+          usageMoment: "После уточнения, как сейчас устроены роли по этапам."
+        }
+      ],
+      artifact: {
+        shouldSave: false,
+        title: "",
+        summary: "",
+        kind: "snapshot"
+      }
+    }
+  };
+}
+
 function buildToolFirstDecision(context) {
-  const requestedTool = detectRequestedTool(context.userText);
+  const requestedTool = detectRequestedToolFromContext(context);
   const entryState = buildEntryState(context, "operations", "weak", "", "keep_in_entry");
   const isSpecific = context.classification.entryMode === "specific_tool_request";
+
+  if (context.classification.inferredToolFollowUp) {
+    return buildToolFollowUpDecision(context, requestedTool, entryState);
+  }
+
   const nextStep = isSpecific
     ? "Скажи, для какого процесса, решения или зоны сейчас нужен этот инструмент, чтобы я дал его под реальный кейс, а не пустую таблицу?"
     : "В какой зоне нужен инструмент: продажи, роли и ответственность, финансы, процессы или подготовка бизнеса к продаже?";

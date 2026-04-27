@@ -249,6 +249,7 @@ function looksMechanicalResponse(text) {
 
 function polishSurfaceText(text) {
   return ensureString(text)
+    .replace(/\\n/g, "\n")
     .replace(/чтобы не гадать/gi, "чтобы не перепутать симптом с конструкцией")
     .replace(/похоже,\s*ты\s*просто\s*открыл\s*чат\./gi, "Привет. Давай сразу зацепимся за реальный бизнес-сигнал.")
     .replace(/в юнит-экономика\s*\(unit economics\)/gi, "в юнит-экономике")

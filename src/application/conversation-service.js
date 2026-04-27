@@ -197,9 +197,38 @@ function looksDiagnosticMetaFollowUp(text) {
   );
 }
 
+function hasToolFirstContext(thread) {
+  return thread?.entryState?.entryMode === "tool_discovery" ||
+    thread?.entryState?.entryMode === "specific_tool_request";
+}
+
+function looksToolFirstFollowUp(classification, history) {
+  const cleanText = String(classification.cleanText || "").trim().toLowerCase();
+  const wordCount = Number(classification.wordCount || 0);
+
+  if (!cleanText || /^\/start$|^(привет|здравствуй|здравствуйте|добрый день|добрый вечер)$/i.test(cleanText)) {
+    return false;
+  }
+
+  if (/инструмент|шаблон|таблиц|матриц|raci|рас[иi]|роль|роли|ответствен|кто\s+.*чем|как\s+.*связан/i.test(cleanText)) {
+    return true;
+  }
+
+  return lastAssistantAskedQuestion(history) && wordCount <= 5;
+}
+
 function contextualizeClassification(classification, thread, history) {
   if (classification.entryMode === "tool_discovery" || classification.entryMode === "specific_tool_request") {
     return classification;
+  }
+
+  if (hasToolFirstContext(thread) && looksToolFirstFollowUp(classification, history)) {
+    return {
+      ...classification,
+      type: "free_text_vague",
+      entryMode: thread.entryState.entryMode,
+      inferredToolFollowUp: true
+    };
   }
 
   if (classification.type !== "free_text_vague" && classification.type !== "unknown") {
