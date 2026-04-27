@@ -1110,14 +1110,38 @@ function isToolFirstContext(context) {
 }
 
 function buildToolFirstSurfaceResponse(response, visibleResponse) {
-  if (visibleResponse && !looksMechanicalResponse(visibleResponse)) {
+  if (visibleResponse && !looksMechanicalResponse(visibleResponse) && !violatesToolDeliveryBoundary(visibleResponse)) {
     return visibleResponse;
+  }
+
+  if (violatesToolDeliveryBoundary(visibleResponse) || violatesToolDeliveryBoundary(response.responseText)) {
+    return joinParagraphs([
+      "Понял: здесь лучше сначала подсветить подходящий инструмент, а не выдавать сам артефакт прямо в чате.",
+      "На этом этапе я объясню, зачем он нужен и где его применить; сам формат получения можно выбрать отдельно: ссылка на готовый инструмент, мини-приложение или генерация в чате.",
+      sanitizeToolNextStep(response.nextStep)
+    ]);
   }
 
   return joinParagraphs([
     ensureSentence(response.whatIUnderstood),
-    `${ensureSentence(response.whyItMatters)} ${ensureString(response.nextStep)}`
+    `${ensureSentence(response.whyItMatters)} ${sanitizeToolNextStep(response.nextStep)}`
   ]);
+}
+
+function violatesToolDeliveryBoundary(text) {
+  return /google\s+sheets|колонк|готов[а-яё\s]+таблиц|таблиц[ау]\s+под|этап\s*\||следующим\s+сообщени[а-яё\s]+дам|дам\s+готов[а-яё\s]+таблиц|сдела[йе]?\s+.*таблиц/i.test(
+    ensureString(text)
+  );
+}
+
+function sanitizeToolNextStep(value) {
+  const text = ensureString(value);
+
+  if (!text || violatesToolDeliveryBoundary(text)) {
+    return "Скажи, для какой зоны или процесса нужен инструмент; сам формат получения потом выберем отдельно: ссылка на готовый инструмент, мини-приложение или генерация в чате.";
+  }
+
+  return text;
 }
 
 function buildVagueSurfaceResponse(response, context) {

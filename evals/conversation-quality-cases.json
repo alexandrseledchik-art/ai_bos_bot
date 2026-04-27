@@ -98,10 +98,10 @@
     "turnChecks": [
       {
         "mustContain": ["матрица ответственности", "для какого процесса"],
-        "mustNotContain": ["пройдём диагностику", "что сейчас тормозит бизнес", "главное ограничение уже"],
+        "mustNotContain": ["пройдём диагностику", "что сейчас тормозит бизнес", "главное ограничение уже", "Google Sheets", "колонки", "готовую таблицу", "следующим сообщением дам", "Этап |"],
         "requireQuestion": true,
         "maxParagraphs": 3,
-        "maxChars": 900
+        "maxChars": 1300
       }
     ]
   },
@@ -118,15 +118,15 @@
       {
         "mustContainAny": ["матрица ответственности", "инструмент"],
         "mustContain": ["инструмент"],
-        "mustNotContain": ["где именно узкое место", "заявок мало", "не покупают", "чек и маржа"],
+        "mustNotContain": ["где именно узкое место", "заявок мало", "не покупают", "чек и маржа", "Google Sheets", "колонки", "готовую таблицу", "следующим сообщением дам", "Этап |"],
         "requireQuestion": true,
-        "maxParagraphs": 3,
-        "maxChars": 1100
+        "maxParagraphs": 4,
+        "maxChars": 1400
       },
       {
         "mustContain": ["продаж", "карту ролей"],
         "mustContainAny": ["кто принимает заявку", "кто квалифицирует", "кто делает первый контакт"],
-        "mustNotContain": ["заявок мало", "заявки есть, но не покупают", "просели чек и маржа", "где именно узкое место"],
+        "mustNotContain": ["заявок мало", "заявки есть, но не покупают", "просели чек и маржа", "где именно узкое место", "Google Sheets", "колонки", "готовую таблицу", "следующим сообщением дам", "Этап |"],
         "requireQuestion": true,
         "maxParagraphs": 4,
         "maxChars": 1300
@@ -134,7 +134,7 @@
       {
         "mustContain": ["связано напрямую", "ответствен"],
         "mustContainAny": ["кто принимает заявку", "кто квалифицирует", "размытой ответственности"],
-        "mustNotContain": ["большой диагностики", "\\n\\n", "заявок мало", "конверсия"],
+        "mustNotContain": ["большой диагностики", "\\n\\n", "заявок мало", "конверсия", "Google Sheets", "колонки", "готовую таблицу", "следующим сообщением дам", "Этап |"],
         "requireQuestion": true,
         "maxParagraphs": 4,
         "maxChars": 1300
@@ -143,6 +143,26 @@
     "conversationChecks": {
       "minUniqueOpeners": 3
     }
+  },
+  {
+    "id": "tool_recommendation_does_not_generate_template",
+    "turns": [
+      "Я не понимаю кто и чем у меня занимается, какой инструмент можно использовать чтобы разобраться?",
+      "Продажи"
+    ],
+    "expectedEntryMode": "tool_discovery",
+    "expectedAction": "clarify",
+    "turnChecks": [
+      {},
+      {
+        "mustContainAny": ["подсветил инструмент", "подсветил бы инструмент", "карта ролей", "матрица ответственности"],
+        "mustContain": ["продаж"],
+        "mustNotContain": ["Google Sheets", "колонки", "готовую таблицу", "следующим сообщением дам", "Этап |"],
+        "requireQuestion": true,
+        "maxParagraphs": 4,
+        "maxChars": 1400
+      }
+    ]
   },
   {
     "id": "site_only_does_not_become_business_diagnosis",
