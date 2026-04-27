@@ -2236,6 +2236,10 @@ export class ReasoningClient {
   }
 
   async decide(context) {
+    if (context.classification?.entryMode === "meta_role") {
+      return this.fallback.decide(context);
+    }
+
     if (!this.primary) {
       return this.fallback.decide(context);
     }
