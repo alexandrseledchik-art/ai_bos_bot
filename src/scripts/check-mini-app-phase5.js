@@ -341,8 +341,7 @@ function assertFrontendAndRoutes() {
   const mainJs = fs.readFileSync("mini-app-assets/src/main.js", "utf8");
   const styles = fs.readFileSync("mini-app-assets/styles.css", "utf8");
   const apiClient = fs.readFileSync("mini-app-assets/src/api-client.js", "utf8");
-  const constraintApi = fs.readFileSync("api/mini-app/constraint/reason.js", "utf8");
-  const nextStepApi = fs.readFileSync("api/mini-app/next-step.js", "utf8");
+  const miniAppApi = fs.readFileSync("api/mini-app/[...path].js", "utf8");
 
   assert.match(mainJs, /renderConstraint/);
   assert.match(mainJs, /renderNextStep/);
@@ -351,8 +350,8 @@ function assertFrontendAndRoutes() {
   assert.match(styles, /\.insight-card/);
   assert.match(apiClient, /reasonConstraint/);
   assert.match(apiClient, /getNextStep/);
-  assert.match(constraintApi, /reasonConstraint/);
-  assert.match(nextStepApi, /getOrCreateNextStep/);
+  assert.match(miniAppApi, /reasonConstraint/);
+  assert.match(miniAppApi, /getOrCreateNextStep/);
 }
 
 async function main() {

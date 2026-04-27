@@ -352,8 +352,7 @@ function assertFrontendRoutesAndPrompt() {
   const config = fs.readFileSync("src/config.js", "utf8");
   const migration = fs.readFileSync("supabase/migrations/20260428_add_mini_app_phase7_consultation.sql", "utf8");
   const prompt = fs.readFileSync("prompts/mini-app/consultation-brief.md", "utf8");
-  const briefApi = fs.readFileSync("api/mini-app/consultation/brief.js", "utf8");
-  const requestApi = fs.readFileSync("api/mini-app/consultation/request.js", "utf8");
+  const miniAppApi = fs.readFileSync("api/mini-app/[...path].js", "utf8");
 
   assert.match(mainJs, /renderConsultation/);
   assert.match(mainJs, /data-consultation-generate/);
@@ -369,8 +368,8 @@ function assertFrontendRoutesAndPrompt() {
   assert.match(migration, /requested_at/);
   assert.match(prompt, /Не диагностируй бизнес заново|Do not diagnose/i);
   assert.match(prompt, /Александр Селедчик/);
-  assert.match(briefApi, /bookingUrlConfigured/);
-  assert.match(requestApi, /markConsultationRequest/);
+  assert.match(miniAppApi, /bookingUrlConfigured/);
+  assert.match(miniAppApi, /markConsultationRequest/);
 }
 
 async function main() {

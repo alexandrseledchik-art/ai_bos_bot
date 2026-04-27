@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import bootstrapRoute from "../../api/mini-app/bootstrap.js";
+import miniAppRoute from "../../api/mini-app/[...path].js";
 import { MiniAppBootstrapService } from "../application/mini-app-bootstrap-service.js";
 import {
   createSignedTelegramWebAppInitDataForTest,
@@ -161,7 +161,7 @@ async function main() {
   process.env.SUPABASE_URL = "https://example.supabase.co";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-key";
 
-  const invalidResponse = await bootstrapRoute.fetch(
+  const invalidResponse = await miniAppRoute.fetch(
     new Request("https://aibosbot.test/api/mini-app/bootstrap?initData=invalid")
   );
   assert.equal(invalidResponse.status, 401);

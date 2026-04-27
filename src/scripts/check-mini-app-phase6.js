@@ -372,10 +372,7 @@ function assertFrontendAndRoutes() {
   const mainJs = fs.readFileSync("mini-app-assets/src/main.js", "utf8");
   const styles = fs.readFileSync("mini-app-assets/styles.css", "utf8");
   const apiClient = fs.readFileSync("mini-app-assets/src/api-client.js", "utf8");
-  const toolsApi = fs.readFileSync("api/mini-app/tools.js", "utf8");
-  const recommendedApi = fs.readFileSync("api/mini-app/tools/recommended.js", "utf8");
-  const documentsApi = fs.readFileSync("api/mini-app/documents.js", "utf8");
-  const documentAnalyzeApi = fs.readFileSync("api/mini-app/documents/[id]/analyze.js", "utf8");
+  const miniAppApi = fs.readFileSync("api/mini-app/[...path].js", "utf8");
 
   assert.match(mainJs, /renderRecommendedToolsPanel/);
   assert.match(mainJs, /renderTools/);
@@ -388,10 +385,10 @@ function assertFrontendAndRoutes() {
   assert.match(styles, /\.document-card/);
   assert.match(apiClient, /getRecommendedTools/);
   assert.match(apiClient, /analyzeDocument/);
-  assert.match(toolsApi, /getTools/);
-  assert.match(recommendedApi, /getRecommendedTools/);
-  assert.match(documentsApi, /saveDocumentLink/);
-  assert.match(documentAnalyzeApi, /analyzeDocument/);
+  assert.match(miniAppApi, /getTools/);
+  assert.match(miniAppApi, /getRecommendedTools/);
+  assert.match(miniAppApi, /saveDocumentLink/);
+  assert.match(miniAppApi, /analyzeDocument/);
 }
 
 async function main() {

@@ -602,9 +602,7 @@ function assertStaticPhase8Wiring() {
   const mainJs = fs.readFileSync("mini-app-assets/src/main.js", "utf8");
   const apiClient = fs.readFileSync("mini-app-assets/src/api-client.js", "utf8");
   const service = fs.readFileSync("src/application/mini-app-diagnostics-service.js", "utf8");
-  const bootstrap = fs.readFileSync("api/mini-app/bootstrap.js", "utf8");
-  const constraintOverride = fs.readFileSync("api/mini-app/dev/constraint-override.js", "utf8");
-  const nextStepOverride = fs.readFileSync("api/mini-app/dev/next-step-override.js", "utf8");
+  const miniAppApi = fs.readFileSync("api/mini-app/[...path].js", "utf8");
 
   assert.match(config, /MINI_APP_ALPHA_MODE/);
   assert.match(migration, /mini_app_analytics_events/);
@@ -618,9 +616,10 @@ function assertStaticPhase8Wiring() {
   assert.match(service, /suggestion_shown/);
   assert.match(service, /captureEvalSnapshot/);
   assert.match(service, /manual_constraint_override/);
-  assert.match(bootstrap, /mini_app_opened/);
-  assert.match(constraintOverride, /miniAppAlphaMode/);
-  assert.match(nextStepOverride, /miniAppAlphaMode/);
+  assert.match(miniAppApi, /mini_app_opened/);
+  assert.match(miniAppApi, /miniAppAlphaMode/);
+  assert.match(miniAppApi, /dev\/constraint-override/);
+  assert.match(miniAppApi, /dev\/next-step-override/);
 }
 
 async function main() {
