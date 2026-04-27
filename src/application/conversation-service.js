@@ -8,6 +8,7 @@ import {
   createGoal,
   createHypothesis,
   createMessage,
+  createObservation,
   createSituation,
   createSnapshot,
   createSymptom,
@@ -362,6 +363,47 @@ function pushUniqueEntity(collection, createFn, predicate) {
   }
 }
 
+function persistExtractedObservations({ state, activeCase, userMessage, extracted }) {
+  if (!activeCase || !userMessage || !Array.isArray(extracted?.observations)) {
+    return;
+  }
+
+  for (const observation of extracted.observations) {
+    const statement = String(observation.label || observation.evidence || "").trim();
+    const normalizedSignal = String(observation.signalId || "").trim();
+    if (!statement || !normalizedSignal) {
+      continue;
+    }
+
+    pushUniqueEntity(
+      state.observations,
+      () =>
+        createObservation({
+          caseId: activeCase.id,
+          sourceId: userMessage.id,
+          statement,
+          normalizedSignal,
+          layer: observation.businessLayer || observation.layer || "",
+          confidence: 0.7,
+          evidence: [
+            {
+              text: observation.evidence || userMessage.text,
+              signalId: normalizedSignal,
+              domains: observation.domains || []
+            }
+          ]
+        }),
+      () =>
+        (state.observations || []).some(
+          (item) =>
+            item.caseId === activeCase.id &&
+            item.sourceId === userMessage.id &&
+            item.normalizedSignal === normalizedSignal
+        )
+    );
+  }
+}
+
 function mergeEntryState(currentState, incomingState, routeType) {
   const current = currentState && typeof currentState === "object" ? currentState : emptyEntryState();
   const incoming = incomingState && typeof incomingState === "object" ? incomingState : {};
@@ -654,21 +696,19 @@ export class ConversationService {
       let decision = await this.reasoner.decide(context);
       decision = applyGuardrails(decision, context);
 
-      state.messages.push(
-        createMessage({
-          threadId: thread.id,
-          role: "user",
-          text
-        })
-      );
+      const userMessage = createMessage({
+        threadId: thread.id,
+        role: "user",
+        text
+      });
+      const assistantMessage = createMessage({
+        threadId: thread.id,
+        role: "assistant",
+        text: decision.response.responseText
+      });
 
-      state.messages.push(
-        createMessage({
-          threadId: thread.id,
-          role: "assistant",
-          text: decision.response.responseText
-        })
-      );
+      state.messages.push(userMessage);
+      state.messages.push(assistantMessage);
 
       thread.entryState = mergeEntryState(thread.entryState, decision.entryState, classification.type);
       thread.entryState.entryMode = classification.entryMode || thread.entryState.entryMode || "unclear";
@@ -707,6 +747,7 @@ export class ConversationService {
       let artifactPath = "";
 
       if (activeCase) {
+        persistExtractedObservations({ state, activeCase, userMessage, extracted });
         persistedMemory = buildPersistedMemory(decision);
 
         activeCase.mode = decision.selectedMode;

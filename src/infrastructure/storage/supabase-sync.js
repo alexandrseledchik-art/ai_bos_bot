@@ -102,13 +102,15 @@ export class SupabaseSyncClient {
       updated_at: row.updated_at
     }));
 
-    const companies = await this.upsertRows("companies", companyRows);
+    const companies = await this.upsertRows("companies", companyRows, "id,external_id,workspace_id");
     const companyIdByExternalId = new Map(companies.map((row) => [row.external_id, row.id]));
+    const workspaceIdByCompanyExternalId = new Map(companies.map((row) => [row.external_id, row.workspace_id]));
 
     const caseRows = projected.cases
       .map((row) => ({
         external_id: row.external_id,
         company_id: companyIdByExternalId.get(row.company_external_id),
+        workspace_id: workspaceIdByCompanyExternalId.get(row.company_external_id),
         kind: row.kind,
         mode: row.mode,
         summary: row.summary,
@@ -118,8 +120,9 @@ export class SupabaseSyncClient {
       }))
       .filter((row) => row.company_id);
 
-    const cases = await this.upsertRows("cases", caseRows);
+    const cases = await this.upsertRows("cases", caseRows, "id,external_id,workspace_id,company_id");
     const caseIdByExternalId = new Map(cases.map((row) => [row.external_id, row.id]));
+    const caseByExternalId = new Map(cases.map((row) => [row.external_id, row]));
 
     const threadRows = projected.threads
       .map((row) => ({
@@ -148,6 +151,28 @@ export class SupabaseSyncClient {
           created_at: row.created_at
         }))
         .filter((row) => row.thread_id),
+      observations: projected.observations
+        .map((row) => {
+          const relatedCase = caseByExternalId.get(row.case_external_id);
+          return {
+            workspace_id: relatedCase?.workspace_id,
+            company_id: relatedCase?.company_id,
+            case_id: relatedCase?.id,
+            source_type: row.source_type || "chat",
+            source_id: row.source_id || row.external_id,
+            statement: row.statement,
+            normalized_signal: row.normalized_signal,
+            layer: row.layer,
+            layer_class: row.layer_class,
+            flow_type: row.flow_type,
+            confidence: row.confidence,
+            evidence: row.evidence || [],
+            status: row.status || "active",
+            created_at: row.created_at,
+            updated_at: row.updated_at
+          };
+        })
+        .filter((row) => row.workspace_id && row.company_id && row.case_id && row.statement && row.source_id),
       goals: projected.goals
         .map((row) => ({
           external_id: row.external_id,
@@ -243,7 +268,22 @@ export class SupabaseSyncClient {
         .filter((row) => row.case_id)
     };
 
+    if (entityRows.observations.length > 0) {
+      await this.request("/rest/v1/observations", {
+        method: "POST",
+        query: {
+          on_conflict: "case_id,source_type,source_id,normalized_signal",
+          select: "id"
+        },
+        prefer: "resolution=merge-duplicates,return=representation",
+        body: entityRows.observations
+      });
+    }
+
     for (const [table, rows] of Object.entries(entityRows)) {
+      if (table === "observations") {
+        continue;
+      }
       await this.upsertRows(table, rows, "id,external_id");
     }
 
@@ -252,6 +292,7 @@ export class SupabaseSyncClient {
       cases: caseRows.length,
       threads: threadRows.length,
       messages: entityRows.messages.length,
+      observations: entityRows.observations.length,
       goals: entityRows.goals.length,
       symptoms: entityRows.symptoms.length,
       hypotheses: entityRows.hypotheses.length,

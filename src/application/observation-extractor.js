@@ -68,12 +68,28 @@ function detectClaimedCause(text) {
   return "";
 }
 
+function toBusinessLayer(layer) {
+  const normalized = String(layer || "").trim().toLowerCase();
+  const mapping = {
+    commercial: "commercial",
+    operations: "operating_model",
+    management: "governance_risks",
+    people: "people_organization",
+    finance: "finance",
+    strategy: "strategy",
+    product: "product_value_proposition"
+  };
+
+  return mapping[normalized] || normalized || "data_analytics";
+}
+
 function buildObservation(node, text) {
   return {
     signalId: node.id,
     type: node.type,
     label: node.label,
     layer: node.layer,
+    businessLayer: toBusinessLayer(node.layer),
     domains: node.domains,
     evidence: text
   };
@@ -99,6 +115,7 @@ export function extractObservations({ userText, classification, entryState, memo
       type: "symptom",
       label: text,
       layer: "management",
+      businessLayer: "governance_risks",
       domains: ["general"],
       evidence: text
     });

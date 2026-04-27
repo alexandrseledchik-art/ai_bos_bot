@@ -5,6 +5,19 @@
   "functions": {
     "api/*.js": {
       "maxDuration": 60
+    },
+    "api/**/*.js": {
+      "maxDuration": 60
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/mini-app",
+      "destination": "/mini-app/index.html"
+    },
+    {
+      "source": "/mini-app/:path*",
+      "destination": "/mini-app/index.html"
+    }
+  ]
 }

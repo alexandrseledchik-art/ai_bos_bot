@@ -37,6 +37,22 @@ export function projectStateToRelationalRows(state) {
       text: item.text,
       created_at: item.createdAt
     })),
+    observations: mapRows(state.observations || [], (item) => ({
+      external_id: item.id,
+      case_external_id: item.caseId,
+      source_type: item.sourceType || "chat",
+      source_id: item.sourceId || item.id,
+      statement: item.statement,
+      normalized_signal: item.normalizedSignal,
+      layer: item.layer,
+      layer_class: item.layerClass,
+      flow_type: item.flowType,
+      confidence: item.confidence,
+      evidence: item.evidence || [],
+      status: item.status || "active",
+      created_at: item.createdAt,
+      updated_at: item.updatedAt
+    })),
     goals: mapRows(state.goals, (item) => ({
       external_id: item.id,
       case_external_id: item.caseId,

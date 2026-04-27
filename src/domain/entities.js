@@ -118,6 +118,7 @@ export function emptyState() {
   return {
     companies: [],
     cases: [],
+    observations: [],
     goals: [],
     symptoms: [],
     hypotheses: [],
@@ -177,6 +178,35 @@ export function createMessage({ threadId, role, text }) {
     role,
     text,
     createdAt: nowIso()
+  };
+}
+
+export function createObservation({
+  caseId,
+  sourceId,
+  statement,
+  normalizedSignal = "",
+  layer = "",
+  layerClass = "",
+  flowType = "",
+  confidence = 0.6,
+  evidence = []
+}) {
+  return {
+    id: createId("observation"),
+    caseId,
+    sourceType: "chat",
+    sourceId,
+    statement,
+    normalizedSignal,
+    layer,
+    layerClass,
+    flowType,
+    confidence,
+    evidence,
+    status: "active",
+    createdAt: nowIso(),
+    updatedAt: nowIso()
   };
 }
 

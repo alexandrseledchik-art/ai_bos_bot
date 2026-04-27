@@ -12,6 +12,14 @@
     "export:memory": "node src/scripts/export-relational-state.js",
     "sync:supabase": "node src/scripts/sync-supabase.js",
     "telegram:webhook": "node src/scripts/register-telegram-webhook.js",
-    "workspace:membership": "node src/scripts/workspace-membership.js"
+    "workspace:membership": "node src/scripts/workspace-membership.js",
+    "miniapp:phase1": "node src/scripts/check-mini-app-phase1.js",
+    "miniapp:phase2": "node src/scripts/check-mini-app-phase2.js",
+    "miniapp:phase3": "node src/scripts/check-mini-app-phase3.js",
+    "miniapp:phase4": "node src/scripts/check-mini-app-phase4.js",
+    "miniapp:phase5": "node src/scripts/check-mini-app-phase5.js",
+    "miniapp:phase6": "node src/scripts/check-mini-app-phase6.js",
+    "miniapp:phase7": "node src/scripts/check-mini-app-phase7.js",
+    "miniapp:phase8": "node src/scripts/check-mini-app-phase8.js"
   }
 }
