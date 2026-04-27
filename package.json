@@ -8,6 +8,7 @@
     "smoke": "node src/scripts/smoke-test.js",
     "evals": "node src/scripts/run-evals.js",
     "evals:diagnostic": "node src/scripts/run-diagnostic-evals.js",
+    "evals:quality": "node src/scripts/run-conversation-quality-evals.js",
     "export:memory": "node src/scripts/export-relational-state.js",
     "sync:supabase": "node src/scripts/sync-supabase.js",
     "telegram:webhook": "node src/scripts/register-telegram-webhook.js",

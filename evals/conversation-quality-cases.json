@@ -1,0 +1,180 @@
+[
+  {
+    "id": "role_self_understanding",
+    "turns": [
+      "Как ты понимаешь свою роль и чем можешь помочь пользователю, в каких задачах?"
+    ],
+    "expectedEntryMode": "meta_role",
+    "expectedAction": "answer",
+    "turnChecks": [
+      {
+        "mustContain": ["не держусь за одну фиксированную роль", "главное ограничение"],
+        "mustContainAny": ["диагност", "архитектор", "навигатор", "партнёр"],
+        "mustNotContain": ["Где у тебя сейчас самое сильное напряжение", "прибыль, рост или управляемость", "выбрал контур"],
+        "maxParagraphs": 5,
+        "maxChars": 1200
+      }
+    ]
+  },
+  {
+    "id": "start_explains_value_and_how_to_talk",
+    "turns": [
+      "/start"
+    ],
+    "expectedEntryMode": "unclear",
+    "expectedAction": "clarify",
+    "turnChecks": [
+      {
+        "mustContain": ["главное ограничение", "3-7 сообщений", "текстом, голосом или ссылкой на сайт", "Скажи одной фразой"],
+        "mustNotContain": ["11 слоёв", "11 слоев", "A-D", "business architect", "tool navigator", "strategic sparring partner"],
+        "maxParagraphs": 4,
+        "maxChars": 1500
+      }
+    ]
+  },
+  {
+    "id": "lead_overload_stays_systemic_without_staffing_frame",
+    "turns": [
+      "Проблема в продажах",
+      "лидов много, не успеваем обработать, продаж нет"
+    ],
+    "expectedEntryMode": "problem_first",
+    "expectedAction": "clarify",
+    "turnChecks": [
+      {},
+      {
+        "mustContainAny": ["профиль целевого клиента", "квалификац", "приоритет", "отфильтрованный поток", "смешанный поток"],
+        "mustNotContain": ["нехватка людей", "не хватает людей", "нужны менеджеры", "решение сейчас в найме"],
+        "requireQuestion": true,
+        "maxParagraphs": 4,
+        "maxChars": 1400
+      }
+    ],
+    "conversationChecks": {
+      "minUniqueOpeners": 2
+    }
+  },
+  {
+    "id": "followup_why_does_not_restart_template",
+    "turns": [
+      "У нас много заявок, квалификаторы зашиваются, но продаж мало",
+      "почему ты не смотришь сразу на найм?"
+    ],
+    "expectedAction": "clarify",
+    "turnChecks": [
+      {},
+      {
+        "mustContainAny": ["версия", "причин", "сначала", "отделить", "пока"],
+        "mustNotContain": ["Что я понял", "Гипотезы", "Почему это важно", "Следующий шаг", "решение сейчас в найме"],
+        "maxParagraphs": 4,
+        "maxChars": 1500
+      }
+    ]
+  },
+  {
+    "id": "icp_term_is_explained_in_russian",
+    "turns": [
+      "Много разных лидов, менеджеры сами решают кого брать в работу",
+      "что такое ICP?"
+    ],
+    "expectedAction": "clarify",
+    "turnChecks": [
+      {},
+      {
+        "mustContain": ["профиль целевого клиента", "правило"],
+        "mustNotContain": ["Ideal Customer Profile", "customer profile", "lead scoring", "routing", "handoff"],
+        "maxParagraphs": 3,
+        "maxChars": 1200
+      }
+    ]
+  },
+  {
+    "id": "tool_request_does_not_force_diagnostic",
+    "turns": [
+      "Мне нужен RACI для ролей"
+    ],
+    "expectedEntryMode": "specific_tool_request",
+    "expectedAction": "clarify",
+    "turnChecks": [
+      {
+        "mustContain": ["матрица ответственности", "для какого процесса"],
+        "mustNotContain": ["пройдём диагностику", "что сейчас тормозит бизнес", "главное ограничение уже"],
+        "requireQuestion": true,
+        "maxParagraphs": 3,
+        "maxChars": 900
+      }
+    ]
+  },
+  {
+    "id": "site_only_does_not_become_business_diagnosis",
+    "turns": [
+      "https://acme.example"
+    ],
+    "expectedEntryMode": "url_only",
+    "expectedAction": "screen",
+    "turnChecks": [
+      {
+        "mustContain": ["не внутренний бизнес-диагноз", "сайт как продукт/воронку"],
+        "mustNotContain": ["главное ограничение бизнеса", "ваша команда", "ваша оргструктура"],
+        "maxParagraphs": 3,
+        "maxChars": 1000
+      }
+    ]
+  },
+  {
+    "id": "doubt_keeps_human_tone",
+    "turns": [
+      "Лиды идут, но сделки не закрываются",
+      "я не уверен что ты правильно понял"
+    ],
+    "expectedAction": "clarify",
+    "turnChecks": [
+      {},
+      {
+        "mustContainAny": ["нормально", "не прошу", "один факт", "провер"],
+        "mustNotContain": ["доверься мне", "я точно прав", "точная причина"],
+        "requireQuestion": true,
+        "maxParagraphs": 4,
+        "maxChars": 1300
+      }
+    ]
+  },
+  {
+    "id": "no_internal_structure_leaks_in_normal_dialog",
+    "turns": [
+      "Деньги есть, но кассовый разрыв постоянно повторяется"
+    ],
+    "expectedEntryMode": "problem_first",
+    "turnChecks": [
+      {
+        "mustNotContain": ["knownFacts", "workingHypotheses", "entryState", "graphPacket", "11 слоёв", "A-D", "systemLayers"],
+        "maxParagraphs": 4,
+        "maxChars": 1300
+      }
+    ]
+  },
+  {
+    "id": "conversation_openers_do_not_repeat_same_rhythm",
+    "turns": [
+      "Хочу разобрать бизнес",
+      "продажи буксуют",
+      "лидов много, но они разные",
+      "а дальше как пойдём?"
+    ],
+    "turnChecks": [
+      {},
+      {},
+      {},
+      {
+        "mustContainAny": ["дальше", "развилк", "отдел", "где"],
+        "mustNotContain": ["Что я понял", "Гипотезы", "Почему это важно", "Следующий шаг"],
+        "maxParagraphs": 4,
+        "maxChars": 1500
+      }
+    ],
+    "conversationChecks": {
+      "minUniqueOpeners": 3,
+      "maxSameOpeningCount": 2
+    }
+  }
+]
