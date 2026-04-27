@@ -1387,6 +1387,36 @@ function visibleResponseMissesDepth(visibleResponse, entryState, context) {
   return false;
 }
 
+function visibleResponseFitsAction(visibleResponse, action) {
+  const normalized = ensureString(visibleResponse);
+  if (!normalized) {
+    return false;
+  }
+
+  if (action === "clarify") {
+    return /\?/.test(normalized);
+  }
+
+  return true;
+}
+
+function canUseModelSurfaceResponse(visibleResponse, decision, entryState, context) {
+  const action = ensureString(decision.decision?.action);
+  if (!visibleResponse) {
+    return false;
+  }
+
+  if (looksMechanicalResponse(visibleResponse)) {
+    return false;
+  }
+
+  if (!visibleResponseFitsAction(visibleResponse, action)) {
+    return false;
+  }
+
+  return !visibleResponseMissesDepth(visibleResponse, entryState, context);
+}
+
 function buildSurfaceResponse(decision, context) {
   const response = decision.response || {};
   const entryState = decision.entryState || emptyEntryState();
@@ -1410,6 +1440,14 @@ function buildSurfaceResponse(decision, context) {
   if (isToolFirstContext(context)) {
     reply = buildToolFirstSurfaceResponse(response, visibleResponse);
     return explainBusinessTerms(reply, context);
+  }
+
+  if (
+    routeType !== "url_only" &&
+    routeType !== "url_plus_problem" &&
+    canUseModelSurfaceResponse(visibleResponse, decision, entryState, context)
+  ) {
+    return explainBusinessTerms(visibleResponse, context);
   }
 
   if (routeType === "free_text_problem" && userAskedMeaning(context)) {
@@ -1459,10 +1497,6 @@ function buildSurfaceResponse(decision, context) {
   ) {
     reply = buildDiagnosticClarifySurfaceResponse(response, entryState, context);
     return explainBusinessTerms(reply, context);
-  }
-
-  if (visibleResponse && !looksMechanicalResponse(visibleResponse) && !visibleResponseMissesDepth(visibleResponse, entryState, context)) {
-    return explainBusinessTerms(visibleResponse, context);
   }
 
   if (decision.selectedMode === "website_screening_mode") {
