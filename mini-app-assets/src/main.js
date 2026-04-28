@@ -15,7 +15,8 @@ const state = {
     data: null,
     loading: false,
     saving: false,
-    error: ""
+    error: "",
+    message: ""
   },
   express: {
     data: null,
@@ -319,11 +320,14 @@ function renderOnboarding() {
       </label>
 
       <div class="form-actions">
-        <button class="primary-button" type="submit" ${block.saving ? "disabled" : ""}>
+        <button class="primary-button" type="submit" data-onboarding-intent="stay" ${block.saving ? "disabled" : ""}>
+          ${block.saving ? "Сохраняю..." : "Сохранить профиль"}
+        </button>
+        <button class="secondary-button" type="submit" data-onboarding-intent="diagnostics" ${block.saving ? "disabled" : ""}>
           ${block.saving ? "Сохраняю..." : "Сохранить и перейти к диагностике"}
         </button>
-        <button class="secondary-button" type="button" data-navigate="/mini-app/diagnostics/express">К диагностике</button>
       </div>
+      ${block.message ? `<p class="hint-text">${escapeHtml(block.message)}</p>` : ""}
     </form>
   `;
 }
@@ -1375,11 +1379,13 @@ async function loadOnboarding({ force = false } = {}) {
 async function saveOnboarding(event) {
   event.preventDefault();
   const form = event.currentTarget;
+  const intent = event.submitter?.dataset?.onboardingIntent || "stay";
   const formData = new FormData(form);
   const payload = Object.fromEntries(formData.entries());
 
   state.onboarding.saving = true;
   state.onboarding.error = "";
+  state.onboarding.message = "";
   render();
 
   try {
@@ -1397,7 +1403,10 @@ async function saveOnboarding(event) {
       companyProfile: result.companyProfile || state.bootstrap.companyProfile,
       onboardingStatus: result.onboardingStatus || state.bootstrap.onboardingStatus
     };
-    navigate("/mini-app/diagnostics/express");
+    state.onboarding.message = "Профиль сохранён.";
+    if (intent === "diagnostics") {
+      navigate("/mini-app/diagnostics/express");
+    }
   } catch (error) {
     state.onboarding.error = errorMessage(error, "Не удалось сохранить профиль.");
   } finally {
