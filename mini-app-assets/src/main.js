@@ -185,7 +185,10 @@ function renderBootstrapCard() {
 }
 
 function renderDashboard() {
-  const expressProgress = state.express.data?.progress?.percent ?? state.bootstrap?.dashboardSummary?.diagnosticProgress?.express ?? 0;
+  const bootstrapExpressProgress = state.bootstrap?.dashboardSummary?.expressProgress?.percent ??
+    state.bootstrap?.dashboardSummary?.diagnosticProgress?.express ??
+    0;
+  const expressProgress = state.express.data?.progress?.percent ?? bootstrapExpressProgress;
   const companyName = state.bootstrap?.company?.name || "Компания";
 
   return `

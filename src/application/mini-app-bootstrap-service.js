@@ -1,3 +1,5 @@
+import { calculateExpressMaturity } from "./maturity-calculator.js";
+
 function slugify(value) {
   const slug = String(value || "workspace")
     .trim()
@@ -52,6 +54,12 @@ export class MiniAppBootstrapService {
     });
 
     return firstRow(rows);
+  }
+
+  async findMany(table, query) {
+    return this.syncClient.request(`/rest/v1/${table}`, {
+      query
+    });
   }
 
   async resolveAppUser(user) {
@@ -178,14 +186,60 @@ export class MiniAppBootstrapService {
     );
   }
 
-  buildDashboardSummary({ companyProfile, activeCase }) {
+  async getExpressProgress(activeCase) {
+    if (!activeCase?.id) {
+      const emptyMaturity = calculateExpressMaturity([]);
+      return {
+        answeredCount: emptyMaturity.answeredCount,
+        totalCount: emptyMaturity.totalCount,
+        percent: emptyMaturity.progressPercent
+      };
+    }
+
+    const run = await this.findOne("diagnostic_runs", {
+      case_id: `eq.${activeCase.id}`,
+      level: "eq.express",
+      order: "updated_at.desc",
+      select: "*"
+    });
+
+    if (!run?.id) {
+      const emptyMaturity = calculateExpressMaturity([]);
+      return {
+        answeredCount: emptyMaturity.answeredCount,
+        totalCount: emptyMaturity.totalCount,
+        percent: emptyMaturity.progressPercent
+      };
+    }
+
+    const answers = await this.findMany("diagnostic_answers", {
+      diagnostic_run_id: `eq.${run.id}`,
+      level: "eq.express",
+      subject_type: "eq.layer",
+      select: "*"
+    });
+    const maturity = calculateExpressMaturity(answers);
+
+    return {
+      answeredCount: maturity.answeredCount,
+      totalCount: maturity.totalCount,
+      percent: maturity.progressPercent
+    };
+  }
+
+  buildDashboardSummary({ companyProfile, activeCase, expressProgress }) {
     return {
       onboardingStatus: companyProfile?.onboarding_status || "draft",
       activeCaseId: activeCase?.id || "",
       diagnosticProgress: {
-        express: 0,
+        express: expressProgress?.percent || 0,
         basic: 0,
         deep: 0
+      },
+      expressProgress: expressProgress || {
+        answeredCount: 0,
+        totalCount: 11,
+        percent: 0
       },
       currentConstraint: null,
       nextStep: null,
@@ -208,6 +262,7 @@ export class MiniAppBootstrapService {
     const company = await this.resolveCompany({ workspace, user: telegramUser });
     const companyProfile = await this.resolveCompanyProfile({ workspace, company });
     const activeCase = await this.resolveActiveDiagnosticCase({ workspace, company, user: telegramUser });
+    const expressProgress = await this.getExpressProgress(activeCase);
 
     return {
       appUser,
@@ -216,7 +271,7 @@ export class MiniAppBootstrapService {
       companyProfile,
       activeCase,
       onboardingStatus: companyProfile?.onboarding_status || "draft",
-      dashboardSummary: this.buildDashboardSummary({ companyProfile, activeCase })
+      dashboardSummary: this.buildDashboardSummary({ companyProfile, activeCase, expressProgress })
     };
   }
 }

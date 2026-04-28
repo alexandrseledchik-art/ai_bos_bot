@@ -194,15 +194,14 @@ function assertMaturityCalculator() {
 async function assertDiagnosticsService() {
   const syncClient = new FakeSupabaseClient();
   const bootstrapService = new MiniAppBootstrapService({ syncClient });
-  const bootstrap = await bootstrapService.bootstrap({
-    telegramUser: {
-      id: 777,
-      username: "phase_three",
-      firstName: "Phase",
-      lastName: "Three",
-      languageCode: "ru"
-    }
-  });
+  const telegramUser = {
+    id: 777,
+    username: "phase_three",
+    firstName: "Phase",
+    lastName: "Three",
+    languageCode: "ru"
+  };
+  const bootstrap = await bootstrapService.bootstrap({ telegramUser });
 
   const service = new MiniAppDiagnosticsService({ syncClient });
 
@@ -240,6 +239,10 @@ async function assertDiagnosticsService() {
   assert.equal(maturity.maturity.progressPercent, 100);
   assert.equal(maturity.run.status, "completed");
   assert.equal(syncClient.getTable("maturity_scores").length, 11);
+
+  const refreshedBootstrap = await bootstrapService.bootstrap({ telegramUser });
+  assert.equal(refreshedBootstrap.dashboardSummary.diagnosticProgress.express, 100);
+  assert.equal(refreshedBootstrap.dashboardSummary.expressProgress.answeredCount, 11);
 }
 
 async function assertApiClient() {
