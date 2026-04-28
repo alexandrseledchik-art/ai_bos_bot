@@ -1341,7 +1341,7 @@ function renderPlaceholder(route) {
         <p>Сейчас реализованы профиль, экспресс-диагностика, матрица, гипотеза ограничения, следующий шаг, инструменты, документы и консультация.</p>
         <div class="status-row">
           <span class="pill">есть назад/главная</span>
-          <span class="pill neutral">кнопка AI-BOSS видна</span>
+          <span class="pill neutral">можно вернуться в чат</span>
         </div>
       </section>
       ${renderBootstrapCard()}
@@ -1444,9 +1444,9 @@ function render() {
 
       <div class="footer-space"></div>
     </main>
-    <button class="floating-ai" type="button" data-ai aria-label="Спросить AI-BOSS">
-      <span class="floating-ai-full">Спросить AI-BOSS</span>
-      <span class="floating-ai-short">AI-BOSS</span>
+    <button class="floating-ai" type="button" data-ai aria-label="Вернуться в чат">
+      <span class="floating-ai-full">Вернуться в чат</span>
+      <span class="floating-ai-short">В чат</span>
     </button>
   `;
 
@@ -1501,17 +1501,17 @@ function bindEvents() {
   appRoot.querySelector("[data-document-form]")?.addEventListener("submit", saveDocument);
   appRoot.querySelector("[data-back]")?.addEventListener("click", goBack);
 
-  appRoot.querySelector("[data-ai]")?.addEventListener("click", openAiBossChat);
+  appRoot.querySelector("[data-ai]")?.addEventListener("click", returnToTelegramChat);
 }
 
-function openAiBossChat() {
+function returnToTelegramChat() {
   const webApp = window.Telegram?.WebApp;
   if (webApp?.close) {
     webApp.close();
     return;
   }
 
-  window.alert("Открой этот кабинет внутри Telegram и нажми «Спросить AI-BOSS» — я верну тебя в чат, где можно задать вопрос по текущему экрану.");
+  window.alert("Открой этот кабинет внутри Telegram и нажми «Вернуться в чат» — я закрою кабинет и верну тебя к диалогу с AI-BOSS.");
 }
 
 function renderOption(value, label, selectedValue) {

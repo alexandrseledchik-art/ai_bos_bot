@@ -51,8 +51,8 @@ assert.match(indexHtml, /telegram-web-app\.js/);
 assert.match(indexHtml, /mini-app-assets\/src\/main\.js/);
 
 const mainJs = fs.readFileSync("mini-app-assets/src/main.js", "utf8");
-assert.match(mainJs, /Спросить AI-BOSS/);
-assert.match(mainJs, /openAiBossChat/);
+assert.match(mainJs, /Вернуться в чат/);
+assert.match(mainJs, /returnToTelegramChat/);
 assert.match(mainJs, /WebApp/);
 assert.match(mainJs, /\.close\(\)/);
 assert.match(mainJs, /isRootRoute/);
