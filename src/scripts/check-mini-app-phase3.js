@@ -295,6 +295,8 @@ function assertFrontendShell() {
   assert.match(mainJs, /data-answer-layer/);
   assert.match(mainJs, /api\.getMaturity/);
   assert.match(mainJs, /Срез зрелости по областям/);
+  assert.match(mainJs, /оценено областей/);
+  assert.match(mainJs, /Что видно по срезу/);
   assert.match(mainJs, /Это не итог диагностики/);
   assert.match(styles, /\.level-option/);
   assert.match(styles, /\.maturity-row/);

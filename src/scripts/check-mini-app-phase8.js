@@ -610,6 +610,8 @@ function assertStaticPhase8Wiring() {
   assert.match(migration, /row level security/);
   assert.match(mainJs, /alpha-banner/);
   assert.match(mainJs, /Срез зрелости по областям/);
+  assert.match(mainJs, /средняя зрелость/);
+  assert.match(mainJs, /зоны риска, опоры и перекосы/);
   assert.match(mainJs, /главное ограничение проверяем отдельно/);
   assert.match(mainJs, /Данных пока мало/);
   assert.match(apiClient, /overrideConstraint/);

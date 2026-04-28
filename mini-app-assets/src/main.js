@@ -480,24 +480,28 @@ function renderMaturity() {
   }
 
   const maturity = block.data.maturity || {};
-  const progress = maturity.progressPercent || 0;
-  const averageScore = maturity.averageScore ?? "нет данных";
+  const scores = maturity.scores || [];
+  const answeredCount = Number(maturity.answeredCount ?? scores.filter((item) => item.status === "answered").length);
+  const totalCount = Number(maturity.totalCount ?? scores.length);
+  const averageScore = formatMaturityAverage(maturity.averageScore);
 
   return `
     <section class="hero compact">
       <p>Матрица зрелости</p>
       <h2>Срез зрелости по областям</h2>
-      <p>Матрица показывает, какие области уже оценены и где может быть слабое место. Это не итог диагностики: главное ограничение проверяем отдельно по запросу, сигналам и связям между областями.</p>
+      <p>Матрица показывает не готовность бизнеса, а срез по оцененным областям. Средняя оценка даёт общий фон зрелости, а оценки областей помогают увидеть зоны риска, опоры и перекосы. Это не итог диагностики: главное ограничение проверяем отдельно по запросу, сигналам и связям между областями.</p>
       <div class="status-row">
-        <span class="pill">заполнено: ${Math.round(Number(progress))}%</span>
-        <span class="pill neutral">средняя оценка: ${escapeHtml(averageScore)}</span>
+        <span class="pill">оценено областей: ${escapeHtml(formatMaturityCoverage(answeredCount, totalCount))}</span>
+        <span class="pill neutral">средняя зрелость: ${escapeHtml(averageScore)}</span>
       </div>
     </section>
+
+    ${renderMaturityInterpretation(maturity)}
 
     <section class="card maturity-card">
       <h3>Ключевые области бизнеса</h3>
       <div class="maturity-grid">
-        ${(maturity.scores || []).map(renderMaturityRow).join("")}
+        ${scores.map(renderMaturityRow).join("")}
       </div>
     </section>
 
@@ -510,6 +514,118 @@ function renderMaturity() {
       </div>
     </section>
   `;
+}
+
+function formatMaturityCoverage(answeredCount, totalCount) {
+  if (!Number.isFinite(totalCount) || totalCount <= 0) {
+    return "нет данных";
+  }
+
+  const safeAnswered = Number.isFinite(answeredCount) ? Math.max(0, Math.min(answeredCount, totalCount)) : 0;
+  return `${safeAnswered}/${totalCount}`;
+}
+
+function formatMaturityAverage(value) {
+  const score = Number(value);
+  if (!Number.isFinite(score)) {
+    return "нет данных";
+  }
+  return `${score}/5`;
+}
+
+function renderMaturityInterpretation(maturity = {}) {
+  const answeredScores = (maturity.scores || [])
+    .map((item) => ({
+      ...item,
+      numericScore: Number(item.score)
+    }))
+    .filter((item) => item.status === "answered" && Number.isFinite(item.numericScore));
+  const average = Number(maturity.averageScore);
+  const weakest = answeredScores
+    .filter((item) => item.numericScore <= 2)
+    .sort((a, b) => a.numericScore - b.numericScore)
+    .slice(0, 3);
+  const strongest = answeredScores
+    .filter((item) => item.numericScore >= 4)
+    .sort((a, b) => b.numericScore - a.numericScore)
+    .slice(0, 3);
+  const sorted = [...answeredScores].sort((a, b) => a.numericScore - b.numericScore);
+  const minScore = sorted[0]?.numericScore ?? null;
+  const maxScore = sorted[sorted.length - 1]?.numericScore ?? null;
+
+  const insights = [
+    {
+      title: "Общий фон",
+      text: getMaturityAverageInsight(average, answeredScores.length)
+    },
+    {
+      title: "Зоны риска",
+      text: weakest.length
+        ? `${formatMaturityAreas(weakest)} — сначала проверяем, являются ли они причиной текущего запроса или только следствием.`
+        : "По оценкам нет явных провалов 1-2/5. Тогда ограничение лучше искать по текущему запросу, сигналам и связям между областями."
+    },
+    {
+      title: "Опоры",
+      text: strongest.length
+        ? `${formatMaturityAreas(strongest)} — на эти области можно опираться, когда выбираем следующий практический шаг.`
+        : "Сильные опоры 4-5/5 пока не выделены. Это значит, что следующий шаг должен быть небольшим и проверочным."
+    },
+    {
+      title: "Разброс",
+      text: getMaturitySpreadInsight(minScore, maxScore)
+    }
+  ];
+
+  return `
+    <section class="card next-card">
+      <h3>Что видно по срезу</h3>
+      <ul class="plain-list">
+        ${insights.map((item) => `
+          <li>
+            <strong>${escapeHtml(item.title)}</strong>
+            <span>${escapeHtml(item.text)}</span>
+          </li>
+        `).join("")}
+      </ul>
+      <p class="hint-text">Шкала: 1-2 — зона риска, 3 — рабочая середина, 4-5 — возможная опора.</p>
+    </section>
+  `;
+}
+
+function getMaturityAverageInsight(average, answeredCount) {
+  if (!answeredCount || !Number.isFinite(average)) {
+    return "Пока недостаточно оценок, чтобы увидеть общий уровень зрелости.";
+  }
+
+  if (average < 2) {
+    return "Система выглядит ранней или сильно ручной: вероятно, несколько областей одновременно теряют результат.";
+  }
+
+  if (average < 3) {
+    return "Базовые контуры уже есть, но зрелости не хватает: слабые области могут быстро ограничивать рост.";
+  }
+
+  if (average < 4) {
+    return "Есть рабочая основа. Важно найти не просто низкую оценку, а область, которая сильнее всего влияет на текущий запрос.";
+  }
+
+  return "Общий фон сильный. Ограничение, скорее всего, точечное или связано с переходом на новый уровень нагрузки.";
+}
+
+function getMaturitySpreadInsight(minScore, maxScore) {
+  if (!Number.isFinite(minScore) || !Number.isFinite(maxScore)) {
+    return "Разброс появится после оценок по областям.";
+  }
+
+  if (maxScore - minScore >= 2) {
+    return `Есть перекос от ${minScore}/5 до ${maxScore}/5: сильные области могут упираться в слабые, поэтому важно смотреть связи между ними.`;
+  }
+
+  return "Оценки близки друг к другу: вместо поиска одной слабой области стоит проверять весь поток текущего запроса.";
+}
+
+function formatMaturityAreas(items) {
+  return items.map((item) => `${item.title} (${item.numericScore}/5)`).join(", ");
 }
 
 function renderMaturityRow(item) {
