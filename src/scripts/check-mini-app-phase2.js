@@ -72,4 +72,26 @@ const client = new MiniAppApiClient({
 await client.bootstrap();
 assert.equal(capturedInitData, "signed-init-data");
 
+const originalFetch = globalThis.fetch;
+let defaultFetchThis = null;
+globalThis.fetch = function (_path, options) {
+  defaultFetchThis = this;
+  capturedInitData = options.headers.get("x-telegram-init-data");
+  return new Response(JSON.stringify({ ok: true }), {
+    status: 200,
+    headers: {
+      "content-type": "application/json"
+    }
+  });
+};
+
+try {
+  const defaultFetchClient = new MiniAppApiClient({ initData: "default-fetch-init-data" });
+  await defaultFetchClient.bootstrap();
+  assert.equal(defaultFetchThis, globalThis);
+  assert.equal(capturedInitData, "default-fetch-init-data");
+} finally {
+  globalThis.fetch = originalFetch;
+}
+
 console.log("Mini App Phase 2 shell checks passed.");

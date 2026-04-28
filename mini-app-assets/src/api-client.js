@@ -1,7 +1,7 @@
 export class MiniAppApiClient {
-  constructor({ initData, fetchImpl = fetch } = {}) {
+  constructor({ initData, fetchImpl } = {}) {
     this.initData = initData || "";
-    this.fetchImpl = fetchImpl;
+    this.fetchImpl = fetchImpl || globalThis.fetch.bind(globalThis);
   }
 
   async request(path, options = {}) {
