@@ -345,6 +345,9 @@ function assertFrontendAndRoutes() {
 
   assert.match(mainJs, /renderConstraint/);
   assert.match(mainJs, /renderNextStep/);
+  assert.match(mainJs, /сила версии/);
+  assert.match(mainJs, /Что проверяем/);
+  assert.match(mainJs, /Зачем это знать/);
   assert.match(mainJs, /data-constraint-action/);
   assert.match(mainJs, /data-next-step-action/);
   assert.match(styles, /\.insight-card/);

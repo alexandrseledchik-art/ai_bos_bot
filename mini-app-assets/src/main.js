@@ -663,6 +663,8 @@ function renderConstraint() {
   const hypothesis = block.data.constraintHypothesis;
   const confidence = Math.round(Number(hypothesis.confidence || 0) * 100);
   const isLowConfidence = Number(hypothesis.confidence || 0) < 0.55;
+  const constraintMeaning = getConstraintMeaning(hypothesis);
+  const strengthMeaning = getHypothesisStrengthMeaning(hypothesis.confidence);
   const statusText = hypothesis.status === "confirmed"
     ? "подтверждено пользователем"
     : hypothesis.status === "rejected"
@@ -673,10 +675,10 @@ function renderConstraint() {
     <section class="hero compact">
       <p>Гипотеза ограничения</p>
       <h2>${escapeHtml(hypothesis.layerTitle || hypothesis.title)}</h2>
-      <p>Это не финальный диагноз. Система выбирает самый причинный кандидат по зрелости, запросу и наблюдениям, а затем предлагает, что проверить дальше.</p>
+      <p>Это не финальный диагноз. Система выбирает область, которая лучше всего объясняет текущий запрос, и показывает, что проверить дальше фактами.</p>
       <div class="status-row">
         <span class="pill">статус: ${escapeHtml(statusText)}</span>
-        <span class="pill neutral">уверенность: ${confidence}%</span>
+        <span class="pill neutral">сила версии: ${confidence}%</span>
         <span class="pill neutral">класс ${escapeHtml(hypothesis.classKey || "")}</span>
       </div>
     </section>
@@ -687,9 +689,23 @@ function renderConstraint() {
       <p>${escapeHtml(hypothesis.explanation)}</p>
       ${isLowConfidence ? `<p class="hint-text">Данных пока мало, поэтому это слабая гипотеза. Её нужно проверить, а не принимать как диагноз.</p>` : ""}
       <div class="status-row">
-        <span class="pill">${escapeHtml(hypothesis.constraint_type || hypothesis.constraintType || "тип ограничения")}</span>
-        <span class="pill neutral">${escapeHtml(hypothesis.confidenceLabel || "рабочая уверенность")}</span>
+        <span class="pill">${escapeHtml(constraintMeaning.label)}</span>
+        <span class="pill neutral">${escapeHtml(strengthMeaning.label)}</span>
       </div>
+      <ul class="plain-list">
+        <li>
+          <strong>Что проверяем</strong>
+          <span>${escapeHtml(constraintMeaning.description)}</span>
+        </li>
+        <li>
+          <strong>Зачем это знать</strong>
+          <span>${escapeHtml(constraintMeaning.purpose)}</span>
+        </li>
+        <li>
+          <strong>Как относиться к версии</strong>
+          <span>${escapeHtml(strengthMeaning.description)}</span>
+        </li>
+      </ul>
       <div class="actions">
         <button
           class="primary-button"
@@ -739,6 +755,103 @@ function renderConstraint() {
       ${renderAlternativeList(hypothesis.alternatives)}
     </section>
   `;
+}
+
+function getConstraintMeaning(hypothesis = {}) {
+  const layerKey = hypothesis.layerKey || hypothesis.layer;
+  const rawType = hypothesis.constraint_type || hypothesis.constraintType || "";
+  const byLayer = {
+    owner_context: {
+      label: "Проверяем рамку решений",
+      description: "Смотрим, не конфликтуют ли цели, роль собственника и правила решений.",
+      purpose: "Если рамка противоречивая, бизнес может терять результат даже при нормальных продажах, людях и процессах."
+    },
+    external_environment: {
+      label: "Проверяем спрос и рынок",
+      description: "Смотрим, хватает ли внешнего спроса и не изменилась ли среда, в которой работает бизнес.",
+      purpose: "Это помогает не чинить внутренние процессы там, где сначала нужно адаптировать модель к рынку."
+    },
+    strategy: {
+      label: "Проверяем фокус",
+      description: "Смотрим, не распыляются ли ресурсы между сегментами, продуктами и направлениями.",
+      purpose: "Если фокус размыт, локальные улучшения могут не складываться в рост."
+    },
+    product_value_proposition: {
+      label: "Проверяем ценность продукта",
+      description: "Смотрим, достаточно ли ясно клиент понимает, зачем покупать именно это решение.",
+      purpose: "Это помогает отделить проблему спроса или продаж от проблемы самого предложения."
+    },
+    commercial: {
+      label: "Проверяем качество входа",
+      description: "Смотрим, приходит ли в бизнес подходящий спрос и есть ли правила фильтрации, приоритета и передачи заявок.",
+      purpose: "Если входящий поток смешанный, команда может быть занята лидами, которые не должны доходить до продажи."
+    },
+    operating_model: {
+      label: "Проверяем прохождение работы",
+      description: "Смотрим, где заявки, заказы или задачи застревают в исполнении.",
+      purpose: "Это помогает найти участок, где бизнес теряет сроки, качество или пропускную способность."
+    },
+    finance: {
+      label: "Проверяем деньги и прибыль",
+      description: "Смотрим, где деньги перестают превращаться в результат: выручка, маржа, расходы, касса, дебиторка или экономика сделки.",
+      purpose: "Если версия верна, первый шаг не просто больше продавать, а понять, где деньги теряются после появления выручки."
+    },
+    people_organization: {
+      label: "Проверяем ресурс команды",
+      description: "Смотрим, хватает ли людей, компетенций, ролей и мощности, чтобы выдержать текущую модель.",
+      purpose: "Это помогает отличить нехватку людей от слабых правил, процессов или приоритетов."
+    },
+    governance_risks: {
+      label: "Проверяем управляемость",
+      description: "Смотрим, не зависают ли решения, ответственность, контроль и ритм управления.",
+      purpose: "Если управление не держит систему, задачи могут теряться даже при понятной стратегии и сильной команде."
+    },
+    technology: {
+      label: "Проверяем инструменты",
+      description: "Смотрим, не тормозят ли работу ручные операции, разрозненные сервисы и отсутствие автоматизации.",
+      purpose: "Это помогает понять, проблема в логике работы или в инструментах, через которые она выполняется."
+    },
+    data_analytics: {
+      label: "Проверяем видимость",
+      description: "Смотрим, хватает ли данных, чтобы видеть реальную картину и принимать решения по фактам.",
+      purpose: "Если видимости нет, бизнес может спорить о симптомах и не видеть настоящую причину."
+    }
+  };
+
+  if (byLayer[layerKey]) {
+    return byLayer[layerKey];
+  }
+
+  return {
+    label: "Проверяем ограничение",
+    description: rawType
+      ? `Система относит эту версию к типу: ${rawType}. Теперь важно перевести это в конкретные факты и проверить на текущем запросе.`
+      : "Смотрим, какая область сильнее всего объясняет текущий запрос.",
+    purpose: "Это нужно, чтобы выбрать первый проверочный шаг и не лечить ближайший симптом вместо причины."
+  };
+}
+
+function getHypothesisStrengthMeaning(confidenceValue) {
+  const confidence = Number(confidenceValue || 0);
+
+  if (confidence < 0.55) {
+    return {
+      label: "данных пока мало",
+      description: "Это ранняя версия. Её можно использовать только как направление для вопросов и быстрой проверки."
+    };
+  }
+
+  if (confidence < 0.75) {
+    return {
+      label: "версия для проверки",
+      description: "Сигналов хватает, чтобы проверить эту версию одной из первых, но подтверждать её нужно фактами."
+    };
+  }
+
+  return {
+    label: "проверить первой",
+    description: "Несколько сигналов сходятся в одну сторону, поэтому эту версию стоит проверить первой. Это всё ещё не диагноз."
+  };
 }
 
 function renderNextStep() {

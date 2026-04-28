@@ -358,8 +358,8 @@ function buildRankingReason(candidate) {
 function buildExplanation(candidate) {
   const layerPack = LAYER_EXPLANATIONS[candidate.layerKey] || LAYER_EXPLANATIONS.data_analytics;
   const confidenceText = candidate.confidence < 0.6
-    ? "Уверенность пока невысокая: данных достаточно для рабочей версии, но недостаточно для диагноза."
-    : "Уверенность рабочая, но это всё равно гипотеза: её нужно подтвердить следующим проверочным шагом.";
+    ? "Данных пока хватает только для ранней версии: её нужно проверить, а не принимать как диагноз."
+    : "Сигналов достаточно, чтобы проверить эту версию первой, но подтверждать её всё равно нужно фактами.";
 
   const evidenceText = candidate.supportingObservations.length > 0
     ? "Её поддерживают сигналы из диалога и текущая матрица зрелости."
@@ -367,7 +367,7 @@ function buildExplanation(candidate) {
 
   return {
     title: layerPack.title,
-    explanation: `Это гипотеза, не финальный диагноз. Сейчас самым причинным кандидатом выглядит слой «${candidate.layerTitle}»: ${evidenceText} ${confidenceText}`,
+    explanation: `Это гипотеза, не финальный диагноз. Сейчас наиболее полезно проверить область «${candidate.layerTitle}»: ${evidenceText} ${confidenceText}`,
     whatItExplains: layerPack.whatItExplains,
     missingEvidence: layerPack.missingEvidence,
     whatToCheckNext: layerPack.checks
