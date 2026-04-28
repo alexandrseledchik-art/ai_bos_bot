@@ -54,7 +54,7 @@ export const MINI_APP_CABINET_SCREENS = {
     screenId: "consultation",
     route: "/mini-app/consultation",
     label: "Подготовить разбор",
-    title: "Разбор с Александром",
+    title: "Разбор с экспертом",
     purpose: "Собрать краткое резюме кейса, чтобы консультация началась не с нуля."
   }
 };

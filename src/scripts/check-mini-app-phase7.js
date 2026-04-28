@@ -361,7 +361,7 @@ function assertFrontendRoutesAndPrompt() {
   assert.match(mainJs, /Скопировать резюме/);
   assert.match(apiClient, /getConsultationBrief/);
   assert.match(apiClient, /requestConsultation/);
-  assert.match(routes, /Разбор с Александром Селедчиком/);
+  assert.match(routes, /Разбор с экспертом/);
   assert.match(config, /alexanderBookingUrl/);
   assert.match(config, /ALEXANDER_BOOKING_URL/);
   assert.match(migration, /open_questions/);

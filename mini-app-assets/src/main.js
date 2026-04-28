@@ -211,7 +211,7 @@ function renderDashboard() {
         <button class="secondary-button" data-navigate="/mini-app/maturity">Открыть матрицу</button>
         <button class="secondary-button" data-navigate="/mini-app/constraint">Найти ограничение</button>
         <button class="secondary-button" data-navigate="/mini-app/tools">Все инструменты</button>
-        <button class="secondary-button" data-navigate="/mini-app/consultation">Разбор с Александром</button>
+        <button class="secondary-button" data-navigate="/mini-app/consultation">Разбор с экспертом</button>
       </div>
     </section>
 
@@ -1231,7 +1231,7 @@ function renderConsultation() {
   return `
     <section class="hero compact">
       <p>Консультация</p>
-      <h2>Разбор с Александром Селедчиком</h2>
+      <h2>Разбор с экспертом</h2>
       <p>Это продолжение диагностики: собираем текущий кейс в короткое резюме, чтобы на консультации не начинать с нуля, а сразу проверить гипотезу и первый шаг.</p>
       <div class="actions">
         <button class="primary-button" data-consultation-generate ${block.generating ? "disabled" : ""}>
