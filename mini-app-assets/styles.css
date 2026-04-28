@@ -664,21 +664,6 @@ a {
     line-height: 1.15;
     text-align: center;
   }
-
-  .floating-ai {
-    right: 10px;
-    bottom: calc(10px + env(safe-area-inset-bottom));
-    padding: 12px 14px;
-    font-size: 14px;
-  }
-
-  .floating-ai-full {
-    display: none;
-  }
-
-  .floating-ai-short {
-    display: inline;
-  }
 }
 
 .status-row {
@@ -794,6 +779,23 @@ a {
 
 .floating-ai-short {
   display: none;
+}
+
+@media (max-width: 620px) {
+  .floating-ai {
+    right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+
+  .floating-ai-full {
+    display: none;
+  }
+
+  .floating-ai-short {
+    display: inline;
+  }
 }
 
 .loading-screen,
