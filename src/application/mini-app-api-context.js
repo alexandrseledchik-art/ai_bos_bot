@@ -1,6 +1,6 @@
 import { MiniAppBootstrapService } from "./mini-app-bootstrap-service.js";
 import { loadConfig } from "../config.js";
-import { SupabaseSyncClient } from "../infrastructure/storage/supabase-sync.js";
+import { MiniAppCompatSyncClient } from "../infrastructure/storage/mini-app-compat-sync.js";
 import { verifyTelegramWebAppInitData } from "../infrastructure/telegram/verify-webapp-init-data.js";
 
 export function jsonResponse(payload, init = {}) {
@@ -41,7 +41,7 @@ export async function createMiniAppContext(request) {
     maxAgeSeconds: config.telegramWebAppAuthMaxAgeSeconds
   });
 
-  const syncClient = new SupabaseSyncClient({
+  const syncClient = new MiniAppCompatSyncClient({
     url: config.supabaseUrl,
     serviceRoleKey: config.supabaseServiceRoleKey
   });

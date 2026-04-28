@@ -1138,11 +1138,14 @@ function renderRouteContent(route) {
 
 function render() {
   const route = state.currentRoute;
+  const isRootRoute = normalizePath(route.path) === "/mini-app";
 
   appRoot.innerHTML = `
     <main class="mini-layout">
       <header class="topbar">
-        <button class="nav-button" type="button" data-back aria-label="Назад">←</button>
+        ${isRootRoute
+          ? `<span class="nav-placeholder" aria-hidden="true"></span>`
+          : `<button class="nav-button" type="button" data-back aria-label="Назад">←</button>`}
         <div class="title-stack">
           <p class="eyebrow">${escapeHtml(route.eyebrow)}</p>
           <h1 class="screen-title">${escapeHtml(route.title)}</h1>

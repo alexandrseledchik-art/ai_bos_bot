@@ -54,6 +54,8 @@ assert.match(mainJs, /Спросить AI-BOSS/);
 assert.match(mainJs, /openAiBossChat/);
 assert.match(mainJs, /WebApp/);
 assert.match(mainJs, /\.close\(\)/);
+assert.match(mainJs, /isRootRoute/);
+assert.match(mainJs, /nav-placeholder/);
 assert.match(mainJs, /data-back/);
 assert.match(mainJs, /data-navigate="\/mini-app"/);
 assert.match(mainJs, /api\.bootstrap/);

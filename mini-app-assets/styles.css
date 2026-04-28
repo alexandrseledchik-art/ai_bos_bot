@@ -104,6 +104,11 @@ a {
   box-shadow: 0 8px 22px rgba(13, 45, 48, 0.08);
 }
 
+.nav-placeholder {
+  width: 44px;
+  height: 44px;
+}
+
 .nav-button:hover,
 .primary-button:hover,
 .secondary-button:hover,

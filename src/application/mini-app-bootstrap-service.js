@@ -56,13 +56,12 @@ export class MiniAppBootstrapService {
 
   async resolveAppUser(user) {
     return this.upsertOne(
-      "app_users",
+      "users",
       {
         telegram_user_id: user.id,
         username: user.username || null,
         first_name: user.firstName || null,
-        last_name: user.lastName || null,
-        language_code: user.languageCode || null
+        last_name: user.lastName || null
       },
       {
         onConflict: "telegram_user_id"
@@ -71,29 +70,17 @@ export class MiniAppBootstrapService {
   }
 
   async resolveExistingWorkspace(appUser) {
-    const membership = await this.findOne("workspace_app_members", {
-      app_user_id: `eq.${appUser.id}`,
-      select: "workspace_id,role"
+    const existingCompany = await this.findOne("companies", {
+      telegram_chat_id: `eq.miniapp:${appUser.telegram_user_id}`,
+      select: "workspace_id"
     });
 
-    if (!membership?.workspace_id) {
-      const existingCompany = await this.findOne("companies", {
-        telegram_chat_id: `eq.${appUser.telegram_user_id}`,
-        select: "workspace_id"
-      });
-
-      if (!existingCompany?.workspace_id) {
-        return null;
-      }
-
-      return this.findOne("workspaces", {
-        id: `eq.${existingCompany.workspace_id}`,
-        select: "*"
-      });
+    if (!existingCompany?.workspace_id) {
+      return null;
     }
 
     return this.findOne("workspaces", {
-      id: `eq.${membership.workspace_id}`,
+      id: `eq.${existingCompany.workspace_id}`,
       select: "*"
     });
   }
@@ -114,17 +101,11 @@ export class MiniAppBootstrapService {
   }
 
   async ensureWorkspaceMembership({ workspace, appUser }) {
-    return this.upsertOne(
-      "workspace_app_members",
-      {
-        workspace_id: workspace.id,
-        app_user_id: appUser.id,
-        role: "owner"
-      },
-      {
-        onConflict: "workspace_id,app_user_id"
-      }
-    );
+    return {
+      workspace_id: workspace.id,
+      app_user_id: appUser.id,
+      role: "owner"
+    };
   }
 
   async resolveCompany({ workspace, user }) {
