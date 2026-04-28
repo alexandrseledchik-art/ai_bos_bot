@@ -142,6 +142,16 @@ export class MiniAppBootstrapService {
   }
 
   async resolveCompanyProfile({ workspace, company }) {
+    const existing = await this.findOne("company_profiles", {
+      company_id: `eq.${company.id}`,
+      workspace_id: `eq.${workspace.id}`,
+      select: "*"
+    });
+
+    if (existing) {
+      return existing;
+    }
+
     return this.upsertOne(
       "company_profiles",
       {

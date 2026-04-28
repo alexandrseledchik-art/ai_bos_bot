@@ -241,6 +241,8 @@ async function assertDiagnosticsService() {
   assert.equal(syncClient.getTable("maturity_scores").length, 11);
 
   const refreshedBootstrap = await bootstrapService.bootstrap({ telegramUser });
+  assert.equal(refreshedBootstrap.onboardingStatus, "completed");
+  assert.equal(refreshedBootstrap.companyProfile.onboarding_status, "completed");
   assert.equal(refreshedBootstrap.dashboardSummary.diagnosticProgress.express, 100);
   assert.equal(refreshedBootstrap.dashboardSummary.expressProgress.answeredCount, 11);
 }
