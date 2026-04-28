@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { MiniAppApiClient } from "../../mini-app-assets/src/api-client.js";
 import { MiniAppBootstrapService } from "../application/mini-app-bootstrap-service.js";
 import { MiniAppDiagnosticsService } from "../application/mini-app-diagnostics-service.js";
-import { MVP_TOOLS } from "../domain/mvp-tools.js";
+import { MINI_APP_TOOL_CATALOG } from "../domain/mini-app-tools-catalog.js";
 
 class FakeSupabaseClient {
   constructor() {
@@ -222,7 +222,8 @@ async function assertToolsFlow() {
   const { syncClient, bootstrap, service } = await buildPhase6Case();
 
   const catalog = await service.getTools({ bootstrap });
-  assert.equal(catalog.tools.length, MVP_TOOLS.length);
+  assert.equal(catalog.tools.length, MINI_APP_TOOL_CATALOG.length);
+  assert.equal(catalog.totalCount, MINI_APP_TOOL_CATALOG.length);
   assert.equal(catalog.tools.every((tool) => tool.is_active === true), true);
 
   await syncClient.request("/rest/v1/tool_recommendations", {
@@ -245,14 +246,8 @@ async function assertToolsFlow() {
 
   const recommendations = await service.getRecommendedTools({ bootstrap });
   assert.equal(recommendations.recommendations.length, 3);
-  assert.equal(
-    recommendations.recommendations.some((item) => item.tool?.slug === "target-customer-review"),
-    true
-  );
-  assert.equal(
-    recommendations.recommendations.some((item) => item.tool?.slug === "funnel-map"),
-    true
-  );
+  assert.equal(recommendations.recommendations.every((item) => item.tool?.source === "business_architecture_tools"), true);
+  assert.equal(recommendations.recommendations.some((item) => item.tool?.layerKeys?.includes("commercial")), true);
   assert.equal(
     recommendations.recommendations.every((item, index) => item.priority === index + 1),
     true

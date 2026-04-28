@@ -609,7 +609,7 @@ function assertStaticPhase8Wiring() {
   assert.match(migration, /mini_app_eval_logs/);
   assert.match(migration, /row level security/);
   assert.match(mainJs, /alpha-banner/);
-  assert.match(mainJs, /Официальная матрица показывает зрелость слоёв, но это не равно главному ограничению/);
+  assert.match(mainJs, /Матрица показывает зрелость ключевых областей бизнеса, но это не равно главному ограничению/);
   assert.match(mainJs, /Данных пока мало/);
   assert.match(apiClient, /overrideConstraint/);
   assert.match(apiClient, /overrideNextStep/);

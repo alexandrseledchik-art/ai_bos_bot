@@ -1,3 +1,23 @@
+function normalizeApiError(error, fallback) {
+  if (!error) {
+    return fallback;
+  }
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (typeof error.message === "string" && error.message.trim()) {
+    return error.message;
+  }
+
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
 export class MiniAppApiClient {
   constructor({ initData, fetchImpl } = {}) {
     this.initData = initData || "";
@@ -24,7 +44,7 @@ export class MiniAppApiClient {
     const payload = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      throw new Error(payload.error || `Request failed: ${response.status}`);
+      throw new Error(normalizeApiError(payload.error, `Request failed: ${response.status}`));
     }
 
     return payload;

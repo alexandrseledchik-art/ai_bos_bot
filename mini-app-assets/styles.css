@@ -282,6 +282,36 @@ a {
   box-shadow: 0 0 0 4px rgba(0, 79, 85, 0.11);
 }
 
+.tool-search {
+  display: grid;
+  gap: 14px;
+}
+
+.tool-search label {
+  display: grid;
+  gap: 7px;
+}
+
+.tool-search label span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.tool-search input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+  padding: 13px 14px;
+  outline: none;
+}
+
+.tool-search input:focus {
+  border-color: rgba(0, 79, 85, 0.48);
+  box-shadow: 0 0 0 4px rgba(0, 79, 85, 0.11);
+}
+
 .form-actions {
   display: flex;
   flex-wrap: wrap;

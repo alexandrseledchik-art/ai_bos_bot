@@ -12,6 +12,26 @@ export function jsonResponse(payload, init = {}) {
   });
 }
 
+function normalizeErrorMessage(error, fallback) {
+  if (!error) {
+    return fallback;
+  }
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (typeof error.message === "string" && error.message.trim()) {
+    return error.message;
+  }
+
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
 export function readMiniAppInitData(request) {
   const headerValue = request.headers.get("x-telegram-init-data");
   if (headerValue) {
@@ -66,7 +86,7 @@ export async function handleMiniAppRoute(request, allowedMethods, handler) {
     const context = await createMiniAppContext(request);
     return await handler(context);
   } catch (error) {
-    const message = error?.message || "Mini App request failed.";
+    const message = normalizeErrorMessage(error, "Mini App request failed.");
     const status = /initData|Telegram WebApp|hash|auth_date/i.test(message) ? 401 : 500;
 
     return jsonResponse(

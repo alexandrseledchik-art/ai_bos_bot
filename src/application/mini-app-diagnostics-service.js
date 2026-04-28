@@ -6,7 +6,7 @@ import { MiniAppAnalyticsService } from "./mini-app-analytics-service.js";
 import { NextStepSelector } from "./next-step-selector.js";
 import { ToolRecommender } from "./tool-recommender.js";
 import { assertBusinessLayerKey, BUSINESS_LAYERS_V1, getBusinessLayerByKey } from "../domain/business-layers.js";
-import { MVP_TOOLS } from "../domain/mvp-tools.js";
+import { MINI_APP_TOOL_CATALOG } from "../domain/mini-app-tools-catalog.js";
 
 const OFFICIAL_ANSWER_SOURCES = new Set([
   "user_explicit",
@@ -1083,30 +1083,8 @@ export class MiniAppDiagnosticsService {
     };
   }
 
-  async ensureMvpTools() {
-    const tools = [];
-
-    for (const tool of MVP_TOOLS) {
-      const row = await this.upsertOne(
-        "tools",
-        {
-          slug: tool.slug,
-          title: tool.title,
-          short_description: tool.shortDescription,
-          when_to_use: tool.whenToUse,
-          template_url: tool.templateUrl || null,
-          layer_keys: tool.layerKeys,
-          problem_types: tool.problemTypes,
-          is_active: true
-        },
-        {
-          onConflict: "slug"
-        }
-      );
-      tools.push(row);
-    }
-
-    return tools;
+  getCatalogTools() {
+    return MINI_APP_TOOL_CATALOG;
   }
 
   decorateTool(row, recommendation = null) {
@@ -1125,32 +1103,22 @@ export class MiniAppDiagnosticsService {
   }
 
   async getTools({ bootstrap }) {
-    const seededTools = await this.ensureMvpTools();
-    const tools = await this.findMany("tools", {
-      is_active: "eq.true",
-      order: "title.asc",
-      select: "*"
-    });
+    const tools = this.getCatalogTools();
     const recommendations = await this.findMany("tool_recommendations", {
       case_id: `eq.${bootstrap.activeCase.id}`,
       order: "priority.asc",
       select: "*"
     });
     const recommendationByToolId = new Map((recommendations || []).filter((item) => item.tool_id).map((item) => [item.tool_id, item]));
-    const catalog = tools?.length ? tools : seededTools;
 
     return {
-      tools: (catalog || []).map((tool) => this.decorateTool(tool, recommendationByToolId.get(tool.id) || null))
+      totalCount: tools.length,
+      tools: tools.map((tool) => this.decorateTool(tool, recommendationByToolId.get(tool.id) || null))
     };
   }
 
   async getToolBySlug({ bootstrap, slug }) {
-    await this.ensureMvpTools();
-    const tool = await this.findOne("tools", {
-      slug: `eq.${trimString(slug)}`,
-      is_active: "eq.true",
-      select: "*"
-    });
+    const tool = this.getCatalogTools().find((item) => item.slug === trimString(slug));
 
     if (!tool) {
       throw new Error("Tool was not found.");
@@ -1227,7 +1195,7 @@ export class MiniAppDiagnosticsService {
   }
 
   async getRecommendedTools({ bootstrap, recalculate = false } = {}) {
-    const tools = await this.ensureMvpTools();
+    const tools = this.getCatalogTools();
     const existing = recalculate
       ? []
       : await this.findMany("tool_recommendations", {
@@ -1235,10 +1203,10 @@ export class MiniAppDiagnosticsService {
           order: "priority.asc",
           select: "*"
         });
-    const existingCatalogRecommendations = (existing || []).filter((row) => row.tool_id);
+    const toolById = new Map(tools.map((tool) => [tool.id, tool]));
+    const existingCatalogRecommendations = (existing || []).filter((row) => row.tool_id && toolById.has(row.tool_id));
 
     if (existingCatalogRecommendations.length >= 3) {
-      const toolById = new Map(tools.map((tool) => [tool.id, tool]));
       return {
         recommendations: existingCatalogRecommendations.slice(0, 3).map((row) => ({
           ...row,
@@ -1261,11 +1229,7 @@ export class MiniAppDiagnosticsService {
   }
 
   async markToolOpened({ bootstrap, toolId }) {
-    await this.ensureMvpTools();
-    const tool = await this.findOne("tools", {
-      id: `eq.${trimString(toolId)}`,
-      select: "*"
-    });
+    const tool = this.getCatalogTools().find((item) => item.id === trimString(toolId));
 
     if (!tool) {
       throw new Error("Tool was not found.");

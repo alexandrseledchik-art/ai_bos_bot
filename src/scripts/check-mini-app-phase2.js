@@ -99,4 +99,18 @@ try {
   globalThis.fetch = originalFetch;
 }
 
+const objectErrorClient = new MiniAppApiClient({
+  fetchImpl: async () => new Response(JSON.stringify({ error: { code: "PGRST205", message: "Could not find table." } }), {
+    status: 500,
+    headers: {
+      "content-type": "application/json"
+    }
+  })
+});
+
+await assert.rejects(
+  () => objectErrorClient.bootstrap(),
+  /Could not find table/
+);
+
 console.log("Mini App Phase 2 shell checks passed.");

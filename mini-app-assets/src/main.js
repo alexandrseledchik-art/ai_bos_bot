@@ -48,6 +48,7 @@ const state = {
     loading: false,
     recommendedLoading: false,
     openingToolId: "",
+    query: "",
     error: ""
   },
   documents: {
@@ -83,6 +84,26 @@ function displayStatus(value) {
     analyzed: "проанализировано"
   };
   return map[value] || value || "";
+}
+
+function errorMessage(error, fallback) {
+  if (!error) {
+    return fallback;
+  }
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (typeof error.message === "string" && error.message.trim()) {
+    return error.message;
+  }
+
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
 }
 
 function navigate(path) {
@@ -183,7 +204,7 @@ function renderDashboard() {
       ${renderBootstrapCard()}
       <section class="card">
         <h3>Экспресс-диагностика</h3>
-        <p>Это не анкета ради оценки. Экспресс нужен, чтобы быстро увидеть, где бизнес теряет результат, и не перепутать слабый слой с главным ограничением.</p>
+        <p>Это не анкета ради оценки. Экспресс нужен, чтобы быстро увидеть, где бизнес теряет результат, и не перепутать слабую область с главным ограничением.</p>
         <div class="progress">
           <div class="progress-bar"><span style="width: ${Number(expressProgress)}%"></span></div>
           <strong>${Math.round(Number(expressProgress))}%</strong>
@@ -315,7 +336,7 @@ function renderExpressDiagnostics() {
   const block = state.express;
 
   if (block.loading) {
-    return renderLoadingCard("Загружаю 11 слоёв экспресс-диагностики...");
+    return renderLoadingCard("Загружаю экспресс-диагностику...");
   }
 
   if (block.error) {
@@ -331,11 +352,11 @@ function renderExpressDiagnostics() {
   return `
     <section class="hero compact">
       <p>Экспресс-диагностика</p>
-      <h2>Оцени 11 слоёв бизнеса</h2>
+      <h2>Соберём быстрый срез бизнеса</h2>
       <p>Выбирай описание, которое ближе всего к текущей реальности. Это не экзамен: ответы нужны, чтобы отличить симптом от причины и понять, куда копать первым.</p>
       <div class="progress hero-progress">
         <div class="progress-bar"><span style="width: ${Number(progress.percent)}%"></span></div>
-        <strong>${progress.answeredCount}/${progress.totalCount}</strong>
+        <strong>${Math.round(Number(progress.percent))}%</strong>
       </div>
     </section>
 
@@ -458,8 +479,8 @@ function renderMaturity() {
   return `
     <section class="hero compact">
       <p>Матрица зрелости</p>
-      <h2>${maturity.answeredCount || 0}/${maturity.totalCount || 11} слоёв оценено</h2>
-      <p>Официальная матрица показывает зрелость слоёв, но это не равно главному ограничению. Слабый слой может быть следствием, а не причиной.</p>
+      <h2>Оценка готова на ${Math.round(Number(progress))}%</h2>
+      <p>Матрица показывает зрелость ключевых областей бизнеса, но это не равно главному ограничению. Слабая область может быть следствием, а не причиной.</p>
       <div class="status-row">
         <span class="pill">прогресс: ${Math.round(Number(progress))}%</span>
         <span class="pill neutral">средняя оценка: ${escapeHtml(averageScore)}</span>
@@ -467,7 +488,7 @@ function renderMaturity() {
     </section>
 
     <section class="card maturity-card">
-      <h3>11 слоёв</h3>
+      <h3>Ключевые области бизнеса</h3>
       <div class="maturity-grid">
         ${(maturity.scores || []).map(renderMaturityRow).join("")}
       </div>
@@ -475,7 +496,7 @@ function renderMaturity() {
 
     <section class="card next-card">
       <h3>Перейти к ограничению</h3>
-      <p>Дальше система проверит, какой слой не просто слабый, а сильнее всего объясняет текущий запрос и тянет за собой остальные проблемы.</p>
+      <p>Дальше система проверит, какая область не просто слабая, а сильнее всего объясняет текущий запрос и тянет за собой остальные проблемы.</p>
       <div class="actions">
         <button class="primary-button" data-navigate="/mini-app/diagnostics/express">Вернуться к экспрессу</button>
         <button class="secondary-button" data-navigate="/mini-app/constraint">Построить гипотезу</button>
@@ -685,17 +706,33 @@ function renderTools() {
 
   const tools = block.catalog?.tools || [];
   const recommendations = block.recommended?.recommendations || [];
+  const query = block.query.trim().toLowerCase();
+  const filteredTools = query
+    ? tools.filter((tool) => normalizeToolSearchText(tool).includes(query))
+    : tools;
+  const visibleTools = filteredTools.slice(0, 80);
 
   return `
     <section class="hero compact">
       <p>Инструменты</p>
-      <h2>Каталог рабочих шаблонов</h2>
-      <p>На этом этапе AI-BOSS рекомендует инструменты из готового каталога и подсвечивает, зачем они нужны. Полные таблицы в чат не выдаём.</p>
+      <h2>Каталог рабочих инструментов</h2>
+      <p>В каталоге ${tools.length} инструментов из архитектурной карты. AI-BOSS использует их как ориентиры: подбирает подходящие по кейсу, но не подменяет ими живую диагностику.</p>
       <div class="actions">
         <button class="primary-button" data-tools-recalculate ${block.recommendedLoading ? "disabled" : ""}>Пересчитать рекомендации</button>
         <button class="secondary-button" data-navigate="/mini-app/documents">Документы</button>
       </div>
     </section>
+
+    <form class="card tool-search" data-tool-search-form>
+      <label>
+        <span>Поиск по каталогу</span>
+        <input name="toolSearch" value="${escapeAttribute(block.query)}" placeholder="Название, область, задача или результат" />
+      </label>
+      <div class="form-actions">
+        <button class="primary-button compact-button" type="submit">Найти</button>
+        <button class="secondary-button compact-button" type="button" data-tool-search-clear>Сброс</button>
+      </div>
+    </form>
 
     <section class="card next-card">
       <h3>Рекомендованные для кейса</h3>
@@ -707,13 +744,17 @@ function renderTools() {
     </section>
 
     <section class="card next-card">
-      <h3>Все инструменты</h3>
+      <h3>${query ? "Результаты поиска" : "Каталог"}</h3>
       ${tools.length ? `
+        <p>${query
+          ? `Найдено: ${filteredTools.length}. Показано первые ${visibleTools.length}.`
+          : `Показано первые ${visibleTools.length} из ${tools.length}. Уточни поиск, если нужен конкретный участок бизнеса.`
+        }</p>
         <div class="tool-grid">
-          ${tools.map((tool) => renderToolTeaser(tool, tool.recommendation)).join("")}
+          ${visibleTools.map((tool) => renderToolTeaser(tool, tool.recommendation)).join("")}
         </div>
       ` : `
-        <p>Каталог пока не загрузился. В MVP здесь должны быть 5 базовых инструментов: роли, целевой клиент, воронка, финансы и подготовка к продаже.</p>
+        <p>Каталог пока не загрузился. Повтори загрузку, чтобы подтянуть инструменты из архитектурной карты.</p>
         <div class="actions">
           <button class="secondary-button" data-tools-recalculate ${block.recommendedLoading ? "disabled" : ""}>Обновить каталог</button>
         </div>
@@ -755,8 +796,9 @@ function renderToolCard() {
       <h3>${escapeHtml(tool.title)}</h3>
       <p>${escapeHtml(tool.when_to_use)}</p>
       <div class="status-row">
-        ${(tool.layerKeys || tool.layer_keys || []).map((layer) => `<span class="pill neutral">${escapeHtml(layer)}</span>`).join("")}
+        ${[tool.layer, tool.domain].filter(Boolean).map((tag) => `<span class="pill neutral">${escapeHtml(tag)}</span>`).join("")}
       </div>
+      ${tool.result ? `<p><strong>Результат:</strong> ${escapeHtml(tool.result)}</p>` : ""}
       ${tool.recommendation ? `<p><strong>Почему рекомендован:</strong> ${escapeHtml(tool.recommendation.reason || "")}</p>` : ""}
       ${tool.templateUrl ? `
         <p><strong>Шаблон:</strong> можно открыть готовый внешний документ.</p>
@@ -784,6 +826,19 @@ function renderToolCard() {
   `;
 }
 
+function normalizeToolSearchText(tool) {
+  return [
+    tool.title,
+    tool.short_description,
+    tool.when_to_use,
+    tool.result,
+    tool.layer,
+    tool.domain,
+    ...(tool.layerKeys || tool.layer_keys || []),
+    ...(tool.problemTypes || tool.problem_types || [])
+  ].filter(Boolean).join(" ").toLowerCase();
+}
+
 function renderToolTeaser(tool, recommendation = null) {
   if (!tool) {
     return "";
@@ -791,7 +846,7 @@ function renderToolTeaser(tool, recommendation = null) {
 
   return `
     <article class="tool-card">
-      <p class="eyebrow">${recommendation ? `приоритет ${escapeHtml(recommendation.priority || "")}` : "инструмент"}</p>
+      <p class="eyebrow">${recommendation ? `приоритет ${escapeHtml(recommendation.priority || "")}` : escapeHtml(tool.layer || "инструмент")}</p>
       <h4>${escapeHtml(tool.title)}</h4>
       <p>${escapeHtml(tool.short_description)}</p>
       ${recommendation?.reason ? `<small>${escapeHtml(recommendation.reason)}</small>` : ""}
@@ -940,7 +995,7 @@ function renderConsultation() {
         </section>
         <section class="card">
           <h3>Матрица зрелости</h3>
-          <p>Заполнено слоёв: ${escapeHtml(maturity.completed_layers || 0)}. Средняя оценка: ${escapeHtml(maturity.avg_score || 0)}/5.</p>
+          <p>Заполнено областей: ${escapeHtml(maturity.completed_layers || 0)}. Средняя оценка: ${escapeHtml(maturity.avg_score || 0)}/5.</p>
           ${renderLayerChips("Слабые зоны", maturity.weak_layers)}
           ${renderLayerChips("Сильные зоны", maturity.strong_layers)}
         </section>
@@ -1206,6 +1261,8 @@ function bindEvents() {
   });
 
   appRoot.querySelector("[data-tools-recalculate]")?.addEventListener("click", recalculateTools);
+  appRoot.querySelector("[data-tool-search-form]")?.addEventListener("submit", updateToolSearch);
+  appRoot.querySelector("[data-tool-search-clear]")?.addEventListener("click", clearToolSearch);
 
   appRoot.querySelectorAll("[data-document-analyze]").forEach((button) => {
     button.addEventListener("click", () => analyzeDocument(button.dataset.documentAnalyze));
@@ -1260,7 +1317,7 @@ async function loadBootstrap() {
   try {
     state.bootstrap = await api.bootstrap();
   } catch (error) {
-    state.error = error.message || "Не удалось загрузить bootstrap state.";
+    state.error = errorMessage(error, "Не удалось загрузить bootstrap state.");
   } finally {
     state.loading = false;
     render();
@@ -1325,7 +1382,7 @@ async function loadOnboarding({ force = false } = {}) {
   try {
     state.onboarding.data = await api.getOnboarding();
   } catch (error) {
-    state.onboarding.error = error.message || "Не удалось загрузить профиль компании.";
+    state.onboarding.error = errorMessage(error, "Не удалось загрузить профиль компании.");
   } finally {
     state.onboarding.loading = false;
     render();
@@ -1359,7 +1416,7 @@ async function saveOnboarding(event) {
     };
     navigate("/mini-app/diagnostics/express");
   } catch (error) {
-    state.onboarding.error = error.message || "Не удалось сохранить профиль.";
+    state.onboarding.error = errorMessage(error, "Не удалось сохранить профиль.");
   } finally {
     state.onboarding.saving = false;
     render();
@@ -1383,7 +1440,7 @@ async function loadExpressDiagnostics({ force = false } = {}) {
     };
     await loadDiagnosticPrefill();
   } catch (error) {
-    state.express.error = error.message || "Не удалось загрузить экспресс-диагностику.";
+    state.express.error = errorMessage(error, "Не удалось загрузить экспресс-диагностику.");
   } finally {
     state.express.loading = false;
     render();
@@ -1402,7 +1459,7 @@ async function loadDiagnosticPrefill() {
       prefillObservations: prefill.observations || []
     };
   } catch (error) {
-    state.express.prefillError = error.message || "Не удалось загрузить предположения системы.";
+    state.express.prefillError = errorMessage(error, "Не удалось загрузить предположения системы.");
   } finally {
     state.express.prefillLoading = false;
   }
@@ -1460,7 +1517,7 @@ async function saveExpressAnswer(layerKey, score) {
     };
     state.maturity.data = null;
   } catch (error) {
-    state.express.error = error.message || "Не удалось сохранить ответ.";
+    state.express.error = errorMessage(error, "Не удалось сохранить ответ.");
   } finally {
     state.express.savingLayerKey = "";
     render();
@@ -1519,7 +1576,7 @@ async function applyPrefillAction(layerKey, action, correctedScore = null) {
     };
     state.maturity.data = null;
   } catch (error) {
-    state.express.error = error.message || "Не удалось применить предположение.";
+    state.express.error = errorMessage(error, "Не удалось применить предположение.");
   } finally {
     state.express.savingLayerKey = "";
     render();
@@ -1538,7 +1595,7 @@ async function loadMaturity({ force = false } = {}) {
   try {
     state.maturity.data = await api.getMaturity();
   } catch (error) {
-    state.maturity.error = error.message || "Не удалось загрузить матрицу зрелости.";
+    state.maturity.error = errorMessage(error, "Не удалось загрузить матрицу зрелости.");
   } finally {
     state.maturity.loading = false;
     render();
@@ -1558,7 +1615,7 @@ async function loadConstraint({ force = false } = {}) {
     state.constraint.data = await api.reasonConstraint();
     state.nextStep.data = null;
   } catch (error) {
-    state.constraint.error = error.message || "Не удалось построить гипотезу ограничения.";
+    state.constraint.error = errorMessage(error, "Не удалось построить гипотезу ограничения.");
   } finally {
     state.constraint.loading = false;
     render();
@@ -1588,7 +1645,7 @@ async function applyConstraintAction(id, action) {
     };
     state.nextStep.data = null;
   } catch (error) {
-    state.constraint.error = error.message || "Не удалось обновить гипотезу.";
+    state.constraint.error = errorMessage(error, "Не удалось обновить гипотезу.");
   } finally {
     state.constraint.actionSaving = "";
     render();
@@ -1607,7 +1664,7 @@ async function loadNextStep({ force = false } = {}) {
   try {
     state.nextStep.data = await api.getNextStep();
   } catch (error) {
-    state.nextStep.error = error.message || "Не удалось выбрать следующий шаг.";
+    state.nextStep.error = errorMessage(error, "Не удалось выбрать следующий шаг.");
   } finally {
     state.nextStep.loading = false;
     render();
@@ -1636,7 +1693,7 @@ async function updateNextStep(id, action) {
       }
     };
   } catch (error) {
-    state.nextStep.error = error.message || "Не удалось обновить следующий шаг.";
+    state.nextStep.error = errorMessage(error, "Не удалось обновить следующий шаг.");
   } finally {
     state.nextStep.actionSaving = "";
     render();
@@ -1655,11 +1712,23 @@ async function loadTools({ force = false } = {}) {
   try {
     state.tools.catalog = await api.getTools();
   } catch (error) {
-    state.tools.error = error.message || "Не удалось загрузить инструменты.";
+    state.tools.error = errorMessage(error, "Не удалось загрузить инструменты.");
   } finally {
     state.tools.loading = false;
     render();
   }
+}
+
+function updateToolSearch(event) {
+  event.preventDefault();
+  const formData = new FormData(event.currentTarget);
+  state.tools.query = String(formData.get("toolSearch") || "").trim();
+  render();
+}
+
+function clearToolSearch() {
+  state.tools.query = "";
+  render();
 }
 
 async function loadRecommendedTools({ force = false } = {}) {
@@ -1690,7 +1759,7 @@ async function recalculateTools() {
     state.tools.catalog = null;
     await loadTools({ force: true });
   } catch (error) {
-    state.tools.error = error.message || "Не удалось пересчитать инструменты.";
+    state.tools.error = errorMessage(error, "Не удалось пересчитать инструменты.");
   } finally {
     state.tools.recommendedLoading = false;
     render();
@@ -1713,7 +1782,7 @@ async function markToolOpened(toolId) {
     await loadTools({ force: true });
     await loadRecommendedTools({ force: true });
   } catch (error) {
-    state.tools.error = error.message || "Не удалось отметить инструмент.";
+    state.tools.error = errorMessage(error, "Не удалось отметить инструмент.");
   } finally {
     state.tools.openingToolId = "";
     render();
@@ -1732,7 +1801,7 @@ async function loadDocuments({ force = false } = {}) {
   try {
     state.documents.data = await api.getDocuments();
   } catch (error) {
-    state.documents.error = error.message || "Не удалось загрузить документы.";
+    state.documents.error = errorMessage(error, "Не удалось загрузить документы.");
   } finally {
     state.documents.loading = false;
     render();
@@ -1763,7 +1832,7 @@ async function saveDocument(event) {
     state.documents.data = null;
     await loadDocuments({ force: true });
   } catch (error) {
-    state.documents.error = error.message || "Не удалось сохранить документ.";
+    state.documents.error = errorMessage(error, "Не удалось сохранить документ.");
   } finally {
     state.documents.saving = false;
     render();
@@ -1790,7 +1859,7 @@ async function analyzeDocument(documentId) {
     state.documents.data = null;
     await loadDocuments({ force: true });
   } catch (error) {
-    state.documents.error = error.message || "Не удалось проанализировать документ.";
+    state.documents.error = errorMessage(error, "Не удалось проанализировать документ.");
   } finally {
     state.documents.analyzingId = "";
     render();
@@ -1809,7 +1878,7 @@ async function loadConsultationBrief({ force = false } = {}) {
   try {
     state.consultation.data = await api.getConsultationBrief();
   } catch (error) {
-    state.consultation.error = error.message || "Не удалось загрузить резюме консультации.";
+    state.consultation.error = errorMessage(error, "Не удалось загрузить резюме консультации.");
   } finally {
     state.consultation.loading = false;
     render();
@@ -1826,7 +1895,7 @@ async function generateConsultationBrief() {
     state.consultation.data = await api.generateConsultationBrief();
     state.consultation.message = "Резюме сформировано из текущего кейса.";
   } catch (error) {
-    state.consultation.error = error.message || "Не удалось сформировать резюме.";
+    state.consultation.error = errorMessage(error, "Не удалось сформировать резюме.");
   } finally {
     state.consultation.generating = false;
     render();
@@ -1859,7 +1928,7 @@ function buildConsultationBriefText(brief) {
     brief.current_request,
     "",
     "Матрица зрелости:",
-    `Средняя оценка: ${maturity.avg_score || 0}/5. Заполнено слоёв: ${maturity.completed_layers || 0}.`,
+    `Средняя оценка: ${maturity.avg_score || 0}/5. Заполнено областей: ${maturity.completed_layers || 0}.`,
     weakLayers ? `Слабые зоны: ${weakLayers}` : "",
     "",
     "Гипотеза ограничения:",
@@ -1930,7 +1999,7 @@ async function requestConsultation() {
       }
     }
   } catch (error) {
-    state.consultation.error = error.message || "Не удалось подготовить запись.";
+    state.consultation.error = errorMessage(error, "Не удалось подготовить запись.");
   } finally {
     state.consultation.requestSaving = false;
     render();
