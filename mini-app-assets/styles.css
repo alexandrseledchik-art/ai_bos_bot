@@ -288,6 +288,10 @@ a {
   gap: 14px;
 }
 
+.catalog-search {
+  margin: 14px 0 18px;
+}
+
 .tool-search label {
   display: grid;
   gap: 7px;

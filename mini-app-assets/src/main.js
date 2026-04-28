@@ -724,17 +724,6 @@ function renderTools() {
       </div>
     </section>
 
-    <form class="card tool-search" data-tool-search-form>
-      <label>
-        <span>Поиск по каталогу</span>
-        <input name="toolSearch" value="${escapeAttribute(block.query)}" placeholder="Название, область, задача или результат" />
-      </label>
-      <div class="form-actions">
-        <button class="primary-button compact-button" type="submit">Найти</button>
-        <button class="secondary-button compact-button" type="button" data-tool-search-clear>Сброс</button>
-      </div>
-    </form>
-
     <section class="card next-card">
       <h3>Рекомендованные для кейса</h3>
       ${recommendations.length ? `
@@ -745,7 +734,17 @@ function renderTools() {
     </section>
 
     <section class="card next-card">
-      <h3>${query ? "Результаты поиска" : "Каталог"}</h3>
+      <h3>${query ? "Результаты поиска" : "Основные инструменты"}</h3>
+      <form class="tool-search catalog-search" data-tool-search-form>
+        <label>
+          <span>Поиск по каталогу</span>
+          <input name="toolSearch" value="${escapeAttribute(block.query)}" placeholder="Название, область, задача или результат" />
+        </label>
+        <div class="form-actions">
+          <button class="primary-button compact-button" type="submit">Найти</button>
+          <button class="secondary-button compact-button" type="button" data-tool-search-clear>Сброс</button>
+        </div>
+      </form>
       ${tools.length ? `
         <p>${query
           ? `Найдено: ${filteredTools.length}. Показано первые ${visibleTools.length}.`
