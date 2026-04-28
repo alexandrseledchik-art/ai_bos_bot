@@ -518,6 +518,24 @@ a {
   display: block;
 }
 
+.scale-guide {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.scale-guide strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.scale-guide span {
+  display: block;
+}
+
 .tool-grid,
 .document-list {
   display: grid;
