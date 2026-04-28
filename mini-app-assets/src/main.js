@@ -197,6 +197,7 @@ function renderDashboard() {
         <button class="secondary-button" data-navigate="/mini-app/diagnostics/express">Пройти диагностику</button>
         <button class="secondary-button" data-navigate="/mini-app/maturity">Открыть матрицу</button>
         <button class="secondary-button" data-navigate="/mini-app/constraint">Найти ограничение</button>
+        <button class="secondary-button" data-navigate="/mini-app/tools">Все инструменты</button>
         <button class="secondary-button" data-navigate="/mini-app/consultation">Разбор с Александром</button>
       </div>
     </section>
@@ -246,9 +247,6 @@ function renderRecommendedToolsPanel() {
       <section class="card next-card">
         <h3>Рекомендованные инструменты</h3>
         <p>После первых ответов и гипотезы ограничения здесь появятся 3 инструмента из каталога.</p>
-        <div class="actions">
-          <button class="secondary-button" data-navigate="/mini-app/tools">Открыть каталог</button>
-        </div>
       </section>
     `;
   }
@@ -258,9 +256,6 @@ function renderRecommendedToolsPanel() {
       <h3>Рекомендованные инструменты</h3>
       <div class="tool-grid">
         ${recommendations.slice(0, 3).map((item) => renderToolTeaser(item.tool, item)).join("")}
-      </div>
-      <div class="actions">
-        <button class="primary-button" data-navigate="/mini-app/tools">Все инструменты</button>
       </div>
     </section>
   `;
