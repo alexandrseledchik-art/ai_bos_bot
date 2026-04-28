@@ -337,9 +337,9 @@ async function assertApiClient() {
   await client.requestConsultation();
 
   assert.deepEqual(calls.map((call) => call.path), [
-    "/api/mini-app/consultation/brief",
-    "/api/mini-app/consultation/brief",
-    "/api/mini-app/consultation/request"
+    "/api/mini-app/rpc?path=consultation%2Fbrief",
+    "/api/mini-app/rpc?path=consultation%2Fbrief",
+    "/api/mini-app/rpc?path=consultation%2Frequest"
   ]);
   assert.deepEqual(calls.map((call) => call.method), ["GET", "POST", "POST"]);
   assert.equal(calls.every((call) => call.initData === "signed-init-data"), true);

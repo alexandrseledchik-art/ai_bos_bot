@@ -4,9 +4,15 @@ import { MiniAppDiagnosticsService } from "../../src/application/mini-app-diagno
 
 function miniAppPath(request) {
   const url = new URL(request.url);
-  return url.pathname
+  const directPath = url.pathname
     .replace(/^\/api\/mini-app\/?/, "")
     .replace(/\/$/, "");
+
+  if (directPath === "rpc") {
+    return (url.searchParams.get("path") || "").replace(/^\/+/, "").replace(/\/+$/, "");
+  }
+
+  return directPath;
 }
 
 function readPathParam(value) {

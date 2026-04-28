@@ -327,8 +327,8 @@ async function assertApiClient() {
   await client.updateNextStep({ id: "step_1", action: "accept" });
 
   assert.deepEqual(calls.map((call) => call.path), [
-    "/api/mini-app/constraint/reason",
-    "/api/mini-app/constraint/reason",
+    "/api/mini-app/rpc?path=constraint%2Freason",
+    "/api/mini-app/rpc?path=constraint%2Freason",
     "/api/mini-app/next-step",
     "/api/mini-app/next-step"
   ]);

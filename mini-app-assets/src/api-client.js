@@ -18,6 +18,26 @@ function normalizeApiError(error, fallback) {
   }
 }
 
+function transportPath(path) {
+  const rawPath = String(path || "");
+  const prefix = "/api/mini-app/";
+
+  if (!rawPath.startsWith(prefix)) {
+    return rawPath;
+  }
+
+  const [pathname, query = ""] = rawPath.split("?");
+  const miniAppPath = pathname.slice(prefix.length);
+
+  if (!miniAppPath.includes("/")) {
+    return rawPath;
+  }
+
+  const params = new URLSearchParams(query);
+  params.set("path", miniAppPath);
+  return `/api/mini-app/rpc?${params.toString()}`;
+}
+
 export class MiniAppApiClient {
   constructor({ initData, fetchImpl } = {}) {
     this.initData = initData || "";
@@ -36,7 +56,7 @@ export class MiniAppApiClient {
       headers.set("x-telegram-init-data", this.initData);
     }
 
-    const response = await this.fetchImpl(path, {
+    const response = await this.fetchImpl(transportPath(path), {
       ...options,
       headers
     });

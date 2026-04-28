@@ -11,18 +11,7 @@ const requiredFiles = [
   "mini-app-assets/src/main.js",
   "mini-app-assets/src/routes.js",
   "mini-app-assets/src/telegram.js",
-  "api/mini-app/diagnostics/express.js",
-  "api/mini-app/diagnostics/express/answer.js",
-  "api/mini-app/diagnostics/prefill.js",
-  "api/mini-app/constraint/reason.js",
-  "api/mini-app/tools/recommended.js",
-  "api/mini-app/tools/recalculate.js",
-  "api/mini-app/tools/[toolId]/opened.js",
-  "api/mini-app/documents/[documentId]/analyze.js",
-  "api/mini-app/consultation/brief.js",
-  "api/mini-app/consultation/request.js",
-  "api/mini-app/dev/constraint-override.js",
-  "api/mini-app/dev/next-step-override.js"
+  "api/mini-app/[...path].js"
 ];
 
 const requiredRoutes = [

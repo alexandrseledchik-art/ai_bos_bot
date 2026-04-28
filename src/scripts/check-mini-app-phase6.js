@@ -342,12 +342,12 @@ async function assertApiClient() {
 
   assert.deepEqual(calls.map((call) => call.path), [
     "/api/mini-app/tools",
-    "/api/mini-app/tools/recommended",
-    "/api/mini-app/tools/recalculate",
-    "/api/mini-app/tools/tool_1/opened",
+    "/api/mini-app/rpc?path=tools%2Frecommended",
+    "/api/mini-app/rpc?path=tools%2Frecalculate",
+    "/api/mini-app/rpc?path=tools%2Ftool_1%2Fopened",
     "/api/mini-app/documents",
     "/api/mini-app/documents",
-    "/api/mini-app/documents/document_1/analyze"
+    "/api/mini-app/rpc?path=documents%2Fdocument_1%2Fanalyze"
   ]);
   assert.deepEqual(calls.map((call) => call.method), [
     "GET",
