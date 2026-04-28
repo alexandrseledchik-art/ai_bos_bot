@@ -78,7 +78,9 @@ function displayStatus(value) {
     rejected: "отклонено",
     accepted: "в работе",
     done: "готово",
-    skipped: "пропущено"
+    skipped: "пропущено",
+    link_added: "ссылка добавлена",
+    analyzed: "проанализировано"
   };
   return map[value] || value || "";
 }
@@ -124,7 +126,7 @@ function renderBootstrapCard() {
         <h3>Кабинет</h3>
         <p>Загружаю состояние компании...</p>
         <div class="status-row">
-          <span class="pill neutral">loading</span>
+          <span class="pill neutral">загрузка</span>
         </div>
       </section>
     `;
@@ -457,7 +459,7 @@ function renderMaturity() {
     <section class="hero compact">
       <p>Матрица зрелости</p>
       <h2>${maturity.answeredCount || 0}/${maturity.totalCount || 11} слоёв оценено</h2>
-      <p>Матрица показывает зрелость слоёв, но это не равно главному ограничению. Слабый слой может быть следствием, а не причиной.</p>
+      <p>Официальная матрица показывает зрелость слоёв, но это не равно главному ограничению. Слабый слой может быть следствием, а не причиной.</p>
       <div class="status-row">
         <span class="pill">прогресс: ${Math.round(Number(progress))}%</span>
         <span class="pill neutral">средняя оценка: ${escapeHtml(averageScore)}</span>
@@ -857,7 +859,7 @@ function renderDocumentCard(document) {
         <h4>${escapeHtml(document.title || document.url)}</h4>
         <p>${escapeHtml(document.url)}</p>
         <div class="status-row">
-          <span class="pill">${escapeHtml(document.status || "link_added")}</span>
+          <span class="pill">${escapeHtml(displayStatus(document.status || "link_added"))}</span>
         </div>
       </div>
       ${snapshot ? `
@@ -1072,7 +1074,7 @@ function renderLoadingCard(text) {
       <h3>Загрузка</h3>
       <p>${escapeHtml(text)}</p>
       <div class="status-row">
-        <span class="pill neutral">loading</span>
+        <span class="pill neutral">загрузка</span>
       </div>
     </section>
   `;

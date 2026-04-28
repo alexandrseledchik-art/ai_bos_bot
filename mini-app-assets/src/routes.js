@@ -7,7 +7,7 @@ export const ROUTES = [
   },
   {
     path: "/mini-app/onboarding",
-    title: "Onboarding",
+    title: "Входной профиль",
     eyebrow: "Профиль компании",
     description: "Короткий вход: компания, отрасль, размер, выручка, текущий запрос и роль пользователя."
   },
