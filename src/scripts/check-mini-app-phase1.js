@@ -148,6 +148,11 @@ async function main() {
   const syncClient = new FakeSupabaseClient();
   const service = new MiniAppBootstrapService({ syncClient });
   const firstBootstrap = await service.bootstrap({ telegramUser: verification.user });
+  Object.assign(firstBootstrap.companyProfile, {
+    user_role: "Собственник",
+    current_request: "Хочу вывести консалтинг на 2M выручки в месяц",
+    onboarding_status: "draft"
+  });
   const secondBootstrap = await service.bootstrap({ telegramUser: verification.user });
 
   assert.equal(firstBootstrap.appUser.id, secondBootstrap.appUser.id);
@@ -156,6 +161,8 @@ async function main() {
   assert.equal(firstBootstrap.activeCase.id, secondBootstrap.activeCase.id);
   assert.equal(firstBootstrap.activeCase.kind, "diagnostic_case");
   assert.equal(firstBootstrap.activeCase.status, "active");
+  assert.equal(secondBootstrap.onboardingStatus, "completed");
+  assert.equal(secondBootstrap.companyProfile.onboarding_status, "completed");
 
   process.env.TELEGRAM_BOT_TOKEN = botToken;
   process.env.SUPABASE_URL = "https://example.supabase.co";

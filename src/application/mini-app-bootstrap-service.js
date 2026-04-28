@@ -20,6 +20,18 @@ function firstRow(rows) {
   return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
 }
 
+function trimString(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function isProfileComplete({ company, profile }) {
+  return Boolean(
+    trimString(company?.name) &&
+    trimString(profile?.user_role) &&
+    trimString(profile?.current_request)
+  );
+}
+
 export class MiniAppBootstrapService {
   constructor({ syncClient }) {
     this.syncClient = syncClient;
@@ -149,6 +161,20 @@ export class MiniAppBootstrapService {
     });
 
     if (existing) {
+      if (existing.onboarding_status !== "completed" && isProfileComplete({ company, profile: existing })) {
+        return this.upsertOne(
+          "company_profiles",
+          {
+            workspace_id: workspace.id,
+            company_id: company.id,
+            onboarding_status: "completed"
+          },
+          {
+            onConflict: "company_id"
+          }
+        );
+      }
+
       return existing;
     }
 
