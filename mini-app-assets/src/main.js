@@ -185,10 +185,15 @@ function renderBootstrapCard() {
 }
 
 function renderDashboard() {
-  const bootstrapExpressProgress = state.bootstrap?.dashboardSummary?.expressProgress?.percent ??
-    state.bootstrap?.dashboardSummary?.diagnosticProgress?.express ??
-    0;
-  const expressProgress = state.express.data?.progress?.percent ?? bootstrapExpressProgress;
+  const bootstrapExpressProgress = state.bootstrap?.dashboardSummary?.expressProgress || {
+    answeredCount: 0,
+    totalCount: 11,
+    percent: state.bootstrap?.dashboardSummary?.diagnosticProgress?.express ?? 0
+  };
+  const expressProgress = state.express.data?.progress || bootstrapExpressProgress;
+  const expressAnsweredCount = Number(expressProgress.answeredCount || 0);
+  const expressTotalCount = Number(expressProgress.totalCount || 0);
+  const expressPercent = Number(expressProgress.percent || 0);
   const companyName = state.bootstrap?.company?.name || "Компания";
   const onboarding = state.bootstrap?.onboardingStatus ||
     state.bootstrap?.dashboardSummary?.onboardingStatus ||
@@ -216,14 +221,33 @@ function renderDashboard() {
         <h3>Экспресс-диагностика</h3>
         <p>Это не анкета ради оценки. Экспресс нужен, чтобы быстро увидеть, где бизнес теряет результат, и не перепутать слабую область с главным ограничением.</p>
         <div class="progress">
-          <div class="progress-bar"><span style="width: ${Number(expressProgress)}%"></span></div>
-          <strong>${Math.round(Number(expressProgress))}%</strong>
+          <div class="progress-bar"><span style="width: ${expressPercent}%"></span></div>
+          <strong>${escapeHtml(formatDiagnosticCoverage(expressAnsweredCount, expressTotalCount))}</strong>
         </div>
+        <p class="progress-caption">Показано, сколько областей уже оценено. Это не итоговая оценка бизнеса.</p>
         <div class="actions">
           <button class="secondary-button compact-button" data-navigate="/mini-app/next-step">Следующий шаг</button>
         </div>
       </section>
     </div>
+
+    <section class="card next-card">
+      <h3>Как пользоваться Кабинетом</h3>
+      <ul class="plain-list">
+        <li>
+          <strong>Чат</strong>
+          <span>Задавай вопросы, присылай ситуацию, голос или ссылку. В чате удобно думать вслух.</span>
+        </li>
+        <li>
+          <strong>Кабинет</strong>
+          <span>Здесь фиксируются профиль, диагностика, гипотеза, следующий шаг, инструменты и документы по кейсу.</span>
+        </li>
+        <li>
+          <strong>Маршрут</strong>
+          <span>Заполни профиль, пройди диагностику, посмотри срез, проверь гипотезу и зафиксируй следующий шаг.</span>
+        </li>
+      </ul>
+    </section>
 
     ${renderRecommendedToolsPanel()}
 
@@ -355,6 +379,9 @@ function renderExpressDiagnostics() {
   }
 
   const progress = block.data.progress || { answeredCount: 0, totalCount: 11, percent: 0 };
+  const answeredCount = Number(progress.answeredCount || 0);
+  const totalCount = Number(progress.totalCount || 0);
+  const percent = Number(progress.percent || 0);
 
   return `
     <section class="hero compact">
@@ -362,9 +389,10 @@ function renderExpressDiagnostics() {
       <h2>Соберём быстрый срез бизнеса</h2>
       <p>Выбирай описание, которое ближе всего к текущей реальности. Это не экзамен: ответы нужны, чтобы отличить симптом от причины и понять, куда копать первым.</p>
       <div class="progress hero-progress">
-        <div class="progress-bar"><span style="width: ${Number(progress.percent)}%"></span></div>
-        <strong>${Math.round(Number(progress.percent))}%</strong>
+        <div class="progress-bar"><span style="width: ${percent}%"></span></div>
+        <strong>${escapeHtml(formatDiagnosticCoverage(answeredCount, totalCount))}</strong>
       </div>
+      <p class="progress-caption">Это прогресс заполнения: сколько областей уже оценено. Это не итоговая оценка бизнеса.</p>
     </section>
 
     <div class="diagnostic-list">
@@ -388,6 +416,7 @@ function renderExpressDiagnostics() {
 }
 
 function renderLayerCard(layer, answer, suggestion) {
+  const hasAnswer = Number.isFinite(Number(answer?.score));
   return `
     <section class="card layer-card" id="layer-${escapeAttribute(layer.key)}">
       <div class="layer-head">
@@ -401,6 +430,10 @@ function renderLayerCard(layer, answer, suggestion) {
       </div>
       <p>${escapeHtml(layer.shortDescription)}</p>
       <p class="diagnostic-question">${escapeHtml(layer.diagnosticQuestion)}</p>
+      <p class="hint-text">${hasAnswer
+        ? `Сейчас выбрано ${Number(answer.score)}/5. Чтобы изменить оценку, нажми другой вариант ниже.`
+        : "Выбери один вариант. Если передумаешь, позже можно нажать другой уровень и заменить оценку."
+      }</p>
       ${!answer && suggestion ? renderSuggestionCard(layer, suggestion) : ""}
 
       <div class="level-options">
@@ -417,13 +450,25 @@ function renderLayerCard(layer, answer, suggestion) {
               ${saving ? "disabled" : ""}
             >
               <strong>${score}</strong>
-              <span>${escapeHtml(description)}</span>
+              <span>
+                ${escapeHtml(description)}
+                ${selected ? `<em>Текущий выбор</em>` : ""}
+              </span>
             </button>
           `;
         }).join("")}
       </div>
     </section>
   `;
+}
+
+function formatDiagnosticCoverage(answeredCount, totalCount) {
+  if (!Number.isFinite(totalCount) || totalCount <= 0) {
+    return "0/0";
+  }
+
+  const safeAnswered = Number.isFinite(answeredCount) ? Math.max(0, Math.min(answeredCount, totalCount)) : 0;
+  return `${safeAnswered}/${totalCount}`;
 }
 
 function renderSuggestionCard(layer, suggestion) {

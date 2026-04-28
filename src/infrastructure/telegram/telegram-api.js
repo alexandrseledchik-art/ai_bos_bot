@@ -86,10 +86,11 @@ export class TelegramApiClient {
     });
   }
 
-  async sendMessage(chatId, text) {
+  async sendMessage(chatId, text, options = {}) {
     return this.api("sendMessage", {
       chat_id: chatId,
-      text
+      text,
+      ...(options.replyMarkup ? { reply_markup: options.replyMarkup } : {})
     });
   }
 

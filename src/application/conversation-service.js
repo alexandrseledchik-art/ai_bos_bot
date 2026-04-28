@@ -21,6 +21,7 @@ import { classifyInput } from "./classify-input.js";
 import { extractObservations } from "./observation-extractor.js";
 import { analyzeWithGraph } from "./graph-reasoner.js";
 import { applyGuardrails } from "./guardrails.js";
+import { buildMiniAppInvite, createMiniAppInviteSnapshot } from "./mini-app-invite-policy.js";
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
@@ -455,7 +456,8 @@ function mergeEntryState(currentState, incomingState, routeType) {
     nextBestQuestion: incoming.nextBestQuestion || current.nextBestQuestion,
     nextBestStep: incoming.nextBestStep || current.nextBestStep,
     whyThisStep: incoming.whyThisStep || current.whyThisStep,
-    promotionReadiness: incoming.promotionReadiness || current.promotionReadiness
+    promotionReadiness: incoming.promotionReadiness || current.promotionReadiness,
+    lastMiniAppInvite: current.lastMiniAppInvite || null
   });
 }
 
@@ -912,21 +914,42 @@ export class ConversationService {
         }
       }
 
+      const runtime = {
+        threadId: thread.id,
+        activeCaseId: activeCase?.id || "",
+        activeCaseKind: activeCase?.kind || "",
+        promotionApplied,
+        artifactSaved: Boolean(artifactPath),
+        entryStateAfterMerge: thread.entryState,
+        graphPacket,
+        persistedMemory
+      };
+      const miniAppInvite = buildMiniAppInvite({
+        classification,
+        decision,
+        runtime,
+        activeCase,
+        persistedMemory,
+        entryState: thread.entryState
+      });
+
+      if (miniAppInvite) {
+        const offeredAt = nowIso();
+        thread.entryState = {
+          ...thread.entryState,
+          lastMiniAppInvite: createMiniAppInviteSnapshot(miniAppInvite, offeredAt),
+          lastUpdatedAt: offeredAt
+        };
+        runtime.entryStateAfterMerge = thread.entryState;
+      }
+
       return {
         reply: decision.response.responseText,
         decision,
         classification,
+        miniAppInvite,
         artifactPath,
-        runtime: {
-          threadId: thread.id,
-          activeCaseId: activeCase?.id || "",
-          activeCaseKind: activeCase?.kind || "",
-          promotionApplied,
-          artifactSaved: Boolean(artifactPath),
-          entryStateAfterMerge: thread.entryState,
-          graphPacket,
-          persistedMemory
-        }
+        runtime
       };
     });
   }

@@ -298,7 +298,13 @@ function assertFrontendShell() {
   assert.match(mainJs, /оценено областей/);
   assert.match(mainJs, /Что видно по срезу/);
   assert.match(mainJs, /Это не итог диагностики/);
+  assert.match(mainJs, /formatDiagnosticCoverage/);
+  assert.match(mainJs, /Это прогресс заполнения/);
+  assert.match(mainJs, /Текущий выбор/);
+  assert.match(mainJs, /Как пользоваться Кабинетом/);
   assert.match(styles, /\.level-option/);
+  assert.match(styles, /\.progress-caption/);
+  assert.match(styles, /\.level-option em/);
   assert.match(styles, /\.maturity-row/);
   assert.match(migration, /maturity_scores_run_subject_version_unique/);
 }

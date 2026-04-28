@@ -336,6 +336,13 @@ a {
   max-width: 520px;
 }
 
+.progress-caption {
+  margin-top: 8px !important;
+  color: var(--muted) !important;
+  font-size: 14px !important;
+  line-height: 1.45;
+}
+
 .progress-bar,
 .maturity-meter {
   overflow: hidden;
@@ -480,6 +487,15 @@ a {
 .level-option span {
   color: var(--muted);
   line-height: 1.45;
+}
+
+.level-option em {
+  display: block;
+  margin-top: 6px;
+  color: var(--panel-strong);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .next-card {

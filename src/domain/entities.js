@@ -102,6 +102,7 @@ export function emptyEntryState() {
     nextBestStep: "",
     whyThisStep: "",
     promotionReadiness: "keep_in_entry",
+    lastMiniAppInvite: null,
     lastUpdatedAt: ""
   };
 }

@@ -1,4 +1,5 @@
 import { extractTelegramMessagePayload, TelegramApiClient } from "./telegram-api.js";
+import { buildMiniAppReplyMarkup } from "./mini-app-webapp.js";
 import { buildVoiceCapabilityReply, isVoiceCapabilityQuestion } from "./telegram-meta.js";
 import { resolveTelegramPayloadToText } from "./resolve-telegram-input.js";
 
@@ -7,7 +8,7 @@ function delay(ms) {
 }
 
 export class TelegramBotRunner {
-  constructor({ token, apiBaseUrl, pollingTimeoutSeconds = 20, audioTranscriber = null }) {
+  constructor({ token, apiBaseUrl, pollingTimeoutSeconds = 20, audioTranscriber = null, appBaseUrl = "" }) {
     this.api = new TelegramApiClient({
       token,
       apiBaseUrl
@@ -15,6 +16,7 @@ export class TelegramBotRunner {
     this.pollingTimeoutSeconds = pollingTimeoutSeconds;
     this.offset = 0;
     this.audioTranscriber = audioTranscriber;
+    this.appBaseUrl = appBaseUrl;
   }
 
   async getUpdates() {
@@ -25,8 +27,8 @@ export class TelegramBotRunner {
     return updates;
   }
 
-  async sendMessage(chatId, text) {
-    return this.api.sendMessage(chatId, text);
+  async sendMessage(chatId, text, options = {}) {
+    return this.api.sendMessage(chatId, text, options);
   }
 
   async start(onMessage) {
@@ -75,7 +77,11 @@ export class TelegramBotRunner {
           }
 
           if (result?.reply) {
-            await this.sendMessage(payload.chatId, result.reply);
+            await this.sendMessage(payload.chatId, result.reply, {
+              replyMarkup: buildMiniAppReplyMarkup(result.miniAppInvite, {
+                appBaseUrl: this.appBaseUrl
+              })
+            });
           }
         }
       } catch (error) {

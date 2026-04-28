@@ -13,7 +13,8 @@ async function main() {
     token: config.telegramToken,
     apiBaseUrl: config.telegramApiBaseUrl,
     pollingTimeoutSeconds: config.pollingTimeoutSeconds,
-    audioTranscriber
+    audioTranscriber,
+    appBaseUrl: config.appBaseUrl
   });
 
   console.log("Business diagnostic bot is running.");

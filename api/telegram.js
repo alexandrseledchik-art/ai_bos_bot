@@ -1,5 +1,6 @@
 import { getServices } from "../src/create-services.js";
 import { extractTelegramMessagePayload } from "../src/infrastructure/telegram/telegram-api.js";
+import { buildMiniAppReplyMarkup } from "../src/infrastructure/telegram/mini-app-webapp.js";
 import { buildVoiceCapabilityReply, isVoiceCapabilityQuestion } from "../src/infrastructure/telegram/telegram-meta.js";
 import { resolveTelegramPayloadToText } from "../src/infrastructure/telegram/resolve-telegram-input.js";
 
@@ -71,7 +72,11 @@ async function handleTelegramWebhook(request) {
   }
 
   if (result?.reply) {
-    await telegramApi.sendMessage(payload.chatId, result.reply);
+    await telegramApi.sendMessage(payload.chatId, result.reply, {
+      replyMarkup: buildMiniAppReplyMarkup(result.miniAppInvite, {
+        appBaseUrl: config.appBaseUrl
+      })
+    });
   }
 
   return json({ ok: true });
