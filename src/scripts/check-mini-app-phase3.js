@@ -289,7 +289,8 @@ function assertFrontendShell() {
   assert.match(mainJs, /data-onboarding-form/);
   assert.match(mainJs, /data-answer-layer/);
   assert.match(mainJs, /api\.getMaturity/);
-  assert.match(mainJs, /Матрица показывает зрелость ключевых областей бизнеса/);
+  assert.match(mainJs, /Срез зрелости по областям/);
+  assert.match(mainJs, /Это не итог диагностики/);
   assert.match(styles, /\.level-option/);
   assert.match(styles, /\.maturity-row/);
   assert.match(migration, /maturity_scores_run_subject_version_unique/);

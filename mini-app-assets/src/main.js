@@ -168,15 +168,16 @@ function renderBootstrapCard() {
 
   const companyName = state.bootstrap?.company?.name || "Компания";
   const onboarding = state.bootstrap?.onboardingStatus || "draft";
-  const caseId = state.bootstrap?.activeCase?.id || "не создан";
+  const profileIsReady = onboarding === "completed";
 
   return `
     <section class="card">
       <h3>${escapeHtml(companyName)}</h3>
-      <p>Профиль компании и рабочий диагностический кейс готовы. Можно заполнить входной профиль и пройти экспресс-диагностику.</p>
+      <p>${profileIsReady
+        ? "Входной профиль заполнен. Можно обновить контекст или перейти к диагностике, чтобы собрать текущий срез бизнеса."
+        : "Мы подготовили рабочее пространство. Заполни входной профиль, затем пройди диагностику — так система точнее соберёт контекст и слабые места."}</p>
       <div class="status-row">
-        <span class="pill">профиль: ${escapeHtml(displayStatus(onboarding))}</span>
-        <span class="pill neutral">кейс: ${escapeHtml(caseId)}</span>
+        <span class="pill ${profileIsReady ? "" : "neutral"}">${profileIsReady ? "профиль заполнен" : "профиль пока не заполнен"}</span>
       </div>
     </section>
   `;
@@ -193,7 +194,7 @@ function renderDashboard() {
       <p>${escapeHtml(companyName)}: здесь чат превращается в рабочий кейс. Мы фиксируем контекст, собираем сигналы, проверяем зрелость и выводим одну рабочую гипотезу ограничения.</p>
       <div class="actions">
         <button class="primary-button" data-navigate="/mini-app/onboarding">Заполнить профиль</button>
-        <button class="secondary-button" data-navigate="/mini-app/diagnostics/express">Пройти экспресс</button>
+        <button class="secondary-button" data-navigate="/mini-app/diagnostics/express">Пройти диагностику</button>
         <button class="secondary-button" data-navigate="/mini-app/maturity">Открыть матрицу</button>
         <button class="secondary-button" data-navigate="/mini-app/constraint">Найти ограничение</button>
         <button class="secondary-button" data-navigate="/mini-app/consultation">Разбор с Александром</button>
@@ -324,7 +325,7 @@ function renderOnboarding() {
 
       <div class="form-actions">
         <button class="primary-button" type="submit" ${block.saving ? "disabled" : ""}>
-          ${block.saving ? "Сохраняю..." : "Сохранить и перейти к экспрессу"}
+          ${block.saving ? "Сохраняю..." : "Сохранить и перейти к диагностике"}
         </button>
         <button class="secondary-button" type="button" data-navigate="/mini-app/diagnostics/express">К диагностике</button>
       </div>
@@ -336,7 +337,7 @@ function renderExpressDiagnostics() {
   const block = state.express;
 
   if (block.loading) {
-    return renderLoadingCard("Загружаю экспресс-диагностику...");
+    return renderLoadingCard("Загружаю диагностику...");
   }
 
   if (block.error) {
@@ -479,10 +480,10 @@ function renderMaturity() {
   return `
     <section class="hero compact">
       <p>Матрица зрелости</p>
-      <h2>Оценка готова на ${Math.round(Number(progress))}%</h2>
-      <p>Матрица показывает зрелость ключевых областей бизнеса, но это не равно главному ограничению. Слабая область может быть следствием, а не причиной.</p>
+      <h2>Срез зрелости по областям</h2>
+      <p>Матрица показывает, какие области уже оценены и где может быть слабое место. Это не итог диагностики: главное ограничение проверяем отдельно по запросу, сигналам и связям между областями.</p>
       <div class="status-row">
-        <span class="pill">прогресс: ${Math.round(Number(progress))}%</span>
+        <span class="pill">заполнено: ${Math.round(Number(progress))}%</span>
         <span class="pill neutral">средняя оценка: ${escapeHtml(averageScore)}</span>
       </div>
     </section>
@@ -498,7 +499,7 @@ function renderMaturity() {
       <h3>Перейти к ограничению</h3>
       <p>Дальше система проверит, какая область не просто слабая, а сильнее всего объясняет текущий запрос и тянет за собой остальные проблемы.</p>
       <div class="actions">
-        <button class="primary-button" data-navigate="/mini-app/diagnostics/express">Вернуться к экспрессу</button>
+        <button class="primary-button" data-navigate="/mini-app/diagnostics/express">Вернуться к диагностике</button>
         <button class="secondary-button" data-navigate="/mini-app/constraint">Построить гипотезу</button>
       </div>
     </section>

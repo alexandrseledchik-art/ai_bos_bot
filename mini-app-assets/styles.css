@@ -57,15 +57,13 @@ a {
 }
 
 .topbar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
+  position: relative;
+  z-index: 10;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
   padding: 8px 0 18px;
-  backdrop-filter: blur(18px);
 }
 
 .alpha-banner {
@@ -125,7 +123,7 @@ a {
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
   text-align: center;
 }
@@ -133,11 +131,12 @@ a {
 .screen-title {
   margin: 0;
   color: var(--panel-strong);
-  font-size: clamp(26px, 5vw, 38px);
+  font-size: 36px;
   font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.045em;
+  line-height: 1.05;
+  letter-spacing: 0;
   text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .hero {
@@ -156,7 +155,8 @@ a {
 }
 
 .hero.compact h2 {
-  font-size: clamp(28px, 6vw, 48px);
+  font-size: 42px;
+  line-height: 1.06;
 }
 
 .hero::after {
@@ -179,10 +179,11 @@ a {
   margin: 0;
   max-width: 760px;
   color: var(--panel-strong);
-  font-size: clamp(30px, 8vw, 58px);
+  font-size: 48px;
   font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.04em;
+  line-height: 1.06;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
 }
 
 .hero p {
@@ -233,7 +234,7 @@ a {
   color: var(--ink);
   font-size: 21px;
   font-weight: 800;
-  letter-spacing: -0.025em;
+  letter-spacing: 0;
 }
 
 .card p {
@@ -623,6 +624,48 @@ a {
   }
 }
 
+@media (max-width: 620px) {
+  .app-shell {
+    padding: 10px;
+  }
+
+  .topbar {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    gap: 8px;
+    padding: 4px 0 14px;
+  }
+
+  .screen-title {
+    font-size: 30px;
+    line-height: 1.08;
+  }
+
+  .hero {
+    gap: 16px;
+    padding: 20px;
+  }
+
+  .hero h2,
+  .hero.compact h2 {
+    font-size: 36px;
+    line-height: 1.08;
+  }
+
+  .hero p {
+    font-size: 16px;
+  }
+
+  .primary-button,
+  .secondary-button,
+  .ghost-button {
+    max-width: 100%;
+    min-height: 44px;
+    padding: 0 15px;
+    line-height: 1.15;
+    text-align: center;
+  }
+}
+
 .status-row {
   display: flex;
   flex-wrap: wrap;
@@ -753,7 +796,7 @@ a {
   background: linear-gradient(135deg, var(--panel-strong), #006b72);
   color: #ffffff;
   font-weight: 700;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
 }
 
 .error-card {
