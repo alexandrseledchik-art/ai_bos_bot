@@ -51,6 +51,9 @@ assert.match(indexHtml, /mini-app-assets\/src\/main\.js/);
 
 const mainJs = fs.readFileSync("mini-app-assets/src/main.js", "utf8");
 assert.match(mainJs, /Спросить AI-BOSS/);
+assert.match(mainJs, /openAiBossChat/);
+assert.match(mainJs, /WebApp/);
+assert.match(mainJs, /\.close\(\)/);
 assert.match(mainJs, /data-back/);
 assert.match(mainJs, /data-navigate="\/mini-app"/);
 assert.match(mainJs, /api\.bootstrap/);

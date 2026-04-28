@@ -1216,9 +1216,17 @@ function bindEvents() {
   appRoot.querySelector("[data-document-form]")?.addEventListener("submit", saveDocument);
   appRoot.querySelector("[data-back]")?.addEventListener("click", goBack);
 
-  appRoot.querySelector("[data-ai]")?.addEventListener("click", () => {
-    window.alert("Можно задать вопрос AI-BOSS прямо в чате Telegram: про текущий экран, оценку, гипотезу ограничения, следующий шаг или подготовку к консультации.");
-  });
+  appRoot.querySelector("[data-ai]")?.addEventListener("click", openAiBossChat);
+}
+
+function openAiBossChat() {
+  const webApp = window.Telegram?.WebApp;
+  if (webApp?.close) {
+    webApp.close();
+    return;
+  }
+
+  window.alert("Открой этот кабинет внутри Telegram и нажми «Спросить AI-BOSS» — я верну тебя в чат, где можно задать вопрос по текущему экрану.");
 }
 
 function renderOption(value, label, selectedValue) {
