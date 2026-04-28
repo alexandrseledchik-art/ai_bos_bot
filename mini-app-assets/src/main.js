@@ -190,6 +190,10 @@ function renderDashboard() {
     0;
   const expressProgress = state.express.data?.progress?.percent ?? bootstrapExpressProgress;
   const companyName = state.bootstrap?.company?.name || "Компания";
+  const onboarding = state.bootstrap?.onboardingStatus ||
+    state.bootstrap?.dashboardSummary?.onboardingStatus ||
+    "draft";
+  const profileActionLabel = onboarding === "completed" ? "Обновить профиль" : "Заполнить профиль";
 
   return `
     <section class="hero">
@@ -197,7 +201,7 @@ function renderDashboard() {
       <h2>Кабинет управленческого кейса</h2>
       <p>${escapeHtml(companyName)}: здесь чат превращается в рабочий кейс. Мы фиксируем контекст, собираем сигналы, проверяем зрелость и выводим одну рабочую гипотезу ограничения.</p>
       <div class="actions">
-        <button class="primary-button" data-navigate="/mini-app/onboarding">Заполнить профиль</button>
+        <button class="primary-button" data-navigate="/mini-app/onboarding">${profileActionLabel}</button>
         <button class="secondary-button" data-navigate="/mini-app/diagnostics/express">Пройти диагностику</button>
         <button class="secondary-button" data-navigate="/mini-app/maturity">Открыть матрицу</button>
         <button class="secondary-button" data-navigate="/mini-app/constraint">Найти ограничение</button>
