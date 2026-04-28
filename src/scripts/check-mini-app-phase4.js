@@ -390,7 +390,7 @@ async function assertApiClient() {
     score: 2
   });
 
-  assert.equal(calls[0].path, "/api/mini-app/rpc?path=diagnostics%2Fprefill");
+  assert.equal(calls[0].path, "/api/mini-app/diagnostics/prefill");
   assert.equal(calls[0].method, "GET");
   assert.equal(calls[1].method, "POST");
   assert.equal(calls[1].body.action, "confirm");

@@ -589,8 +589,8 @@ async function assertApiClientDevOverrides() {
   await client.overrideNextStep({ title: "Manual step" });
 
   assert.deepEqual(calls.map((call) => call.path), [
-    "/api/mini-app/rpc?path=dev%2Fconstraint-override",
-    "/api/mini-app/rpc?path=dev%2Fnext-step-override"
+    "/api/mini-app/dev/constraint-override",
+    "/api/mini-app/dev/next-step-override"
   ]);
   assert.deepEqual(calls.map((call) => call.method), ["POST", "POST"]);
   assert.equal(calls.every((call) => call.initData === "signed-init-data"), true);

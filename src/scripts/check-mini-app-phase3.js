@@ -272,8 +272,8 @@ async function assertApiClient() {
   assert.deepEqual(calls.map((call) => call.path), [
     "/api/mini-app/onboarding",
     "/api/mini-app/onboarding",
-    "/api/mini-app/rpc?path=diagnostics%2Fexpress",
-    "/api/mini-app/rpc?path=diagnostics%2Fexpress%2Fanswer",
+    "/api/mini-app/diagnostics/express",
+    "/api/mini-app/diagnostics/express/answer",
     "/api/mini-app/maturity"
   ]);
   assert.equal(calls.every((call) => call.initData === "signed-init-data"), true);
