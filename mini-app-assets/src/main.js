@@ -78,8 +78,8 @@ function displayStatus(value) {
     confirmed: "подтверждено",
     corrected: "исправлено",
     rejected: "отклонено",
-    accepted: "в работе",
-    done: "готово",
+    accepted: "сохранён как следующий шаг",
+    done: "выполнено",
     skipped: "пропущено",
     link_added: "ссылка добавлена",
     analyzed: "проанализировано"
@@ -651,6 +651,7 @@ function renderNextStep() {
 
   const nextStep = block.data.nextStep;
   const constraint = block.data.constraintHypothesis || nextStep.constraintHypothesis;
+  const nextStepIsSaved = nextStep.status === "accepted";
 
   return `
     <section class="hero compact">
@@ -669,6 +670,9 @@ function renderNextStep() {
       <p>${escapeHtml(nextStep.description)}</p>
       <div class="divider"></div>
       <p><strong>Почему это первым:</strong> ${escapeHtml(nextStep.why_this_first || nextStep.whyThisFirst)}</p>
+      <p class="hint-text">${nextStepIsSaved
+        ? "Шаг сохранён в текущем кейсе и попадёт в резюме для разбора."
+        : "Сохранение фиксирует этот шаг в текущем кейсе и учитывает его в рекомендациях и резюме для разбора."}</p>
       ${constraint ? `
         <div class="status-row">
           <span class="pill">гипотеза: ${escapeHtml(constraint.layerTitle || constraint.title || "ограничение")}</span>
@@ -681,18 +685,9 @@ function renderNextStep() {
           type="button"
           data-next-step-action="accept"
           data-next-step-id="${escapeAttribute(nextStep.id)}"
-          ${block.actionSaving ? "disabled" : ""}
+          ${block.actionSaving || nextStepIsSaved ? "disabled" : ""}
         >
-          Беру в работу
-        </button>
-        <button
-          class="secondary-button"
-          type="button"
-          data-next-step-action="done"
-          data-next-step-id="${escapeAttribute(nextStep.id)}"
-          ${block.actionSaving ? "disabled" : ""}
-        >
-          Уже сделал
+          ${block.actionSaving === "accept" ? "Сохраняю..." : nextStepIsSaved ? "Шаг сохранён" : "Сохранить как следующий шаг"}
         </button>
         <button class="secondary-button" type="button" data-navigate="/mini-app/constraint">К гипотезе</button>
       </div>
