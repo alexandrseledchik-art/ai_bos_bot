@@ -706,9 +706,16 @@ function renderTools() {
 
     <section class="card next-card">
       <h3>Все инструменты</h3>
-      <div class="tool-grid">
-        ${tools.map((tool) => renderToolTeaser(tool, tool.recommendation)).join("")}
-      </div>
+      ${tools.length ? `
+        <div class="tool-grid">
+          ${tools.map((tool) => renderToolTeaser(tool, tool.recommendation)).join("")}
+        </div>
+      ` : `
+        <p>Каталог пока не загрузился. В MVP здесь должны быть 5 базовых инструментов: роли, целевой клиент, воронка, финансы и подготовка к продаже.</p>
+        <div class="actions">
+          <button class="secondary-button" data-tools-recalculate ${block.recommendedLoading ? "disabled" : ""}>Обновить каталог</button>
+        </div>
+      `}
     </section>
   `;
 }
@@ -749,14 +756,24 @@ function renderToolCard() {
         ${(tool.layerKeys || tool.layer_keys || []).map((layer) => `<span class="pill neutral">${escapeHtml(layer)}</span>`).join("")}
       </div>
       ${tool.recommendation ? `<p><strong>Почему рекомендован:</strong> ${escapeHtml(tool.recommendation.reason || "")}</p>` : ""}
+      ${tool.templateUrl ? `
+        <p><strong>Шаблон:</strong> можно открыть готовый внешний документ.</p>
+      ` : `
+        <p><strong>Шаблон:</strong> пока не подключён. Сейчас инструмент доступен как рекомендация и карточка; ссылку на готовый шаблон добавим в каталог отдельно.</p>
+      `}
       <div class="actions">
+        ${tool.templateUrl ? `
+          <a class="primary-button" href="${escapeAttribute(tool.templateUrl)}" target="_blank" rel="noopener noreferrer">Открыть шаблон</a>
+        ` : `
+          <button class="primary-button" type="button" disabled>Шаблон скоро будет доступен</button>
+        `}
         <button
-          class="primary-button"
+          class="secondary-button"
           type="button"
           data-tool-opened="${escapeAttribute(tool.id)}"
           ${opening ? "disabled" : ""}
         >
-          ${opening ? "Отмечаю..." : "Отметить как открытый"}
+          ${opening ? "Отмечаю..." : "Отметить как просмотренный"}
         </button>
         <button class="secondary-button" type="button" data-navigate="/mini-app/documents">Добавить заполненный документ</button>
         <button class="secondary-button" type="button" data-navigate="/mini-app/tools">К каталогу</button>
@@ -777,7 +794,7 @@ function renderToolTeaser(tool, recommendation = null) {
       <p>${escapeHtml(tool.short_description)}</p>
       ${recommendation?.reason ? `<small>${escapeHtml(recommendation.reason)}</small>` : ""}
       <div class="actions">
-        <button class="secondary-button compact-button" data-navigate="/mini-app/tools/${escapeAttribute(tool.slug)}">Открыть</button>
+        <button class="secondary-button compact-button" data-navigate="/mini-app/tools/${escapeAttribute(tool.slug)}">Посмотреть</button>
       </div>
     </article>
   `;

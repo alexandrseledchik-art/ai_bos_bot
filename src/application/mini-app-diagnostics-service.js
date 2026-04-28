@@ -1118,12 +1118,14 @@ export class MiniAppDiagnosticsService {
       ...row,
       layerKeys: row.layer_keys || [],
       problemTypes: row.problem_types || [],
+      templateUrl: row.template_url || "",
+      hasTemplate: Boolean(row.template_url),
       recommendation
     };
   }
 
   async getTools({ bootstrap }) {
-    await this.ensureMvpTools();
+    const seededTools = await this.ensureMvpTools();
     const tools = await this.findMany("tools", {
       is_active: "eq.true",
       order: "title.asc",
@@ -1135,9 +1137,10 @@ export class MiniAppDiagnosticsService {
       select: "*"
     });
     const recommendationByToolId = new Map((recommendations || []).filter((item) => item.tool_id).map((item) => [item.tool_id, item]));
+    const catalog = tools?.length ? tools : seededTools;
 
     return {
-      tools: (tools || []).map((tool) => this.decorateTool(tool, recommendationByToolId.get(tool.id) || null))
+      tools: (catalog || []).map((tool) => this.decorateTool(tool, recommendationByToolId.get(tool.id) || null))
     };
   }
 
