@@ -782,8 +782,6 @@ function renderToolCard() {
     return renderErrorCard("Инструмент не найден в каталоге.", "К каталогу", "/mini-app/tools");
   }
 
-  const opening = block.openingToolId === tool.id;
-
   return `
     <section class="hero compact">
       <p>Инструмент</p>
@@ -811,16 +809,7 @@ function renderToolCard() {
         ` : `
           <button class="primary-button" type="button" disabled>Шаблон скоро будет доступен</button>
         `}
-        <button
-          class="secondary-button"
-          type="button"
-          data-tool-opened="${escapeAttribute(tool.id)}"
-          ${opening ? "disabled" : ""}
-        >
-          ${opening ? "Отмечаю..." : "Отметить как просмотренный"}
-        </button>
         <button class="secondary-button" type="button" data-navigate="/mini-app/documents">Добавить заполненный документ</button>
-        <button class="secondary-button" type="button" data-navigate="/mini-app/tools">К каталогу</button>
       </div>
     </section>
   `;
@@ -1254,10 +1243,6 @@ function bindEvents() {
 
   appRoot.querySelectorAll("[data-next-step-action]").forEach((button) => {
     button.addEventListener("click", () => updateNextStep(button.dataset.nextStepId, button.dataset.nextStepAction));
-  });
-
-  appRoot.querySelectorAll("[data-tool-opened]").forEach((button) => {
-    button.addEventListener("click", () => markToolOpened(button.dataset.toolOpened));
   });
 
   appRoot.querySelector("[data-tools-recalculate]")?.addEventListener("click", recalculateTools);
