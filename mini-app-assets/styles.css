@@ -664,6 +664,21 @@ a {
     line-height: 1.15;
     text-align: center;
   }
+
+  .floating-ai {
+    right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+
+  .floating-ai-full {
+    display: none;
+  }
+
+  .floating-ai-short {
+    display: inline;
+  }
 }
 
 .status-row {
@@ -775,6 +790,10 @@ a {
   color: #ffffff;
   font-weight: 800;
   box-shadow: 0 18px 46px rgba(0, 79, 85, 0.24);
+}
+
+.floating-ai-short {
+  display: none;
 }
 
 .loading-screen,

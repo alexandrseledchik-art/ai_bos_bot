@@ -1208,7 +1208,10 @@ function render() {
 
       <div class="footer-space"></div>
     </main>
-    <button class="floating-ai" type="button" data-ai>Спросить AI-BOSS</button>
+    <button class="floating-ai" type="button" data-ai aria-label="Спросить AI-BOSS">
+      <span class="floating-ai-full">Спросить AI-BOSS</span>
+      <span class="floating-ai-short">AI-BOSS</span>
+    </button>
   `;
 
   bindEvents();
