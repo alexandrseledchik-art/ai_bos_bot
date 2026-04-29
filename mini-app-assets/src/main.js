@@ -884,11 +884,16 @@ function renderConstraintSelectionExplanation(hypothesis = {}, reasoning = {}) {
     ? primary.rankingReasons
     : hypothesis.rankingReasons || [];
   const alternatives = (reasoning?.alternatives || hypothesis.alternatives || []).slice(0, 3);
+  const selectedLayerTitle = primary.layerTitle || hypothesis.layerTitle || hypothesis.title || "эта область";
+  const readableReasons = rankingReasons.length
+    ? rankingReasons.map(formatConstraintRankingReason)
+    : [`Сейчас ${selectedLayerTitle} лучше других связывает текущий запрос, оценку области и возможное влияние на остальные изменения.`];
 
   return `
     <section class="card next-card">
-      <h3>Почему выбрана именно эта гипотеза</h3>
-      <p>Выбрана не просто самая низкая оценка. Мы смотрим, какая область лучше всего объясняет текущую ситуацию: насколько она просела, связана ли с твоим запросом и есть ли подтверждения в диалоге.</p>
+      <h3>Почему начинаем с этой гипотезы</h3>
+      <p>Сейчас есть предположение: область «${escapeHtml(selectedLayerTitle)}» сильнее всего влияет на текущую ситуацию. Если причина действительно здесь, работа с ней может помочь не только с этим запросом, но и с другими связанными изменениями.</p>
+      <p>Почему так думаем: смотрим не на одну цифру, а на три вещи — оценку области, связь с твоим запросом и сигналы из диалога.</p>
       <div class="selection-breakdown">
         <div>
           <span>Оценка области</span>
@@ -903,8 +908,9 @@ function renderConstraintSelectionExplanation(hypothesis = {}, reasoning = {}) {
           <strong>${escapeHtml(formatObservationCount(primary.observationCount))}</strong>
         </div>
       </div>
+      ${Number(primary.observationCount || 0) ? "" : `<p class="hint-text">Сигналов из диалога пока мало. Значит, гипотезу стоит подтвердить следующим вопросом или короткой проверкой, а не принимать как готовый вывод.</p>`}
       <ul class="plain-list">
-        ${(rankingReasons.length ? rankingReasons : ["Эта версия сейчас лучше других связывает текущий запрос, оценку области и возможное влияние на остальные части бизнеса."]).map((reason) => `
+        ${readableReasons.map((reason) => `
           <li>${escapeHtml(reason)}</li>
         `).join("")}
       </ul>
@@ -921,6 +927,29 @@ function renderConstraintSelectionExplanation(hypothesis = {}, reasoning = {}) {
       ` : ""}
     </section>
   `;
+}
+
+function formatConstraintRankingReason(reason = "") {
+  const text = String(reason || "").trim();
+  const maturity = text.match(/низкая оценка зрелости:\s*([0-9.]+\/5)/i);
+  if (maturity) {
+    return `Область оценена низко: ${maturity[1]}. Это может быть реальным тормозом, но всё равно требует проверки фактами.`;
+  }
+
+  if (/слой связан с текущим запросом/i.test(text)) {
+    return "Есть связь с твоим текущим запросом: эта область может объяснять, почему ситуация не двигается так, как нужно.";
+  }
+
+  const observations = text.match(/есть сигналы из диалога:\s*(\d+)/i);
+  if (observations) {
+    return `В диалоге уже есть сигналы в эту сторону: ${observations[1]}. Это усиливает гипотезу.`;
+  }
+
+  if (/верхний|проходной слой/i.test(text)) {
+    return "Если начать здесь, изменения могут повлиять и на другие области, которые зависят от этой части бизнеса.";
+  }
+
+  return text || "Эта причина требует дополнительной проверки фактами.";
 }
 
 function renderConstraintGrowthMap(maturity = {}, hypothesis = {}) {

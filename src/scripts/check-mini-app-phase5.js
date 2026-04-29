@@ -346,7 +346,8 @@ function assertFrontendAndRoutes() {
   assert.match(mainJs, /renderConstraint/);
   assert.match(mainJs, /renderNextStep/);
   assert.match(mainJs, /Что показала диагностика/);
-  assert.match(mainJs, /Почему выбрана именно эта гипотеза/);
+  assert.match(mainJs, /Почему начинаем с этой гипотезы/);
+  assert.match(mainJs, /Сейчас есть предположение/);
   assert.match(mainJs, /Точки роста по областям/);
   assert.match(mainJs, /Что проверяем первым/);
   assert.match(mainJs, /сила версии/);
