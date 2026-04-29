@@ -839,6 +839,11 @@ a {
   color: var(--panel-strong);
 }
 
+.pill.success {
+  background: #e4f7ea;
+  color: #176b36;
+}
+
 .primary-button,
 .secondary-button,
 .ghost-button {
