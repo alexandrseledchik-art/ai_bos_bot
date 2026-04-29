@@ -297,7 +297,7 @@ function assertFrontendShell() {
   assert.match(mainJs, /Срез зрелости по областям/);
   assert.match(mainJs, /оценено областей/);
   assert.match(mainJs, /Что видно по срезу/);
-  assert.match(mainJs, /Это не итог диагностики/);
+  assert.match(mainJs, /Это быстрый срез по оцененным областям/);
   assert.match(mainJs, /formatDiagnosticCoverage/);
   assert.match(mainJs, /renderDiagnosticProgress/);
   assert.match(mainJs, /Заполнение диагностики/);
