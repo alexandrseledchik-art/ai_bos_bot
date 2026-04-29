@@ -1,3 +1,8 @@
+import {
+  buildAccessDeniedReply,
+  buildAccessRequestAdminMessage
+} from "../../application/access-control-service.js";
+import { handleAccessAdminCommand, looksLikeAdminCommand } from "../../application/access-admin-commands.js";
 import { extractTelegramMessagePayload, TelegramApiClient } from "./telegram-api.js";
 import { buildMiniAppReplyMarkup } from "./mini-app-webapp.js";
 import { buildVoiceCapabilityReply, isVoiceCapabilityQuestion } from "./telegram-meta.js";
@@ -8,7 +13,15 @@ function delay(ms) {
 }
 
 export class TelegramBotRunner {
-  constructor({ token, apiBaseUrl, pollingTimeoutSeconds = 20, audioTranscriber = null, appBaseUrl = "" }) {
+  constructor({
+    token,
+    apiBaseUrl,
+    pollingTimeoutSeconds = 20,
+    audioTranscriber = null,
+    appBaseUrl = "",
+    accessControl = null,
+    accessRequestNotifyChatId = ""
+  }) {
     this.api = new TelegramApiClient({
       token,
       apiBaseUrl
@@ -17,6 +30,8 @@ export class TelegramBotRunner {
     this.offset = 0;
     this.audioTranscriber = audioTranscriber;
     this.appBaseUrl = appBaseUrl;
+    this.accessControl = accessControl;
+    this.accessRequestNotifyChatId = accessRequestNotifyChatId;
   }
 
   async getUpdates() {
@@ -42,6 +57,38 @@ export class TelegramBotRunner {
 
           if (!payload) {
             continue;
+          }
+
+          if (payload.kind === "text" && looksLikeAdminCommand(payload.text)) {
+            const reply = await handleAccessAdminCommand({
+              text: payload.text,
+              fromTelegramUserId: payload.userMeta?.telegramUserId || payload.userMeta?.id || payload.chatId,
+              accessControl: this.accessControl
+            });
+            await this.sendMessage(payload.chatId, reply);
+            continue;
+          }
+
+          if (this.accessControl) {
+            const accessDecision = await this.accessControl.checkTelegramAccess({
+              telegramUser: {
+                ...payload.userMeta,
+                id: payload.userMeta?.telegramUserId || payload.userMeta?.id || payload.chatId
+              }
+            });
+
+            if (!accessDecision.allowed) {
+              await this.sendMessage(payload.chatId, buildAccessDeniedReply(accessDecision));
+
+              if (accessDecision.shouldNotifyAdmin && this.accessRequestNotifyChatId) {
+                await this.sendMessage(
+                  this.accessRequestNotifyChatId,
+                  buildAccessRequestAdminMessage(accessDecision)
+                );
+              }
+
+              continue;
+            }
           }
 
           const stopTyping = this.api.startTyping(payload.chatId);

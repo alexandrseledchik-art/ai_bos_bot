@@ -1,3 +1,4 @@
+import { AccessControlService, buildAccessDeniedReply } from "./access-control-service.js";
 import { MiniAppBootstrapService } from "./mini-app-bootstrap-service.js";
 import { loadConfig } from "../config.js";
 import { MiniAppCompatSyncClient } from "../infrastructure/storage/mini-app-compat-sync.js";
@@ -66,6 +67,20 @@ export async function createMiniAppContext(request) {
     serviceRoleKey: config.supabaseServiceRoleKey
   });
 
+  const accessControl = new AccessControlService({
+    syncClient: config.accessControlEnabled ? syncClient : null,
+    mode: config.accessControlMode,
+    adminTelegramUserIds: config.adminTelegramUserIds
+  });
+  const accessDecision = await accessControl.checkTelegramAccess({ telegramUser: verification.user });
+
+  if (!accessDecision.allowed) {
+    const error = new Error(buildAccessDeniedReply(accessDecision));
+    error.status = 403;
+    error.accessStatus = accessDecision.status;
+    throw error;
+  }
+
   const bootstrapService = new MiniAppBootstrapService({ syncClient });
   const bootstrap = await bootstrapService.bootstrap({ telegramUser: verification.user });
 
@@ -73,7 +88,8 @@ export async function createMiniAppContext(request) {
     config,
     syncClient,
     telegramUser: verification.user,
-    bootstrap
+    bootstrap,
+    accessDecision
   };
 }
 
@@ -87,12 +103,13 @@ export async function handleMiniAppRoute(request, allowedMethods, handler) {
     return await handler(context);
   } catch (error) {
     const message = normalizeErrorMessage(error, "Mini App request failed.");
-    const status = /initData|Telegram WebApp|hash|auth_date/i.test(message) ? 401 : 500;
+    const status = error.status || (/initData|Telegram WebApp|hash|auth_date/i.test(message) ? 401 : 500);
 
     return jsonResponse(
       {
         ok: false,
-        error: message
+        error: message,
+        ...(error.accessStatus ? { accessStatus: error.accessStatus } : {})
       },
       { status }
     );

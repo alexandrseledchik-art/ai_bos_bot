@@ -73,6 +73,15 @@ export function loadConfig() {
   const dataRoot = resolveDataRoot(cwd);
   const serverlessRuntime = isServerlessRuntime();
   const hasSupabaseConfig = Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const adminTelegramUserIds = (process.env.ADMIN_TELEGRAM_USER_IDS || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const accessControlMode = process.env.ACCESS_CONTROL_MODE || "open";
+  const accessRequestNotifyChatId = process.env.ACCESS_REQUEST_NOTIFY_CHAT_ID || "";
+  const accessControlEnabled = accessControlMode === "approval" ||
+    adminTelegramUserIds.length > 0 ||
+    Boolean(accessRequestNotifyChatId);
   const memoryBackend = process.env.MEMORY_BACKEND ||
     (serverlessRuntime && hasSupabaseConfig ? "supabase" : "file");
   const supabaseStateMode = process.env.SUPABASE_STATE_MODE ||
@@ -87,6 +96,10 @@ export function loadConfig() {
     telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET || "",
     telegramWebAppAuthMaxAgeSeconds: Number(process.env.TELEGRAM_WEBAPP_AUTH_MAX_AGE_SECONDS || 86400),
     telegramApiBaseUrl: process.env.TELEGRAM_API_BASE_URL || "https://api.telegram.org",
+    accessControlEnabled,
+    accessControlMode,
+    adminTelegramUserIds,
+    accessRequestNotifyChatId,
     appBaseUrl: process.env.APP_BASE_URL || "",
     alexanderBookingUrl: process.env.ALEXANDER_BOOKING_URL || "",
     miniAppAlphaMode: process.env.MINI_APP_ALPHA_MODE === "true",

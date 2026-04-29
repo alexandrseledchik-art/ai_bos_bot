@@ -76,7 +76,7 @@ export class MiniAppBootstrapService {
 
   async resolveAppUser(user) {
     return this.upsertOne(
-      "users",
+      "app_users",
       {
         telegram_user_id: user.id,
         username: user.username || null,
@@ -121,11 +121,17 @@ export class MiniAppBootstrapService {
   }
 
   async ensureWorkspaceMembership({ workspace, appUser }) {
-    return {
-      workspace_id: workspace.id,
-      app_user_id: appUser.id,
-      role: "owner"
-    };
+    return this.upsertOne(
+      "workspace_app_members",
+      {
+        workspace_id: workspace.id,
+        app_user_id: appUser.id,
+        role: "owner"
+      },
+      {
+        onConflict: "workspace_id,app_user_id"
+      }
+    );
   }
 
   async resolveCompany({ workspace, user }) {

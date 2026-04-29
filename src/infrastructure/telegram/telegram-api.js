@@ -1,8 +1,12 @@
 function buildUserMeta(message) {
   return {
+    id: message.from?.id || message.chat?.id || "",
+    telegramUserId: message.from?.id || message.chat?.id || "",
     username: message.from?.username || "",
     chatTitle: message.chat.title || message.chat.username || "",
-    firstName: message.from?.first_name || ""
+    firstName: message.from?.first_name || "",
+    lastName: message.from?.last_name || "",
+    languageCode: message.from?.language_code || ""
   };
 }
 

@@ -1,4 +1,9 @@
 import { getServices } from "../src/create-services.js";
+import {
+  buildAccessDeniedReply,
+  buildAccessRequestAdminMessage
+} from "../src/application/access-control-service.js";
+import { handleAccessAdminCommand, looksLikeAdminCommand } from "../src/application/access-admin-commands.js";
 import { extractTelegramMessagePayload } from "../src/infrastructure/telegram/telegram-api.js";
 import { buildMiniAppReplyMarkup } from "../src/infrastructure/telegram/mini-app-webapp.js";
 import { buildVoiceCapabilityReply, isVoiceCapabilityQuestion } from "../src/infrastructure/telegram/telegram-meta.js";
@@ -22,7 +27,7 @@ function validateWebhookSecret(request, expectedSecret) {
 }
 
 async function handleTelegramWebhook(request) {
-  const { config, conversationService, telegramApi, audioTranscriber } = getServices();
+  const { config, conversationService, telegramApi, audioTranscriber, accessControl } = getServices();
 
   if (!config.telegramToken) {
     return json({ ok: false, error: "TELEGRAM_BOT_TOKEN is missing" }, { status: 500 });
@@ -37,6 +42,36 @@ async function handleTelegramWebhook(request) {
 
   if (!payload) {
     return json({ ok: true, ignored: true });
+  }
+
+  if (payload.kind === "text" && looksLikeAdminCommand(payload.text)) {
+    const reply = await handleAccessAdminCommand({
+      text: payload.text,
+      fromTelegramUserId: payload.userMeta?.telegramUserId || payload.userMeta?.id || payload.chatId,
+      accessControl
+    });
+    await telegramApi.sendMessage(payload.chatId, reply);
+    return json({ ok: true, handled: "access-admin-command" });
+  }
+
+  const accessDecision = await accessControl.checkTelegramAccess({
+    telegramUser: {
+      ...payload.userMeta,
+      id: payload.userMeta?.telegramUserId || payload.userMeta?.id || payload.chatId
+    }
+  });
+
+  if (!accessDecision.allowed) {
+    await telegramApi.sendMessage(payload.chatId, buildAccessDeniedReply(accessDecision));
+
+    if (accessDecision.shouldNotifyAdmin && config.accessRequestNotifyChatId) {
+      await telegramApi.sendMessage(
+        config.accessRequestNotifyChatId,
+        buildAccessRequestAdminMessage(accessDecision)
+      );
+    }
+
+    return json({ ok: true, handled: "access-denied", accessStatus: accessDecision.status });
   }
 
   const stopTyping = telegramApi.startTyping(payload.chatId);
