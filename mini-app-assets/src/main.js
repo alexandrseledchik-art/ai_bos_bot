@@ -220,11 +220,12 @@ function renderDashboard() {
       <section class="card">
         <h3>Экспресс-диагностика</h3>
         <p>Это не анкета ради оценки. Экспресс нужен, чтобы быстро увидеть, где бизнес теряет результат, и не перепутать слабую область с главным ограничением.</p>
-        <div class="progress">
-          <div class="progress-bar"><span style="width: ${expressPercent}%"></span></div>
-          <strong>${escapeHtml(formatDiagnosticCoverage(expressAnsweredCount, expressTotalCount))}</strong>
-        </div>
-        <p class="progress-caption">Показано, сколько областей уже оценено. Это не итоговая оценка бизнеса.</p>
+        ${renderDiagnosticProgress({
+          answeredCount: expressAnsweredCount,
+          totalCount: expressTotalCount,
+          percent: expressPercent,
+          caption: "Шкала показывает, сколько областей уже оценено. Это не итоговая оценка бизнеса."
+        })}
         <div class="actions">
           <button class="secondary-button compact-button" data-navigate="/mini-app/next-step">Следующий шаг</button>
         </div>
@@ -388,11 +389,13 @@ function renderExpressDiagnostics() {
       <p>Экспресс-диагностика</p>
       <h2>Соберём быстрый срез бизнеса</h2>
       <p>Выбирай описание, которое ближе всего к текущей реальности. Это не экзамен: ответы нужны, чтобы отличить симптом от причины и понять, куда копать первым.</p>
-      <div class="progress hero-progress">
-        <div class="progress-bar"><span style="width: ${percent}%"></span></div>
-        <strong>${escapeHtml(formatDiagnosticCoverage(answeredCount, totalCount))}</strong>
-      </div>
-      <p class="progress-caption">Это прогресс заполнения: сколько областей уже оценено. Это не итоговая оценка бизнеса.</p>
+      ${renderDiagnosticProgress({
+        answeredCount,
+        totalCount,
+        percent,
+        className: "hero-progress",
+        caption: "Шкала показывает прогресс заполнения: сколько областей уже оценено. Это не итоговая оценка бизнеса."
+      })}
     </section>
 
     <div class="diagnostic-list">
@@ -469,6 +472,24 @@ function formatDiagnosticCoverage(answeredCount, totalCount) {
 
   const safeAnswered = Number.isFinite(answeredCount) ? Math.max(0, Math.min(answeredCount, totalCount)) : 0;
   return `${safeAnswered}/${totalCount}`;
+}
+
+function renderDiagnosticProgress({ answeredCount, totalCount, percent, className = "", caption = "" }) {
+  const coverage = formatDiagnosticCoverage(answeredCount, totalCount);
+  const safePercent = Number.isFinite(Number(percent)) ? Math.max(0, Math.min(100, Number(percent))) : 0;
+
+  return `
+    <div class="progress-block ${escapeAttribute(className)}">
+      <div class="progress-label">
+        <span>Заполнение диагностики</span>
+        <strong>Оценено ${escapeHtml(coverage)} областей</strong>
+      </div>
+      <div class="progress progress-single" aria-label="Заполнение диагностики: оценено ${escapeAttribute(coverage)} областей">
+        <div class="progress-bar"><span style="width: ${safePercent}%"></span></div>
+      </div>
+      ${caption ? `<p class="progress-caption">${escapeHtml(caption)}</p>` : ""}
+    </div>
+  `;
 }
 
 function renderSuggestionCard(layer, suggestion) {

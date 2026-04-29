@@ -299,10 +299,13 @@ function assertFrontendShell() {
   assert.match(mainJs, /Что видно по срезу/);
   assert.match(mainJs, /Это не итог диагностики/);
   assert.match(mainJs, /formatDiagnosticCoverage/);
-  assert.match(mainJs, /Это прогресс заполнения/);
+  assert.match(mainJs, /renderDiagnosticProgress/);
+  assert.match(mainJs, /Заполнение диагностики/);
+  assert.match(mainJs, /Оценено/);
   assert.match(mainJs, /Текущий выбор/);
   assert.match(mainJs, /Как пользоваться Кабинетом/);
   assert.match(styles, /\.level-option/);
+  assert.match(styles, /\.progress-label/);
   assert.match(styles, /\.progress-caption/);
   assert.match(styles, /\.level-option em/);
   assert.match(styles, /\.maturity-row/);

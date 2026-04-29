@@ -332,8 +332,34 @@ a {
   margin-top: 16px;
 }
 
+.progress-block {
+  margin-top: 18px;
+}
+
 .hero-progress {
   max-width: 520px;
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.progress-label strong {
+  color: var(--ink);
+  font-size: 15px;
+  text-align: right;
+}
+
+.progress-single {
+  grid-template-columns: 1fr;
+  margin-top: 0;
 }
 
 .progress-caption {
