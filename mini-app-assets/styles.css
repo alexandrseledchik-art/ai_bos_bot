@@ -425,6 +425,11 @@ a {
   color: var(--good);
 }
 
+.score-badge.saving {
+  background: var(--accent-soft);
+  color: var(--warning);
+}
+
 .diagnostic-question {
   font-style: italic;
 }

@@ -420,6 +420,7 @@ function renderExpressDiagnostics() {
 
 function renderLayerCard(layer, answer, suggestion) {
   const hasAnswer = Number.isFinite(Number(answer?.score));
+  const isSavingAnswer = answer?.status === "saving";
   return `
     <section class="card layer-card" id="layer-${escapeAttribute(layer.key)}">
       <div class="layer-head">
@@ -427,14 +428,16 @@ function renderLayerCard(layer, answer, suggestion) {
           <p class="eyebrow">Класс ${escapeHtml(layer.classKey)}</p>
           <h3>${escapeHtml(layer.title)}</h3>
         </div>
-        <span class="score-badge ${answer?.score ? "filled" : ""}">
-          ${answer?.score ? `${answer.score}/5` : "не оценено"}
+        <span class="score-badge ${answer?.score ? "filled" : ""} ${isSavingAnswer ? "saving" : ""}">
+          ${answer?.score ? `${answer.score}/5${isSavingAnswer ? " · сохраняю" : ""}` : "не оценено"}
         </span>
       </div>
       <p>${escapeHtml(layer.shortDescription)}</p>
       <p class="diagnostic-question">${escapeHtml(layer.diagnosticQuestion)}</p>
       <p class="hint-text">${hasAnswer
-        ? `Сейчас выбрано ${Number(answer.score)}/5. Чтобы изменить оценку, нажми другой вариант ниже.`
+        ? isSavingAnswer
+          ? `Выбор ${Number(answer.score)}/5 уже отмечен. Сохраняю его в кейсе.`
+          : `Сейчас выбрано ${Number(answer.score)}/5. Чтобы изменить оценку, нажми другой вариант ниже.`
         : "Выбери один вариант. Если передумаешь, позже можно нажать другой уровень и заменить оценку."
       }</p>
       ${!answer && suggestion ? renderSuggestionCard(layer, suggestion) : ""}
@@ -1772,14 +1775,101 @@ async function saveLayerScore(layerKey, score) {
   return saveExpressAnswer(layerKey, score);
 }
 
+function decorateSavedExpressAnswer(answer) {
+  return {
+    id: answer.id,
+    layerKey: answer.subject_key,
+    score: answer.score,
+    selectedDescription: answer.selected_description,
+    source: answer.source,
+    status: answer.status,
+    confidence: answer.confidence
+  };
+}
+
+function calculateOptimisticProgress(answers = {}, fallbackProgress = {}) {
+  const totalCount = Number(fallbackProgress.totalCount || state.express.data?.layers?.length || 11);
+  const answeredCount = Object.values(answers)
+    .filter((answer) => Number.isFinite(Number(answer?.score)) && answer.status !== "rejected")
+    .length;
+
+  return {
+    answeredCount,
+    totalCount,
+    percent: totalCount > 0 ? Math.round((answeredCount / totalCount) * 100) : 0
+  };
+}
+
+function applyOptimisticExpressAnswer(layer, score) {
+  const answers = {
+    ...(state.express.data?.answers || {}),
+    [layer.key]: {
+      ...(state.express.data?.answers?.[layer.key] || {}),
+      id: state.express.data?.answers?.[layer.key]?.id || `optimistic-${layer.key}`,
+      layerKey: layer.key,
+      score,
+      selectedDescription: layer.levels?.[Number(score) - 1] || "",
+      source: "user_explicit",
+      status: "saving",
+      confidence: 1
+    }
+  };
+
+  state.express.data = {
+    ...state.express.data,
+    answers,
+    progress: calculateOptimisticProgress(answers, state.express.data?.progress)
+  };
+}
+
+function rollbackOptimisticExpressAnswer(layerKey, previousAnswer) {
+  const answers = { ...(state.express.data?.answers || {}) };
+  if (previousAnswer) {
+    answers[layerKey] = previousAnswer;
+  } else {
+    delete answers[layerKey];
+  }
+
+  state.express.data = {
+    ...state.express.data,
+    answers,
+    progress: calculateOptimisticProgress(answers, state.express.data?.progress)
+  };
+}
+
+function removePrefillSuggestion(layerKey) {
+  const prefillByLayer = { ...(state.express.data?.prefillByLayer || {}) };
+  delete prefillByLayer[layerKey];
+  state.express.data = {
+    ...state.express.data,
+    prefillByLayer
+  };
+}
+
+function restorePrefillSuggestion(layerKey, suggestion) {
+  if (!suggestion) {
+    return;
+  }
+
+  state.express.data = {
+    ...state.express.data,
+    prefillByLayer: {
+      ...(state.express.data?.prefillByLayer || {}),
+      [layerKey]: suggestion
+    }
+  };
+}
+
 async function saveExpressAnswer(layerKey, score) {
   const layer = state.express.data?.layers?.find((item) => item.key === layerKey);
   if (!layer) {
     return;
   }
 
+  const previousAnswer = state.express.data?.answers?.[layerKey] || null;
   state.express.savingLayerKey = layerKey;
   state.express.error = "";
+  applyOptimisticExpressAnswer(layer, score);
   render();
 
   try {
@@ -1800,19 +1890,12 @@ async function saveExpressAnswer(layerKey, score) {
       },
       answers: {
         ...(state.express.data.answers || {}),
-        [result.answer.subject_key]: {
-          id: result.answer.id,
-          layerKey: result.answer.subject_key,
-          score: result.answer.score,
-          selectedDescription: result.answer.selected_description,
-          source: result.answer.source,
-          status: result.answer.status,
-          confidence: result.answer.confidence
-        }
+        [result.answer.subject_key]: decorateSavedExpressAnswer(result.answer)
       }
     };
     state.maturity.data = null;
   } catch (error) {
+    rollbackOptimisticExpressAnswer(layerKey, previousAnswer);
     state.express.error = errorMessage(error, "Не удалось сохранить ответ.");
   } finally {
     state.express.savingLayerKey = "";
@@ -1829,8 +1912,15 @@ async function applyPrefillAction(layerKey, action, correctedScore = null) {
   }
 
   const score = action === "correct" ? correctedScore : suggestion.score;
+  const previousAnswer = state.express.data?.answers?.[layerKey] || null;
+  const previousSuggestion = suggestion;
   state.express.savingLayerKey = layerKey;
   state.express.error = "";
+  if (action === "confirm" || action === "correct") {
+    applyOptimisticExpressAnswer(layer, score);
+  } else if (action === "reject") {
+    removePrefillSuggestion(layerKey);
+  }
   render();
 
   try {
@@ -1847,15 +1937,7 @@ async function applyPrefillAction(layerKey, action, correctedScore = null) {
 
     const nextAnswers = { ...(state.express.data.answers || {}) };
     if (action === "confirm" || action === "correct") {
-      nextAnswers[result.answer.subject_key] = {
-        id: result.answer.id,
-        layerKey: result.answer.subject_key,
-        score: result.answer.score,
-        selectedDescription: result.answer.selected_description,
-        source: result.answer.source,
-        status: result.answer.status,
-        confidence: result.answer.confidence
-      };
+      nextAnswers[result.answer.subject_key] = decorateSavedExpressAnswer(result.answer);
     }
 
     state.express.data = {
@@ -1872,6 +1954,11 @@ async function applyPrefillAction(layerKey, action, correctedScore = null) {
     };
     state.maturity.data = null;
   } catch (error) {
+    if (action === "confirm" || action === "correct") {
+      rollbackOptimisticExpressAnswer(layerKey, previousAnswer);
+    } else if (action === "reject") {
+      restorePrefillSuggestion(layerKey, previousSuggestion);
+    }
     state.express.error = errorMessage(error, "Не удалось применить предположение.");
   } finally {
     state.express.savingLayerKey = "";
