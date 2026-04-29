@@ -722,12 +722,6 @@ function renderConstraint() {
   const isLowConfidence = Number(hypothesis.confidence || 0) < 0.55;
   const constraintMeaning = getConstraintMeaning(hypothesis);
   const strengthMeaning = getHypothesisStrengthMeaning(hypothesis.confidence);
-  const statusText = hypothesis.status === "confirmed"
-    ? "подтверждено пользователем"
-    : hypothesis.status === "rejected"
-      ? "отклонено"
-      : "гипотеза";
-
   return `
     ${renderConstraintDiagnosticSummary(block.data.maturity, hypothesis)}
 
@@ -736,9 +730,7 @@ function renderConstraint() {
       <h2>${escapeHtml(hypothesis.layerTitle || hypothesis.title)}</h2>
       <p>Это не финальный диагноз. Система выбирает область, которая лучше всего объясняет текущий запрос, и показывает, что проверить дальше фактами.</p>
       <div class="status-row">
-        <span class="pill">статус: ${escapeHtml(statusText)}</span>
         <span class="pill neutral">сила версии: ${confidence}%</span>
-        <span class="pill neutral">класс ${escapeHtml(hypothesis.classKey || "")}</span>
       </div>
     </section>
 
