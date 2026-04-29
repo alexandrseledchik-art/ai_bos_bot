@@ -583,6 +583,81 @@ a {
   display: block;
 }
 
+.selection-breakdown {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.selection-breakdown div,
+.comparison-list article,
+.growth-row {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.selection-breakdown div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+}
+
+.selection-breakdown span,
+.comparison-list span,
+.growth-row span {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.selection-breakdown strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.comparison-list,
+.growth-list {
+  display: grid;
+  gap: 10px;
+}
+
+.comparison-list {
+  margin-top: 4px;
+}
+
+.comparison-list > strong {
+  color: var(--ink);
+}
+
+.comparison-list article {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.comparison-list b,
+.growth-row strong,
+.growth-row b {
+  color: var(--ink);
+}
+
+.growth-list {
+  margin-top: 10px;
+}
+
+.growth-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) auto minmax(180px, 1.2fr);
+  gap: 12px;
+  align-items: start;
+  padding: 13px;
+}
+
+.growth-row.selected {
+  border-color: rgba(0, 79, 85, 0.42);
+  background: rgba(0, 79, 85, 0.06);
+}
+
 .tool-grid,
 .document-list {
   display: grid;
@@ -688,6 +763,11 @@ a {
 }
 
 @media (max-width: 620px) {
+  .selection-breakdown,
+  .growth-row {
+    grid-template-columns: 1fr;
+  }
+
   .maturity-row {
     grid-template-columns: 1fr;
   }

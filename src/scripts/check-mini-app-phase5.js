@@ -345,12 +345,17 @@ function assertFrontendAndRoutes() {
 
   assert.match(mainJs, /renderConstraint/);
   assert.match(mainJs, /renderNextStep/);
+  assert.match(mainJs, /Общий вывод по диагностике/);
+  assert.match(mainJs, /Почему выбрана именно эта гипотеза/);
+  assert.match(mainJs, /Точки роста по областям/);
   assert.match(mainJs, /сила версии/);
   assert.match(mainJs, /Что проверяем/);
   assert.match(mainJs, /Зачем это знать/);
   assert.match(mainJs, /data-constraint-action/);
   assert.match(mainJs, /data-next-step-action/);
   assert.match(styles, /\.insight-card/);
+  assert.match(styles, /\.selection-breakdown/);
+  assert.match(styles, /\.growth-row/);
   assert.match(apiClient, /reasonConstraint/);
   assert.match(apiClient, /getNextStep/);
   assert.match(miniAppApi, /reasonConstraint/);

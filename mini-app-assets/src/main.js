@@ -748,8 +748,10 @@ function renderConstraint() {
       : "гипотеза";
 
   return `
+    ${renderConstraintDiagnosticSummary(block.data.maturity, hypothesis)}
+
     <section class="hero compact">
-      <p>Гипотеза ограничения</p>
+      <p>Главное ограничение</p>
       <h2>${escapeHtml(hypothesis.layerTitle || hypothesis.title)}</h2>
       <p>Это не финальный диагноз. Система выбирает область, которая лучше всего объясняет текущий запрос, и показывает, что проверить дальше фактами.</p>
       <div class="status-row">
@@ -758,6 +760,9 @@ function renderConstraint() {
         <span class="pill neutral">класс ${escapeHtml(hypothesis.classKey || "")}</span>
       </div>
     </section>
+
+    ${renderConstraintSelectionExplanation(hypothesis, block.data.reasoning)}
+    ${renderConstraintGrowthMap(block.data.maturity, hypothesis)}
 
     <section class="card insight-card">
       <p class="eyebrow">Рабочая версия</p>
@@ -831,6 +836,201 @@ function renderConstraint() {
       ${renderAlternativeList(hypothesis.alternatives)}
     </section>
   `;
+}
+
+function renderConstraintDiagnosticSummary(maturity = {}, hypothesis = {}) {
+  const scores = getAnsweredMaturityScores(maturity);
+  const average = Number(maturity?.averageScore);
+  const weak = scores
+    .filter((item) => item.numericScore <= 2)
+    .sort((a, b) => a.numericScore - b.numericScore)
+    .slice(0, 4);
+  const strong = scores
+    .filter((item) => item.numericScore >= 4)
+    .sort((a, b) => b.numericScore - a.numericScore)
+    .slice(0, 4);
+  const selectedScore = scores.find((item) => item.layerKey === (hypothesis.layerKey || hypothesis.layer));
+
+  return `
+    <section class="card next-card">
+      <h3>Общий вывод по диагностике</h3>
+      <p>${escapeHtml(getMaturityAverageInsight(average, scores.length))}</p>
+      <ul class="plain-list">
+        <li>
+          <strong>Сильные стороны</strong>
+          <span>${escapeHtml(strong.length
+            ? formatMaturityAreas(strong)
+            : "Явные опоры 4-5/5 пока не выделены. Значит, первые шаги должны быть небольшими и проверочными."
+          )}</span>
+        </li>
+        <li>
+          <strong>Слабые области</strong>
+          <span>${escapeHtml(weak.length
+            ? `${formatMaturityAreas(weak)}. Это зоны риска, но не каждая слабая область автоматически является главным ограничением.`
+            : "Нет явных провалов 1-2/5. Тогда ограничение ищем по связям с текущим запросом и сигналами из диалога."
+          )}</span>
+        </li>
+        <li>
+          <strong>Текущий фокус проверки</strong>
+          <span>${escapeHtml(selectedScore
+            ? `${selectedScore.title} (${selectedScore.numericScore}/5): эта область выглядит не просто слабой, а объясняющей текущий запрос лучше других.`
+            : `${hypothesis.layerTitle || hypothesis.title || "Выбранная область"}: версию нужно проверить фактами, потому что оценок пока мало.`
+          )}</span>
+        </li>
+      </ul>
+    </section>
+  `;
+}
+
+function renderConstraintSelectionExplanation(hypothesis = {}, reasoning = {}) {
+  const selectedLayerKey = hypothesis.layerKey || hypothesis.layer;
+  const primary = reasoning?.primary?.layerKey === selectedLayerKey
+    ? reasoning.primary
+    : (reasoning?.shortlist || []).find((item) => item.layerKey === selectedLayerKey) || reasoning?.primary || {};
+  const rankingReasons = primary.rankingReasons?.length
+    ? primary.rankingReasons
+    : hypothesis.rankingReasons || [];
+  const alternatives = (reasoning?.alternatives || hypothesis.alternatives || []).slice(0, 3);
+
+  return `
+    <section class="card next-card">
+      <h3>Почему выбрана именно эта гипотеза</h3>
+      <p>Система не выбирает главное ограничение только по самой низкой оценке. Она сравнивает, какая область лучше объясняет текущий запрос: по зрелости, связи с запросом, сигналам из диалога и влиянию на поток ниже.</p>
+      <div class="selection-breakdown">
+        <div>
+          <span>Оценка области</span>
+          <strong>${escapeHtml(formatNullableScore(primary.maturityScore))}</strong>
+        </div>
+        <div>
+          <span>Связь с запросом</span>
+          <strong>${escapeHtml(formatSignalStrength(primary.requestRelevance))}</strong>
+        </div>
+        <div>
+          <span>Сигналы из диалога</span>
+          <strong>${escapeHtml(formatObservationCount(primary.observationCount))}</strong>
+        </div>
+      </div>
+      <ul class="plain-list">
+        ${(rankingReasons.length ? rankingReasons : ["Эта версия сейчас лучше других связывает текущий запрос, оценку области и возможное влияние на остальные части бизнеса."]).map((reason) => `
+          <li>${escapeHtml(reason)}</li>
+        `).join("")}
+      </ul>
+      ${alternatives.length ? `
+        <div class="comparison-list">
+          <strong>Что было рядом, но не выбрано первым</strong>
+          ${alternatives.map((item) => `
+            <article>
+              <b>${escapeHtml(item.layerTitle || item.layerKey)}</b>
+              <span>${escapeHtml(item.whyAlternative || "Версия возможна, но сейчас объясняет кейс слабее выбранной гипотезы.")}</span>
+            </article>
+          `).join("")}
+        </div>
+      ` : ""}
+    </section>
+  `;
+}
+
+function renderConstraintGrowthMap(maturity = {}, hypothesis = {}) {
+  const scores = getMaturityScores(maturity);
+  if (!scores.length) {
+    return "";
+  }
+
+  return `
+    <section class="card next-card">
+      <h3>Точки роста по областям</h3>
+      <p>Это не план внедрения всего сразу. Это карта, что нужно подтянуть в каждой области, чтобы понимать дальнейший маршрут после проверки главного ограничения.</p>
+      <div class="growth-list">
+        ${scores.map((item) => renderGrowthRow(item, hypothesis)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function getMaturityScores(maturity = {}) {
+  return (maturity.scores || []).map((item) => ({
+    ...item,
+    numericScore: Number(item.score)
+  }));
+}
+
+function getAnsweredMaturityScores(maturity = {}) {
+  return getMaturityScores(maturity)
+    .filter((item) => item.status === "answered" && Number.isFinite(item.numericScore));
+}
+
+function renderGrowthRow(item, hypothesis = {}) {
+  const selectedLayerKey = hypothesis.layerKey || hypothesis.layer;
+  const isSelected = item.layerKey === selectedLayerKey;
+  const scoreLabel = Number.isFinite(item.numericScore) ? `${item.numericScore}/5` : "нет оценки";
+
+  return `
+    <article class="growth-row ${isSelected ? "selected" : ""}">
+      <div>
+        <p class="eyebrow">${escapeHtml(isSelected ? "текущая гипотеза" : `класс ${item.classKey || ""}`)}</p>
+        <strong>${escapeHtml(item.title || item.layerKey)}</strong>
+      </div>
+      <b>${escapeHtml(scoreLabel)}</b>
+      <span>${escapeHtml(getGrowthAdvice(item))}</span>
+    </article>
+  `;
+}
+
+function getGrowthAdvice(item = {}) {
+  if (!Number.isFinite(item.numericScore)) {
+    return "Сначала оценить область, чтобы не строить выводы на пустом месте.";
+  }
+
+  const layerAdvice = {
+    owner_context: "Согласовать цели, горизонт, роль собственника и правила ключевых решений.",
+    external_environment: "Собрать регулярный срез рынка, спроса, каналов и внешних ограничений.",
+    strategy: "Выбрать фокус: сегмент, преимущество, приоритеты и осознанный отказ от лишнего.",
+    product_value_proposition: "Проверить боль клиента, ценность предложения, доказательства и причины отказов.",
+    commercial: "Настроить качество входа: целевой сегмент, фильтрацию, приоритет и передачу заявок.",
+    operating_model: "Показать путь заявки или заказа, найти очереди, ручные решения и точки срыва.",
+    finance: "Связать выручку, маржу, расходы, кассу и конкретный участок потока, где теряются деньги.",
+    people_organization: "Развести роли, нагрузку и компетенции; понять, где нужен человек, а где правило или процесс.",
+    governance_risks: "Закрепить владельцев решений, ритм контроля, ответственность и работу с рисками.",
+    technology: "Убрать ручные переносы, дубли и разрывы между инструментами, которые тормозят поток.",
+    data_analytics: "Собрать минимальные метрики и единую версию правды по текущему запросу."
+  };
+
+  if (item.numericScore <= 2) {
+    return layerAdvice[item.layerKey] || "Довести область до рабочего стандарта: правила, владелец, факты и регулярность.";
+  }
+
+  if (item.numericScore === 3) {
+    return "Закрепить рабочий стандарт: сделать правила повторяемыми, измеримыми и независимыми от ручного контроля.";
+  }
+
+  return "Использовать как опору: масштабировать удачную практику и проверить, не упирается ли она в слабые области.";
+}
+
+function formatNullableScore(value) {
+  const score = Number(value);
+  return Number.isFinite(score) ? `${score}/5` : "нет оценки";
+}
+
+function formatSignalStrength(value) {
+  const score = Number(value || 0);
+  if (score >= 0.75) {
+    return "сильная";
+  }
+  if (score >= 0.45) {
+    return "средняя";
+  }
+  if (score > 0) {
+    return "слабая";
+  }
+  return "неявная";
+}
+
+function formatObservationCount(value) {
+  const count = Number(value || 0);
+  if (!count) {
+    return "пока нет";
+  }
+  return `${count}`;
 }
 
 function getConstraintMeaning(hypothesis = {}) {
