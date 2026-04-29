@@ -1513,10 +1513,6 @@ function render() {
 
       <div class="footer-space"></div>
     </main>
-    <button class="floating-ai" type="button" data-ai aria-label="Вернуться в чат">
-      <span class="floating-ai-full">Вернуться в чат</span>
-      <span class="floating-ai-short">В чат</span>
-    </button>
   `;
 
   bindEvents();
@@ -1569,18 +1565,6 @@ function bindEvents() {
   appRoot.querySelector("[data-onboarding-form]")?.addEventListener("submit", saveOnboarding);
   appRoot.querySelector("[data-document-form]")?.addEventListener("submit", saveDocument);
   appRoot.querySelector("[data-back]")?.addEventListener("click", goBack);
-
-  appRoot.querySelector("[data-ai]")?.addEventListener("click", returnToTelegramChat);
-}
-
-function returnToTelegramChat() {
-  const webApp = window.Telegram?.WebApp;
-  if (webApp?.close) {
-    webApp.close();
-    return;
-  }
-
-  window.alert("Открой этот кабинет внутри Telegram и нажми «Вернуться в чат» — я закрою кабинет и верну тебя к диалогу с AI-BOSS.");
 }
 
 function renderOption(value, label, selectedValue) {

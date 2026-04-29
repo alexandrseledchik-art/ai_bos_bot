@@ -51,10 +51,10 @@ assert.match(indexHtml, /telegram-web-app\.js/);
 assert.match(indexHtml, /mini-app-assets\/src\/main\.js/);
 
 const mainJs = fs.readFileSync("mini-app-assets/src/main.js", "utf8");
-assert.match(mainJs, /Вернуться в чат/);
-assert.match(mainJs, /returnToTelegramChat/);
-assert.match(mainJs, /WebApp/);
-assert.match(mainJs, /\.close\(\)/);
+const styles = fs.readFileSync("mini-app-assets/styles.css", "utf8");
+assert.doesNotMatch(mainJs, /floating-ai/);
+assert.doesNotMatch(mainJs, /returnToTelegramChat/);
+assert.doesNotMatch(styles, /\.floating-ai/);
 assert.match(mainJs, /isRootRoute/);
 assert.match(mainJs, /nav-placeholder/);
 assert.match(mainJs, /data-back/);
