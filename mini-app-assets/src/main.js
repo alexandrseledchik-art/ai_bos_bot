@@ -210,7 +210,7 @@ function renderDashboard() {
         <button class="secondary-button" data-navigate="/mini-app/diagnostics/express">Пройти диагностику</button>
         <button class="secondary-button" data-navigate="/mini-app/maturity">Открыть матрицу</button>
         <button class="secondary-button" data-navigate="/mini-app/constraint">Найти ограничение</button>
-        <button class="secondary-button" data-navigate="/mini-app/tools">Все инструменты</button>
+        <button class="secondary-button" data-navigate="/mini-app/tools">Инструменты</button>
         <button class="secondary-button" data-navigate="/mini-app/consultation">Разбор с экспертом</button>
       </div>
     </section>
