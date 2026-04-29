@@ -373,6 +373,9 @@ function assertFrontendAndRoutes() {
   assert.match(mainJs, /renderTools/);
   assert.match(mainJs, /renderToolCard/);
   assert.match(mainJs, /renderDocuments/);
+  assert.match(mainJs, /Рекомендованные инструменты под текущую ситуацию/);
+  assert.match(mainJs, /data-tools-recommendations-toggle/);
+  assert.match(mainJs, /data-open-tool-recommendations/);
   assert.doesNotMatch(mainJs, /data-tool-opened/);
   assert.match(mainJs, /data-tool-search-form/);
   assert.match(mainJs, /data-document-analyze/);

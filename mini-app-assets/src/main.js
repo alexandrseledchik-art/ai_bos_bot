@@ -50,6 +50,7 @@ const state = {
     recommendedLoading: false,
     openingToolId: "",
     query: "",
+    showRecommended: false,
     error: ""
   },
   documents: {
@@ -263,32 +264,12 @@ function renderDashboard() {
 }
 
 function renderRecommendedToolsPanel() {
-  const block = state.tools;
-
-  if (block.recommendedLoading) {
-    return `
-      <section class="card next-card">
-        <h3>Рекомендованные инструменты</h3>
-        <p>Подбираю 3 инструмента под текущий кейс...</p>
-      </section>
-    `;
-  }
-
-  const recommendations = block.recommended?.recommendations || [];
-  if (!recommendations.length) {
-    return `
-      <section class="card next-card">
-        <h3>Рекомендованные инструменты</h3>
-        <p>После первых ответов и гипотезы ограничения здесь появятся 3 инструмента из каталога.</p>
-      </section>
-    `;
-  }
-
   return `
     <section class="card next-card">
-      <h3>Рекомендованные инструменты</h3>
-      <div class="tool-grid">
-        ${recommendations.slice(0, 3).map((item) => renderToolTeaser(item.tool, item)).join("")}
+      <h3>Инструменты под ситуацию</h3>
+      <p>Если нужен прикладной набор под текущий запрос, гипотезу ограничения и следующий шаг, открой отдельную подборку. Каталог при этом останется ниже как справочник.</p>
+      <div class="actions">
+        <button class="secondary-button" type="button" data-open-tool-recommendations>Рекомендованные инструменты под текущую ситуацию</button>
       </div>
     </section>
   `;
@@ -1225,19 +1206,14 @@ function renderTools() {
       <h2>Каталог рабочих инструментов</h2>
       <p>В каталоге ${tools.length} инструментов из архитектурной карты. AI-BOSS использует их как ориентиры: подбирает подходящие по кейсу, но не подменяет ими живую диагностику.</p>
       <div class="actions">
-        <button class="primary-button" data-tools-recalculate ${block.recommendedLoading ? "disabled" : ""}>Пересчитать рекомендации</button>
+        <button class="primary-button" type="button" data-tools-recommendations-toggle ${block.recommendedLoading ? "disabled" : ""}>
+          ${block.showRecommended ? "Скрыть рекомендации" : "Рекомендованные инструменты под текущую ситуацию"}
+        </button>
         <button class="secondary-button" data-navigate="/mini-app/documents">Документы</button>
       </div>
     </section>
 
-    <section class="card next-card">
-      <h3>Рекомендованные для кейса</h3>
-      ${recommendations.length ? `
-        <div class="tool-grid">
-          ${recommendations.map((item) => renderToolTeaser(item.tool, item)).join("")}
-        </div>
-      ` : `<p>Рекомендации появятся после расчёта по запросу, ограничению и следующему шагу.</p>`}
-    </section>
+    ${block.showRecommended ? renderToolsRecommendations(recommendations, block) : ""}
 
     <section class="card next-card">
       <h3>${query ? "Результаты поиска" : "Основные инструменты"}</h3>
@@ -1265,6 +1241,32 @@ function renderTools() {
           <button class="secondary-button" data-tools-recalculate ${block.recommendedLoading ? "disabled" : ""}>Обновить каталог</button>
         </div>
       `}
+    </section>
+  `;
+}
+
+function renderToolsRecommendations(recommendations, block) {
+  if (block.recommendedLoading) {
+    return `
+      <section class="card next-card">
+        <h3>Рекомендованные под текущую ситуацию</h3>
+        <p>Подбираю инструменты по текущему запросу, гипотезе ограничения и следующему шагу.</p>
+      </section>
+    `;
+  }
+
+  return `
+    <section class="card next-card">
+      <h3>Рекомендованные под текущую ситуацию</h3>
+      <p>Это не обязательный план внедрения. Это короткая подборка, которая может помочь проверить гипотезу и выполнить ближайший шаг.</p>
+      ${recommendations.length ? `
+        <div class="tool-grid">
+          ${recommendations.map((item) => renderToolTeaser(item.tool, item)).join("")}
+        </div>
+      ` : `<p>Рекомендации появятся после расчёта по запросу, ограничению и следующему шагу.</p>`}
+      <div class="actions">
+        <button class="secondary-button" type="button" data-tools-recalculate ${block.recommendedLoading ? "disabled" : ""}>Пересчитать рекомендации</button>
+      </div>
     </section>
   `;
 }
@@ -1750,7 +1752,13 @@ function bindEvents() {
     button.addEventListener("click", () => updateNextStep(button.dataset.nextStepId, button.dataset.nextStepAction));
   });
 
-  appRoot.querySelector("[data-tools-recalculate]")?.addEventListener("click", recalculateTools);
+  appRoot.querySelector("[data-tools-recommendations-toggle]")?.addEventListener("click", toggleToolRecommendations);
+  appRoot.querySelectorAll("[data-open-tool-recommendations]").forEach((button) => {
+    button.addEventListener("click", openToolRecommendations);
+  });
+  appRoot.querySelectorAll("[data-tools-recalculate]").forEach((button) => {
+    button.addEventListener("click", recalculateTools);
+  });
   appRoot.querySelector("[data-tool-search-form]")?.addEventListener("submit", updateToolSearch);
   appRoot.querySelector("[data-tool-search-clear]")?.addEventListener("click", clearToolSearch);
 
@@ -1810,10 +1818,6 @@ async function loadRouteData({ force = false } = {}) {
 
   const path = normalizePath(state.currentRoute.path);
 
-  if (path === "/mini-app") {
-    await loadRecommendedTools({ force });
-  }
-
   if (path === "/mini-app/onboarding") {
     await loadOnboarding({ force });
   }
@@ -1836,7 +1840,9 @@ async function loadRouteData({ force = false } = {}) {
 
   if (path === "/mini-app/tools" || path.startsWith("/mini-app/tools/")) {
     await loadTools({ force });
-    await loadRecommendedTools({ force });
+    if (state.tools.showRecommended) {
+      await loadRecommendedTools({ force });
+    }
   }
 
   if (path === "/mini-app/documents") {
@@ -2298,6 +2304,19 @@ function clearToolSearch() {
   render();
 }
 
+function toggleToolRecommendations() {
+  state.tools.showRecommended = !state.tools.showRecommended;
+  render();
+  if (state.tools.showRecommended) {
+    loadRecommendedTools();
+  }
+}
+
+function openToolRecommendations() {
+  state.tools.showRecommended = true;
+  navigate("/mini-app/tools");
+}
+
 async function loadRecommendedTools({ force = false } = {}) {
   if (state.tools.recommendedLoading || (state.tools.recommended && !force)) {
     return;
@@ -2317,6 +2336,7 @@ async function loadRecommendedTools({ force = false } = {}) {
 }
 
 async function recalculateTools() {
+  state.tools.showRecommended = true;
   state.tools.recommendedLoading = true;
   state.tools.error = "";
   render();

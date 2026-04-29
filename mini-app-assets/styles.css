@@ -851,7 +851,11 @@ a {
   justify-content: center;
   align-items: center;
   min-height: 44px;
-  padding: 0 16px;
+  max-width: 100%;
+  padding: 10px 16px;
+  line-height: 1.15;
+  text-align: center;
+  white-space: normal;
 }
 
 .primary-button {
