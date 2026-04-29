@@ -611,7 +611,7 @@ function assertStaticPhase8Wiring() {
   assert.match(mainJs, /alpha-banner/);
   assert.match(mainJs, /Срез зрелости по областям/);
   assert.match(mainJs, /средняя зрелость/);
-  assert.match(mainJs, /где уже есть опора, где виден риск/);
+  assert.match(mainJs, /что уже работает, где есть слабые места/);
   assert.match(mainJs, /Как читать оценку/);
   assert.match(mainJs, /эталонный уровень/);
   assert.match(mainJs, /Главное ограничение выбираем отдельно/);
