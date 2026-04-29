@@ -583,6 +583,27 @@ a {
   display: block;
 }
 
+.decision-note {
+  display: grid;
+  gap: 7px;
+  padding: 13px;
+  border: 1px solid rgba(0, 79, 85, 0.16);
+  border-radius: var(--radius-md);
+  background: rgba(0, 79, 85, 0.05);
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.decision-note strong,
+.decision-note b {
+  color: var(--ink);
+}
+
+.decision-note span {
+  display: block;
+}
+
 .selection-breakdown {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

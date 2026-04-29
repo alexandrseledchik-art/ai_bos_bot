@@ -760,6 +760,11 @@ function renderConstraint() {
           <span>${escapeHtml(strengthMeaning.description)}</span>
         </li>
       </ul>
+      <div class="decision-note">
+        <strong>Что меняют кнопки</strong>
+        <span><b>Подтвердить</b> — взять эту версию как рабочую основу: следующий шаг, рекомендации и резюме кейса будут опираться на неё.</span>
+        <span><b>Отклонить</b> — не вести маршрут от этой версии. Тогда стоит уточнить ответы или добавить факты, чтобы выбрать другую гипотезу.</span>
+      </div>
       <div class="actions">
         <button
           class="primary-button"
@@ -768,7 +773,7 @@ function renderConstraint() {
           data-constraint-id="${escapeAttribute(hypothesis.id)}"
           ${block.actionSaving ? "disabled" : ""}
         >
-          Подтвердить гипотезу
+          Подтвердить как рабочую версию
         </button>
         <button
           class="secondary-button"
@@ -777,7 +782,7 @@ function renderConstraint() {
           data-constraint-id="${escapeAttribute(hypothesis.id)}"
           ${block.actionSaving ? "disabled" : ""}
         >
-          Отклонить
+          Отклонить версию
         </button>
         <button class="secondary-button" type="button" data-navigate="/mini-app/next-step">К следующему шагу</button>
       </div>
