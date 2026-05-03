@@ -65,6 +65,11 @@ function matchesSearch(conversation, query) {
   return haystack.includes(query.toLowerCase());
 }
 
+function isServiceThread(thread) {
+  return thread?.external_id === "miniapp_compat_store_v1" ||
+    thread?.telegram_chat_id === "miniapp:compat-store";
+}
+
 function pickConversationSummary({ thread, company, activeCase, latestMessage, messages = [], latestEvaluation }) {
   const userMessages = messages.filter((message) => message.role === "user");
   const assistantMessages = messages.filter((message) => message.role === "assistant");
@@ -165,10 +170,11 @@ export class AdminAnalyticsService {
       order: "updated_at.desc",
       limit: normalizedLimit
     });
+    const visibleThreads = threads.filter((thread) => !isServiceThread(thread));
 
-    const threadIds = threads.map((thread) => thread.id);
-    const companyIds = threads.map((thread) => thread.company_id);
-    const caseIds = threads.map((thread) => thread.active_case_id).filter(Boolean);
+    const threadIds = visibleThreads.map((thread) => thread.id);
+    const companyIds = visibleThreads.map((thread) => thread.company_id);
+    const caseIds = visibleThreads.map((thread) => thread.active_case_id).filter(Boolean);
 
     const [companies, cases, messages, evaluations] = await Promise.all([
       this.fetchByIds("companies", companyIds),
@@ -193,7 +199,7 @@ export class AdminAnalyticsService {
     const latestMessageByThread = latestByGroup(messages, "thread_id");
     const latestEvaluationByThread = latestByGroup(evaluations, "thread_id");
 
-    const conversations = threads
+    const conversations = visibleThreads
       .map((thread) => pickConversationSummary({
         thread,
         company: companyById.get(thread.company_id),

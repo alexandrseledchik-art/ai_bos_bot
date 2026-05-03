@@ -1,6 +1,6 @@
 import { AdminAnalyticsService } from "./admin-analytics-service.js";
 import { loadConfig } from "../config.js";
-import { SupabaseSyncClient } from "../infrastructure/storage/supabase-sync.js";
+import { MiniAppCompatSyncClient } from "../infrastructure/storage/mini-app-compat-sync.js";
 
 export function adminJsonResponse(payload, init = {}) {
   return new Response(JSON.stringify(payload), {
@@ -78,7 +78,7 @@ export async function createAdminContext(request) {
   const config = loadConfig();
   assertAdminRequest(request, config);
 
-  const syncClient = new SupabaseSyncClient({
+  const syncClient = new MiniAppCompatSyncClient({
     url: config.supabaseUrl,
     serviceRoleKey: config.supabaseServiceRoleKey
   });
