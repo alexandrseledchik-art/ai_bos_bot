@@ -154,6 +154,28 @@ function createSeed() {
         updated_at: "2026-05-01T10:03:00.000Z"
       }
     ],
+    app_users: [
+      {
+        id: "app-user-1",
+        telegram_user_id: 123,
+        username: "existing_dialog_user",
+        first_name: "Existing",
+        last_name: "Dialog",
+        access_status: "approved",
+        created_at: "2026-05-01T09:00:00.000Z",
+        updated_at: "2026-05-01T10:04:00.000Z"
+      },
+      {
+        id: "app-user-2",
+        telegram_user_id: 456,
+        username: "new_approved_user",
+        first_name: "New",
+        last_name: "Approved",
+        access_status: "approved",
+        created_at: "2026-05-01T11:00:00.000Z",
+        updated_at: "2026-05-01T11:02:00.000Z"
+      }
+    ],
     messages: [
       {
         id: "message-1",
@@ -202,11 +224,24 @@ async function run() {
   const service = new AdminAnalyticsService({ syncClient });
 
   const conversations = await service.listConversations({ limit: 10 });
-  assert(conversations.count === 1, "expected one conversation");
-  assert(conversations.conversations[0].counters.messages === 3, "expected message counters");
+  assert(conversations.count === 2, "expected real conversation plus access user placeholder");
+  assert(conversations.conversations.some((item) => item.counters.messages === 3), "expected message counters");
+  assert(conversations.conversations.some((item) => item.id === "app_user:456" && item.isPlaceholder), "expected access user without dialog");
 
   const detail = await service.getConversation({ threadId: "thread-1" });
   assert(detail.messages.length === 3, "expected conversation messages");
+
+  const placeholderDetail = await service.getConversation({ threadId: "app_user:456" });
+  assert(placeholderDetail.isPlaceholder, "expected placeholder detail");
+  assert(placeholderDetail.messages.length === 0, "expected placeholder without messages");
+
+  await service.evaluateConversation({ threadId: "app_user:456", persist: true })
+    .then(() => {
+      throw new Error("expected placeholder evaluation to fail");
+    })
+    .catch((error) => {
+      assert(error.status === 400, "expected placeholder evaluation 400");
+    });
 
   const result = await service.evaluateConversation({ threadId: "thread-1", persist: true });
   assert(result.evaluation.score < 100, "expected evaluator to find issues");

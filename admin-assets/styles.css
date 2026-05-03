@@ -43,6 +43,13 @@ button:hover {
   background: var(--teal-dark);
 }
 
+button:disabled,
+button:disabled:hover {
+  background: #dce5e2;
+  color: #768581;
+  cursor: not-allowed;
+}
+
 button.ghost,
 button.secondary {
   background: white;
@@ -53,6 +60,15 @@ button.secondary {
 button.ghost:hover,
 button.secondary:hover {
   background: #eef7f5;
+}
+
+button.ghost:disabled,
+button.ghost:disabled:hover,
+button.secondary:disabled,
+button.secondary:disabled:hover {
+  background: #f2f5f4;
+  color: #7d8c88;
+  border-color: #dce5e2;
 }
 
 .shell {

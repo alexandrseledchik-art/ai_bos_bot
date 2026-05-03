@@ -40,6 +40,21 @@ function groupBy(rows = [], key) {
   return map;
 }
 
+function normalizeTelegramId(value) {
+  return String(value ?? "").trim();
+}
+
+function appUserName(user = {}) {
+  const fullName = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
+  if (fullName) {
+    return fullName;
+  }
+  if (user.username) {
+    return `@${user.username}`;
+  }
+  return `Telegram ${user.telegram_user_id}`;
+}
+
 function latestByGroup(rows = [], key) {
   const groups = groupBy(rows, key);
   const result = new Map();
@@ -58,6 +73,10 @@ function matchesSearch(conversation, query) {
   const haystack = [
     conversation.company?.name,
     conversation.thread?.telegram_chat_id,
+    conversation.appUser?.username,
+    conversation.appUser?.first_name,
+    conversation.appUser?.last_name,
+    conversation.appUser?.access_status,
     conversation.latestMessage?.text,
     conversation.activeCase?.summary
   ].join(" ").toLowerCase();
@@ -87,6 +106,41 @@ function pickConversationSummary({ thread, company, activeCase, latestMessage, m
       assistantMessages: assistantMessages.length
     },
     updatedAt: thread.updated_at || thread.created_at || ""
+  };
+}
+
+function pickAccessUserSummary({ user }) {
+  const updatedAt = user.updated_at || user.access_requested_at || user.created_at || "";
+  const accessStatus = user.access_status || "pending";
+
+  return {
+    id: `app_user:${user.telegram_user_id}`,
+    kind: "access_user",
+    isPlaceholder: true,
+    appUser: user,
+    thread: {
+      id: `app_user:${user.telegram_user_id}`,
+      external_id: `app_user:${user.telegram_user_id}`,
+      telegram_chat_id: String(user.telegram_user_id),
+      created_at: user.created_at || updatedAt,
+      updated_at: updatedAt
+    },
+    company: {
+      name: appUserName(user)
+    },
+    activeCase: null,
+    latestMessage: {
+      role: "system",
+      text: `Пользователь есть в списке доступа: ${accessStatus}. Сохранённого диалога пока нет.`,
+      created_at: updatedAt
+    },
+    latestEvaluation: null,
+    counters: {
+      messages: 0,
+      userMessages: 0,
+      assistantMessages: 0
+    },
+    updatedAt
   };
 }
 
@@ -163,13 +217,50 @@ export class AdminAnalyticsService {
       }).catch(async () => null);
   }
 
+  async resolveAccessUserConversation(threadId) {
+    const match = trimString(threadId).match(/^app_user:(\d+)$/);
+    if (!match) {
+      return null;
+    }
+
+    const user = await this.findOne("app_users", {
+      telegram_user_id: `eq.${match[1]}`,
+      select: "*"
+    }).catch(() => null);
+
+    if (!user) {
+      return null;
+    }
+
+    return {
+      ...pickAccessUserSummary({ user }),
+      messages: [],
+      observations: [],
+      goals: [],
+      symptoms: [],
+      hypotheses: [],
+      constraints: [],
+      situations: [],
+      actionWaves: [],
+      snapshots: [],
+      miniAppEvalLogs: []
+    };
+  }
+
   async listConversations({ limit = 30, search = "" } = {}) {
     const normalizedLimit = normalizeLimit(limit);
-    const threads = await this.safeFindMany("threads", {
-      select: "*",
-      order: "updated_at.desc",
-      limit: normalizedLimit
-    });
+    const [threads, appUsers] = await Promise.all([
+      this.safeFindMany("threads", {
+        select: "*",
+        order: "updated_at.desc",
+        limit: normalizedLimit
+      }),
+      this.safeFindMany("app_users", {
+        select: "*",
+        order: "updated_at.desc",
+        limit: normalizedLimit * 2
+      })
+    ]);
     const visibleThreads = threads.filter((thread) => !isServiceThread(thread));
 
     const threadIds = visibleThreads.map((thread) => thread.id);
@@ -199,7 +290,15 @@ export class AdminAnalyticsService {
     const latestMessageByThread = latestByGroup(messages, "thread_id");
     const latestEvaluationByThread = latestByGroup(evaluations, "thread_id");
 
-    const conversations = visibleThreads
+    const threadTelegramIds = new Set(
+      visibleThreads.map((thread) => normalizeTelegramId(thread.telegram_chat_id)).filter(Boolean)
+    );
+    const userPlaceholders = appUsers
+      .filter((user) => !threadTelegramIds.has(normalizeTelegramId(user.telegram_user_id)))
+      .map((user) => pickAccessUserSummary({ user }));
+
+    const conversations = [
+      ...visibleThreads
       .map((thread) => pickConversationSummary({
         thread,
         company: companyById.get(thread.company_id),
@@ -207,8 +306,11 @@ export class AdminAnalyticsService {
         latestMessage: latestMessageByThread.get(thread.id),
         messages: messagesByThread.get(thread.id) || [],
         latestEvaluation: latestEvaluationByThread.get(thread.id)
-      }))
+      })),
+      ...userPlaceholders
+    ]
       .filter((conversation) => matchesSearch(conversation, trimString(search)));
+    conversations.sort((left, right) => String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")));
 
     return {
       conversations,
@@ -217,6 +319,11 @@ export class AdminAnalyticsService {
   }
 
   async getConversation({ threadId }) {
+    const accessUserConversation = await this.resolveAccessUserConversation(threadId);
+    if (accessUserConversation) {
+      return accessUserConversation;
+    }
+
     const thread = await this.resolveThread(threadId);
     if (!thread) {
       const error = new Error("Conversation not found.");
@@ -304,6 +411,12 @@ export class AdminAnalyticsService {
 
   async evaluateConversation({ threadId, persist = true } = {}) {
     const detail = await this.getConversation({ threadId });
+    if (detail.isPlaceholder || !detail.messages?.length) {
+      const error = new Error("У этого пользователя пока нет сохранённого диалога, поэтому оценивать ещё нечего.");
+      error.status = 400;
+      throw error;
+    }
+
     const evaluation = this.evaluator.evaluateConversation(detail);
     const savedEvaluation = persist
       ? await this.saveConversationEvaluation({ detail, evaluation })

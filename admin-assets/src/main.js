@@ -117,14 +117,32 @@ function conversationTitle(item) {
   return item.company?.name || item.thread?.telegram_chat_id || item.thread?.external_id || "Диалог";
 }
 
+function accessStatusLabel(status) {
+  if (status === "approved") {
+    return "доступ открыт";
+  }
+  if (status === "blocked") {
+    return "заблокирован";
+  }
+  return "ожидает доступа";
+}
+
 function renderConversationList(payload) {
   const rows = payload.conversations || [];
   const list = rows.length
     ? rows.map((item) => {
         const latest = item.latestMessage?.text || "Сообщений пока нет";
+        const messagesCount = Number(item.counters?.messages || 0);
+        const canEvaluate = !item.isPlaceholder && messagesCount > 0;
         const evaluation = item.latestEvaluation
           ? `<span class="pill ${scoreClass(item.latestEvaluation.status)}">оценка: ${item.latestEvaluation.score}/100</span>`
           : `<span class="pill orange">без оценки</span>`;
+        const accessStatus = item.appUser?.access_status
+          ? `<span class="pill ${item.appUser.access_status === "approved" ? "green" : item.appUser.access_status === "blocked" ? "red" : "orange"}">${escapeHtml(accessStatusLabel(item.appUser.access_status))}</span>`
+          : "";
+        const placeholder = item.isPlaceholder
+          ? `<span class="pill orange">диалога пока нет</span>`
+          : "";
 
         return `
           <article class="row">
@@ -132,14 +150,16 @@ function renderConversationList(payload) {
               <div class="row-title">${escapeHtml(conversationTitle(item))}</div>
               <p>${escapeHtml(latest.slice(0, 220))}</p>
               <div class="meta">
-                <span class="pill">${escapeHtml(item.counters?.messages || 0)} сообщений</span>
+                <span class="pill">${escapeHtml(messagesCount)} сообщений</span>
+                ${accessStatus}
+                ${placeholder}
                 ${evaluation}
                 <span class="pill">${escapeHtml(formatDate(item.updatedAt))}</span>
               </div>
             </div>
             <div class="meta">
               <button class="secondary" data-open="${escapeHtml(item.id)}" type="button">Открыть</button>
-              <button data-evaluate="${escapeHtml(item.id)}" type="button">Оценить</button>
+              <button data-evaluate="${escapeHtml(item.id)}" type="button" ${canEvaluate ? "" : "disabled"} title="${canEvaluate ? "" : "Оценка появится, когда будет сохранённая переписка"}">Оценить</button>
             </div>
           </article>
         `;
@@ -240,15 +260,16 @@ function renderConversationDetail(payload) {
   if (!target) {
     return;
   }
+  const canEvaluate = !detail.isPlaceholder && (detail.messages || []).length > 0;
 
   target.innerHTML = `
     <section class="detail">
       <div class="toolbar">
         <div>
           <h2>${escapeHtml(detail.company?.name || detail.thread?.telegram_chat_id || "Диалог")}</h2>
-          <p>${escapeHtml(detail.activeCase?.summary || "Рабочий диагностический кейс")}</p>
+          <p>${escapeHtml(detail.isPlaceholder ? "Пользователь есть в списке доступа, но сохранённой переписки пока нет." : detail.activeCase?.summary || "Рабочий диагностический кейс")}</p>
         </div>
-        <button data-evaluate-detail="${escapeHtml(detail.thread.id)}" type="button">Оценить диалог</button>
+        <button data-evaluate-detail="${escapeHtml(detail.thread.id)}" type="button" ${canEvaluate ? "" : "disabled"}>${canEvaluate ? "Оценить диалог" : "Пока нечего оценивать"}</button>
       </div>
       <div class="columns">
         <div>
