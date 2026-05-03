@@ -122,9 +122,23 @@ p {
 }
 
 .token-form {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 12px;
   margin-top: 22px;
+}
+
+.hint {
+  margin: 12px 0 0;
+  font-size: 14px;
+}
+
+.hint[data-type="success"] {
+  color: var(--green);
+}
+
+.hint[data-type="error"] {
+  color: var(--red);
 }
 
 input {
@@ -319,12 +333,15 @@ input {
 
   .topbar,
   .toolbar,
-  .token-form,
   .row,
   .columns {
     grid-template-columns: 1fr;
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .token-form {
+    grid-template-columns: 1fr;
   }
 
   .toolbar form {

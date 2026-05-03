@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>AI-BOSS Admin</title>
-    <link rel="stylesheet" href="/admin-assets/styles.css?v=20260503-1">
+    <link rel="stylesheet" href="/admin-assets/styles.css?v=20260503-2">
   </head>
   <body>
     <main class="shell">
@@ -18,11 +18,23 @@
 
       <section class="token-panel" id="tokenPanel">
         <h2>Вход в админку</h2>
-        <p>Укажи admin token из Vercel env `ADMIN_DASHBOARD_TOKEN`.</p>
+        <p>Вставь admin token из Vercel env `ADMIN_DASHBOARD_TOKEN`.</p>
         <form id="tokenForm" class="token-form">
-          <input id="tokenInput" name="token" type="password" autocomplete="off" placeholder="ADMIN_DASHBOARD_TOKEN">
+          <input
+            id="tokenInput"
+            name="token"
+            type="password"
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+            inputmode="text"
+            placeholder="ADMIN_DASHBOARD_TOKEN"
+          >
+          <button class="secondary" id="pasteTokenButton" type="button">Вставить токен</button>
           <button type="submit">Открыть</button>
         </form>
+        <p class="hint" id="tokenHint">Можно вставить через кнопку или обычным Cmd/Ctrl+V.</p>
       </section>
 
       <section class="workspace" id="workspace" hidden>
@@ -36,6 +48,6 @@
       </section>
     </main>
 
-    <script type="module" src="/admin-assets/src/main.js?v=20260503-1"></script>
+    <script type="module" src="/admin-assets/src/main.js?v=20260503-2"></script>
   </body>
 </html>

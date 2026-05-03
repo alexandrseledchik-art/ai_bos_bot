@@ -12,6 +12,8 @@ const workspace = document.querySelector("#workspace");
 const content = document.querySelector("#content");
 const tokenForm = document.querySelector("#tokenForm");
 const tokenInput = document.querySelector("#tokenInput");
+const pasteTokenButton = document.querySelector("#pasteTokenButton");
+const tokenHint = document.querySelector("#tokenHint");
 const logoutButton = document.querySelector("#logoutButton");
 const tabs = [...document.querySelectorAll(".tab")];
 
@@ -62,6 +64,21 @@ function setAuthenticated(isAuthenticated) {
   tokenPanel.hidden = isAuthenticated;
   workspace.hidden = !isAuthenticated;
   logoutButton.hidden = !isAuthenticated;
+}
+
+function setTokenHint(message, type = "") {
+  if (!tokenHint) {
+    return;
+  }
+
+  tokenHint.textContent = message;
+  tokenHint.dataset.type = type;
+}
+
+function setTokenValue(value) {
+  tokenInput.value = String(value || "").trim();
+  tokenInput.focus();
+  tokenInput.setSelectionRange(tokenInput.value.length, tokenInput.value.length);
 }
 
 async function api(path, options = {}) {
@@ -407,9 +424,42 @@ async function loadCurrentView() {
 tokenForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   state.token = tokenInput.value.trim();
+  if (!state.token) {
+    setTokenHint("Сначала вставь токен доступа.", "error");
+    tokenInput.focus();
+    return;
+  }
+
   localStorage.setItem(TOKEN_KEY, state.token);
   setAuthenticated(true);
   await loadCurrentView();
+});
+
+tokenInput.addEventListener("paste", (event) => {
+  const pasted = event.clipboardData?.getData("text") || "";
+  if (!pasted.trim()) {
+    return;
+  }
+
+  event.preventDefault();
+  setTokenValue(pasted);
+  setTokenHint("Токен вставлен. Теперь нажми “Открыть”.", "success");
+});
+
+pasteTokenButton?.addEventListener("click", async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text.trim()) {
+      setTokenHint("В буфере обмена нет токена.", "error");
+      return;
+    }
+
+    setTokenValue(text);
+    setTokenHint("Токен вставлен. Теперь нажми “Открыть”.", "success");
+  } catch {
+    tokenInput.focus();
+    setTokenHint("Браузер не дал доступ к буферу. Нажми в поле и вставь Cmd/Ctrl+V.", "error");
+  }
 });
 
 logoutButton.addEventListener("click", () => {
