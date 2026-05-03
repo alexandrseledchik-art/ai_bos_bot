@@ -43,8 +43,8 @@ export function buildAccessRequestAdminMessage(decision) {
     `Username: ${username}`,
     `Telegram ID: ${user.telegram_user_id}`,
     "",
-    `Одобрить: /approve ${user.telegram_user_id}`,
-    `Заблокировать: /block ${user.telegram_user_id}`
+    `Одобрить: /approve${user.telegram_user_id}`,
+    `Заблокировать: /block${user.telegram_user_id}`
   ].join("\n");
 }
 

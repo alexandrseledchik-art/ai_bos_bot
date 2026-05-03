@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { handleAccessAdminCommand } from "../application/access-admin-commands.js";
+import { handleAccessAdminCommand, looksLikeAdminCommand } from "../application/access-admin-commands.js";
 import { AccessControlService } from "../application/access-control-service.js";
 import { MiniAppBootstrapService } from "../application/mini-app-bootstrap-service.js";
 
@@ -153,6 +153,13 @@ async function main() {
     adminTelegramUserIds: ["111"]
   });
 
+  assert.equal(looksLikeAdminCommand("/approve222"), true);
+  assert.equal(looksLikeAdminCommand("/block222"), true);
+  assert.equal(looksLikeAdminCommand("/unblock222"), true);
+  assert.equal(looksLikeAdminCommand("/approve 222"), true);
+  assert.equal(looksLikeAdminCommand("/approval 222"), false);
+  assert.equal(looksLikeAdminCommand("/approveabc"), false);
+
   const firstDecision = await accessControl.checkTelegramAccess({
     telegramUser: {
       id: 222,
@@ -174,7 +181,7 @@ async function main() {
   assert.equal(secondDecision.shouldNotifyAdmin, false);
 
   const nonAdminReply = await handleAccessAdminCommand({
-    text: "/approve 222",
+    text: "/approve222",
     fromTelegramUserId: 222,
     accessControl
   });
@@ -189,7 +196,7 @@ async function main() {
   assert.match(pendingReply, /pending/);
 
   const approvedReply = await handleAccessAdminCommand({
-    text: "/approve 222",
+    text: "/approve222",
     fromTelegramUserId: 111,
     accessControl
   });
@@ -202,7 +209,7 @@ async function main() {
   assert.equal(approvedDecision.status, "approved");
 
   const blockedReply = await handleAccessAdminCommand({
-    text: "/block 222",
+    text: "/block222",
     fromTelegramUserId: 111,
     accessControl
   });
@@ -215,14 +222,14 @@ async function main() {
   assert.equal(blockedDecision.status, "blocked");
 
   await handleAccessAdminCommand({
-    text: "/unblock 222",
+    text: "/unblock222",
     fromTelegramUserId: 111,
     accessControl
   });
   assert.equal((await accessControl.checkTelegramAccess({ telegramUser: { id: 222 } })).allowed, true);
 
   await handleAccessAdminCommand({
-    text: "/block 333",
+    text: "/block333",
     fromTelegramUserId: 111,
     accessControl
   });
