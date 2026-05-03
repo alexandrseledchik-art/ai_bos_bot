@@ -14,6 +14,10 @@ function ensureUrl(url) {
   return url.endsWith("/") ? url.slice(0, -1) : url;
 }
 
+function isTelegramChatConflict(error) {
+  return /telegram_chat_id/i.test(String(error?.message || error || ""));
+}
+
 export class SupabaseSyncClient {
   constructor({ url, serviceRoleKey }) {
     this.url = ensureUrl(url);
@@ -87,6 +91,108 @@ export class SupabaseSyncClient {
     return results;
   }
 
+  async upsertCompanyRows(rows) {
+    if (!rows.length) {
+      return [];
+    }
+
+    const results = [];
+
+    for (const row of rows) {
+      try {
+        const [company] = await this.upsertRows("companies", [row], "id,external_id,workspace_id,telegram_chat_id");
+        results.push(company);
+        continue;
+      } catch (error) {
+        if (!isTelegramChatConflict(error) || !row.telegram_chat_id) {
+          throw error;
+        }
+      }
+
+      const existing = await this.request("/rest/v1/companies", {
+        query: {
+          telegram_chat_id: `eq.${row.telegram_chat_id}`,
+          select: "id,external_id,workspace_id,telegram_chat_id",
+          limit: 1
+        }
+      });
+
+      if (!existing.length) {
+        throw new Error(`Company sync conflict for telegram_chat_id=${row.telegram_chat_id}, but existing row was not found.`);
+      }
+
+      const patched = await this.request("/rest/v1/companies", {
+        method: "PATCH",
+        query: {
+          id: `eq.${existing[0].id}`,
+          select: "id,external_id,workspace_id,telegram_chat_id"
+        },
+        prefer: "return=representation",
+        body: {
+          external_id: row.external_id,
+          name: row.name,
+          updated_at: row.updated_at
+        }
+      });
+
+      results.push(patched[0] || existing[0]);
+    }
+
+    return results;
+  }
+
+  async upsertThreadRows(rows) {
+    if (!rows.length) {
+      return [];
+    }
+
+    const results = [];
+
+    for (const row of rows) {
+      try {
+        const [thread] = await this.upsertRows("threads", [row], "id,external_id,telegram_chat_id");
+        results.push(thread);
+        continue;
+      } catch (error) {
+        if (!isTelegramChatConflict(error) || !row.telegram_chat_id) {
+          throw error;
+        }
+      }
+
+      const existing = await this.request("/rest/v1/threads", {
+        query: {
+          telegram_chat_id: `eq.${row.telegram_chat_id}`,
+          select: "id,external_id,telegram_chat_id",
+          limit: 1
+        }
+      });
+
+      if (!existing.length) {
+        throw new Error(`Thread sync conflict for telegram_chat_id=${row.telegram_chat_id}, but existing row was not found.`);
+      }
+
+      const patched = await this.request("/rest/v1/threads", {
+        method: "PATCH",
+        query: {
+          id: `eq.${existing[0].id}`,
+          select: "id,external_id,telegram_chat_id"
+        },
+        prefer: "return=representation",
+        body: {
+          external_id: row.external_id,
+          company_id: row.company_id,
+          active_case_id: row.active_case_id,
+          entry_state: row.entry_state,
+          updated_at: row.updated_at
+        }
+      });
+
+      results.push(patched[0] || existing[0]);
+    }
+
+    return results;
+  }
+
   async syncState(state) {
     if (!this.enabled) {
       throw new Error("Supabase sync is not configured. Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY.");
@@ -102,9 +208,15 @@ export class SupabaseSyncClient {
       updated_at: row.updated_at
     }));
 
-    const companies = await this.upsertRows("companies", companyRows, "id,external_id,workspace_id");
-    const companyIdByExternalId = new Map(companies.map((row) => [row.external_id, row.id]));
-    const workspaceIdByCompanyExternalId = new Map(companies.map((row) => [row.external_id, row.workspace_id]));
+    const companies = await this.upsertCompanyRows(companyRows);
+    const companyIdByExternalId = new Map();
+    const workspaceIdByCompanyExternalId = new Map();
+
+    companies.forEach((company, index) => {
+      const stateExternalId = companyRows[index]?.external_id || company.external_id;
+      companyIdByExternalId.set(stateExternalId, company.id);
+      workspaceIdByCompanyExternalId.set(stateExternalId, company.workspace_id);
+    });
 
     const caseRows = projected.cases
       .map((row) => ({
@@ -138,8 +250,13 @@ export class SupabaseSyncClient {
       }))
       .filter((row) => row.company_id);
 
-    const threads = await this.upsertRows("threads", threadRows);
-    const threadIdByExternalId = new Map(threads.map((row) => [row.external_id, row.id]));
+    const threads = await this.upsertThreadRows(threadRows);
+    const threadIdByExternalId = new Map();
+
+    threads.forEach((thread, index) => {
+      const stateExternalId = threadRows[index]?.external_id || thread.external_id;
+      threadIdByExternalId.set(stateExternalId, thread.id);
+    });
 
     const entityRows = {
       messages: projected.messages
