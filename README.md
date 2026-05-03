@@ -86,25 +86,31 @@ npm run evals:diagnostic
 - `promotion`
 - `artifact`
 
-5. Экспорт текущей памяти в реляционный staging-вид:
+5. Проверка admin quality loop:
+
+```bash
+npm run admin:check
+```
+
+6. Экспорт текущей памяти в реляционный staging-вид:
 
 ```bash
 npm run export:memory -- data/smoke-state.json
 ```
 
-6. Синхронизация локальной памяти в Supabase:
+7. Синхронизация локальной памяти в Supabase:
 
 ```bash
 npm run sync:supabase -- data/smoke-state.json
 ```
 
-7. Запуск Telegram-бота:
+8. Запуск Telegram-бота:
 
 ```bash
 npm start
 ```
 
-8. Регистрация Telegram webhook после деплоя на Vercel:
+9. Регистрация Telegram webhook после деплоя на Vercel:
 
 ```bash
 npm run telegram:webhook
@@ -115,6 +121,7 @@ npm run telegram:webhook
 - `TELEGRAM_BOT_TOKEN` — токен бота
 - `TELEGRAM_WEBHOOK_SECRET` — секрет для заголовка `x-telegram-bot-api-secret-token`
 - `APP_BASE_URL` — публичный URL приложения, например `https://your-app.vercel.app`
+- `ADMIN_DASHBOARD_TOKEN` — токен для `/admin` и `/api/admin/*`
 - `OPENAI_API_KEY` — ключ OpenAI
 - `OPENAI_REASONING_MODEL` — по умолчанию `gpt-5.4-mini`
 - `OPENAI_REASONING_EFFORT` — `low|medium|high`
@@ -208,6 +215,19 @@ npm run workspace:membership -- grant --user-id <auth-user-uuid> --workspace-slu
   - graph confidence
 - Артефакты кейсов — локально в `data/artifacts/*.md`, а их содержимое дополнительно сохраняется в structured memory для serverless-runtime
 - Реляционный staging export — в `data/relational-export/*.json`
+
+## Admin quality loop
+
+Первый контур контроля качества доступен через `/admin`.
+
+- `/admin` — простая панель для просмотра диалогов, оценок и повторяющихся улучшений
+- `/api/admin/conversations` — список диалогов
+- `/api/admin/conversations/:threadId` — переписка и диагностические артефакты
+- `/api/admin/conversations/:threadId/evaluate` — запуск evaluator по диалогу
+- `/api/admin/evaluations` — история оценок качества
+- `/api/admin/improvements` — накопленные повторяющиеся улучшения
+
+Админка требует `ADMIN_DASHBOARD_TOKEN`. На сервере она читает данные через `SUPABASE_SERVICE_ROLE_KEY`, поэтому перед production-запуском нужно применить миграцию [20260503_add_admin_quality_loop.sql](</Users/aleksandrseledcik/Library/Mobile Documents/com~apple~CloudDocs/Проект ТГ Бота/supabase/migrations/20260503_add_admin_quality_loop.sql>).
 
 ## Следующие шаги
 

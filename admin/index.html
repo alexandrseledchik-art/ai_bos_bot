@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI-BOSS Admin</title>
+    <link rel="stylesheet" href="/admin-assets/styles.css?v=20260503-1">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">AI-BOSS</p>
+          <h1>Контроль качества</h1>
+        </div>
+        <button class="ghost" id="logoutButton" type="button">Сбросить токен</button>
+      </header>
+
+      <section class="token-panel" id="tokenPanel">
+        <h2>Вход в админку</h2>
+        <p>Укажи admin token из Vercel env `ADMIN_DASHBOARD_TOKEN`.</p>
+        <form id="tokenForm" class="token-form">
+          <input id="tokenInput" name="token" type="password" autocomplete="off" placeholder="ADMIN_DASHBOARD_TOKEN">
+          <button type="submit">Открыть</button>
+        </form>
+      </section>
+
+      <section class="workspace" id="workspace" hidden>
+        <nav class="tabs" aria-label="Разделы админки">
+          <button class="tab active" data-view="conversations" type="button">Диалоги</button>
+          <button class="tab" data-view="evaluations" type="button">Оценки</button>
+          <button class="tab" data-view="improvements" type="button">Улучшения</button>
+        </nav>
+
+        <section class="panel" id="content"></section>
+      </section>
+    </main>
+
+    <script type="module" src="/admin-assets/src/main.js?v=20260503-1"></script>
+  </body>
+</html>

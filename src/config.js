@@ -100,6 +100,7 @@ export function loadConfig() {
     accessControlMode,
     adminTelegramUserIds,
     accessRequestNotifyChatId,
+    adminDashboardToken: process.env.ADMIN_DASHBOARD_TOKEN || "",
     appBaseUrl: process.env.APP_BASE_URL || "",
     alexanderBookingUrl: process.env.ALEXANDER_BOOKING_URL || "",
     miniAppAlphaMode: process.env.MINI_APP_ALPHA_MODE === "true",

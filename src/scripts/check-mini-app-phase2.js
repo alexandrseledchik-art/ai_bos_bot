@@ -43,7 +43,14 @@ assert.equal(matchRoute("/mini-app/tools/sample").params.slug, "sample");
 const vercelConfig = JSON.parse(fs.readFileSync("vercel.json", "utf8"));
 assert.deepEqual(
   vercelConfig.rewrites?.map((rewrite) => rewrite.source),
-  ["/api/mini-app/:first/:rest*", "/mini-app", "/mini-app/:path*"]
+  [
+    "/api/mini-app/:first/:rest*",
+    "/api/admin/:first/:rest*",
+    "/admin",
+    "/admin/:path*",
+    "/mini-app",
+    "/mini-app/:path*"
+  ]
 );
 
 const indexHtml = fs.readFileSync("mini-app/index.html", "utf8");

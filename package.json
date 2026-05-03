@@ -14,6 +14,7 @@
     "telegram:webhook": "node src/scripts/register-telegram-webhook.js",
     "workspace:membership": "node src/scripts/workspace-membership.js",
     "access:check": "node src/scripts/check-access-control.js",
+    "admin:check": "node src/scripts/check-admin-analytics.js",
     "miniapp:phase1": "node src/scripts/check-mini-app-phase1.js",
     "miniapp:phase2": "node src/scripts/check-mini-app-phase2.js",
     "miniapp:phase3": "node src/scripts/check-mini-app-phase3.js",

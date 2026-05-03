@@ -23,7 +23,9 @@ const COMPAT_TABLES = new Set([
   "artifacts",
   "consultation_briefs",
   "mini_app_analytics_events",
-  "mini_app_eval_logs"
+  "mini_app_eval_logs",
+  "admin_conversation_evaluations",
+  "admin_improvements"
 ]);
 
 function firstRow(rows) {

@@ -13,6 +13,18 @@
       "destination": "/api/mini-app/rpc?path=:first/:rest*"
     },
     {
+      "source": "/api/admin/:first/:rest*",
+      "destination": "/api/admin/rpc?path=:first/:rest*"
+    },
+    {
+      "source": "/admin",
+      "destination": "/admin/index.html"
+    },
+    {
+      "source": "/admin/:path*",
+      "destination": "/admin/index.html"
+    },
+    {
       "source": "/mini-app",
       "destination": "/mini-app/index.html"
     },
