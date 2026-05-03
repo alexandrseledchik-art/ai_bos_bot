@@ -22,6 +22,30 @@ function inferAudioFileName(kind, media) {
   return "audio-message.mp3";
 }
 
+function inferFileName(kind, media) {
+  if (media?.file_name) {
+    return media.file_name;
+  }
+
+  if (kind === "photo") {
+    return "telegram-photo.jpg";
+  }
+
+  if (kind === "video") {
+    return "telegram-video.mp4";
+  }
+
+  return "telegram-document";
+}
+
+function pickLargestPhoto(photos = []) {
+  return [...photos].sort((left, right) => {
+    const leftWeight = Number(left.file_size || 0) || Number(left.width || 0) * Number(left.height || 0);
+    const rightWeight = Number(right.file_size || 0) || Number(right.width || 0) * Number(right.height || 0);
+    return rightWeight - leftWeight;
+  })[0] || null;
+}
+
 export function extractTelegramMessagePayload(update) {
   const message = update?.message || update?.edited_message || null;
 
@@ -38,20 +62,68 @@ export function extractTelegramMessagePayload(update) {
     };
   }
 
-  const media = message.voice || message.audio || null;
-  if (!media?.file_id) {
-    return null;
+  const audioMedia = message.voice || message.audio || null;
+  if (audioMedia?.file_id) {
+    return {
+      kind: message.voice ? "voice" : "audio",
+      chatId: message.chat.id,
+      userMeta: buildUserMeta(message),
+      fileId: audioMedia.file_id,
+      mimeType: audioMedia.mime_type || "",
+      fileName: inferAudioFileName(message.voice ? "voice" : "audio", audioMedia),
+      durationSeconds: Number(audioMedia.duration || 0)
+    };
   }
 
-  return {
-    kind: message.voice ? "voice" : "audio",
-    chatId: message.chat.id,
-    userMeta: buildUserMeta(message),
-    fileId: media.file_id,
-    mimeType: media.mime_type || "",
-    fileName: inferAudioFileName(message.voice ? "voice" : "audio", media),
-    durationSeconds: Number(media.duration || 0)
-  };
+  if (message.document?.file_id) {
+    const media = message.document;
+    return {
+      kind: "document",
+      chatId: message.chat.id,
+      userMeta: buildUserMeta(message),
+      fileId: media.file_id,
+      fileUniqueId: media.file_unique_id || "",
+      mimeType: media.mime_type || "",
+      fileName: inferFileName("document", media),
+      fileSize: Number(media.file_size || 0),
+      caption: message.caption || ""
+    };
+  }
+
+  const photo = pickLargestPhoto(message.photo);
+  if (photo?.file_id) {
+    return {
+      kind: "photo",
+      chatId: message.chat.id,
+      userMeta: buildUserMeta(message),
+      fileId: photo.file_id,
+      fileUniqueId: photo.file_unique_id || "",
+      mimeType: "image/jpeg",
+      fileName: inferFileName("photo", photo),
+      fileSize: Number(photo.file_size || 0),
+      caption: message.caption || "",
+      width: Number(photo.width || 0),
+      height: Number(photo.height || 0)
+    };
+  }
+
+  if (message.video?.file_id) {
+    const media = message.video;
+    return {
+      kind: "video",
+      chatId: message.chat.id,
+      userMeta: buildUserMeta(message),
+      fileId: media.file_id,
+      fileUniqueId: media.file_unique_id || "",
+      mimeType: media.mime_type || "video/mp4",
+      fileName: inferFileName("video", media),
+      fileSize: Number(media.file_size || 0),
+      caption: message.caption || "",
+      durationSeconds: Number(media.duration || 0)
+    };
+  }
+
+  return null;
 }
 
 export function extractTelegramTextMessage(update) {

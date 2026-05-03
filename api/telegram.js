@@ -6,7 +6,12 @@ import {
 import { handleAccessAdminCommand, looksLikeAdminCommand } from "../src/application/access-admin-commands.js";
 import { extractTelegramMessagePayload } from "../src/infrastructure/telegram/telegram-api.js";
 import { buildMiniAppReplyMarkup } from "../src/infrastructure/telegram/mini-app-webapp.js";
-import { buildVoiceCapabilityReply, isVoiceCapabilityQuestion } from "../src/infrastructure/telegram/telegram-meta.js";
+import {
+  buildFileCapabilityReply,
+  buildVoiceCapabilityReply,
+  isFileCapabilityQuestion,
+  isVoiceCapabilityQuestion
+} from "../src/infrastructure/telegram/telegram-meta.js";
 import { resolveTelegramPayloadToText } from "../src/infrastructure/telegram/resolve-telegram-input.js";
 
 function json(payload, init = {}) {
@@ -95,6 +100,11 @@ async function handleTelegramWebhook(request) {
         buildVoiceCapabilityReply({ voiceEnabled: Boolean(audioTranscriber?.isEnabled) })
       );
       return json({ ok: true, handled: "voice-capability-question" });
+    }
+
+    if (isFileCapabilityQuestion(resolved.text)) {
+      await telegramApi.sendMessage(payload.chatId, buildFileCapabilityReply());
+      return json({ ok: true, handled: "file-capability-question" });
     }
 
     result = await conversationService.handleUserMessage({

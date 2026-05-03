@@ -5,7 +5,12 @@ import {
 import { handleAccessAdminCommand, looksLikeAdminCommand } from "../../application/access-admin-commands.js";
 import { extractTelegramMessagePayload, TelegramApiClient } from "./telegram-api.js";
 import { buildMiniAppReplyMarkup } from "./mini-app-webapp.js";
-import { buildVoiceCapabilityReply, isVoiceCapabilityQuestion } from "./telegram-meta.js";
+import {
+  buildFileCapabilityReply,
+  buildVoiceCapabilityReply,
+  isFileCapabilityQuestion,
+  isVoiceCapabilityQuestion
+} from "./telegram-meta.js";
 import { resolveTelegramPayloadToText } from "./resolve-telegram-input.js";
 
 function delay(ms) {
@@ -111,6 +116,11 @@ export class TelegramBotRunner {
                 payload.chatId,
                 buildVoiceCapabilityReply({ voiceEnabled: Boolean(this.audioTranscriber?.isEnabled) })
               );
+              continue;
+            }
+
+            if (isFileCapabilityQuestion(resolved.text)) {
+              await this.sendMessage(payload.chatId, buildFileCapabilityReply());
               continue;
             }
 

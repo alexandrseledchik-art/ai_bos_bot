@@ -5,7 +5,13 @@ import { ConversationService } from "../application/conversation-service.js";
 import { ReasoningClient } from "../infrastructure/openai/reasoning-client.js";
 import { FileMemoryStore } from "../infrastructure/storage/file-store.js";
 import { extractTelegramMessagePayload } from "../infrastructure/telegram/telegram-api.js";
-import { buildVoiceCapabilityReply, isVoiceCapabilityQuestion } from "../infrastructure/telegram/telegram-meta.js";
+import { resolveTelegramPayloadToText } from "../infrastructure/telegram/resolve-telegram-input.js";
+import {
+  buildFileCapabilityReply,
+  buildVoiceCapabilityReply,
+  isFileCapabilityQuestion,
+  isVoiceCapabilityQuestion
+} from "../infrastructure/telegram/telegram-meta.js";
 
 class StubWebsiteScreener {
   async screen(url) {
@@ -58,6 +64,89 @@ async function run() {
 
   if (!/Да, принимаю/i.test(buildVoiceCapabilityReply({ voiceEnabled: true }))) {
     throw new Error("Voice capability positive reply should be available.");
+  }
+
+  if (!isFileCapabilityQuestion("Файлы и pdf принимаешь?")) {
+    throw new Error("File capability question should be detected.");
+  }
+
+  if (!/файлы принимаю/i.test(buildFileCapabilityReply())) {
+    throw new Error("File capability reply should be available.");
+  }
+
+  const documentPayload = extractTelegramMessagePayload({
+    message: {
+      chat: { id: 42 },
+      from: { username: "file_user", first_name: "File" },
+      caption: "Посмотри, что здесь важно для продаж",
+      document: {
+        file_id: "document-file-id",
+        file_unique_id: "document-unique-id",
+        file_name: "sales-notes.txt",
+        mime_type: "text/plain",
+        file_size: 128
+      }
+    }
+  });
+
+  if (!documentPayload || documentPayload.kind !== "document" || documentPayload.caption !== "Посмотри, что здесь важно для продаж") {
+    throw new Error("Document payload should be extracted with caption.");
+  }
+
+  const resolvedDocument = await resolveTelegramPayloadToText({
+    payload: documentPayload,
+    telegramApi: {
+      async getFile(fileId) {
+        if (fileId !== "document-file-id") {
+          throw new Error("Unexpected file id.");
+        }
+        return { file_path: "documents/sales-notes.txt" };
+      },
+      async downloadFile() {
+        return Buffer.from("Лидов много, но часть заявок нецелевые и не проходят квалификацию.", "utf8");
+      }
+    },
+    audioTranscriber: null
+  });
+
+  if (!resolvedDocument.text.includes("Содержимое файла") || !resolvedDocument.userMeta.fileContentExtracted) {
+    throw new Error("Text document should be resolved into message text.");
+  }
+
+  const photoPayload = extractTelegramMessagePayload({
+    message: {
+      chat: { id: 42 },
+      from: { username: "photo_user", first_name: "Photo" },
+      caption: "Это скрин воронки",
+      photo: [
+        {
+          file_id: "small-photo",
+          width: 100,
+          height: 100,
+          file_size: 1000
+        },
+        {
+          file_id: "large-photo",
+          width: 1000,
+          height: 1000,
+          file_size: 100000
+        }
+      ]
+    }
+  });
+
+  if (!photoPayload || photoPayload.kind !== "photo" || photoPayload.fileId !== "large-photo") {
+    throw new Error("Photo payload should use the largest available Telegram photo.");
+  }
+
+  const resolvedPhoto = await resolveTelegramPayloadToText({
+    payload: photoPayload,
+    telegramApi: {},
+    audioTranscriber: null
+  });
+
+  if (!resolvedPhoto.text.includes("Содержимое этого файла пока не извлечено автоматически")) {
+    throw new Error("Unsupported photo should produce a safe file context.");
   }
 
   const cwd = process.cwd();
