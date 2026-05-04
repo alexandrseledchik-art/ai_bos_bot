@@ -352,7 +352,31 @@ function buildRankingReason(candidate) {
     reasons.push("это верхний или проходной слой, который может объяснять проблемы ниже");
   }
 
+  if (candidate.rejectionPenalty > 0) {
+    reasons.push("предыдущая версия по этому слою была отклонена пользователем");
+  }
+
   return reasons;
+}
+
+function extractRejectedLayersWithFeedback(observations = []) {
+  const layers = new Set();
+
+  for (const observation of observations || []) {
+    if (observation?.normalized_signal !== "constraint_rejection_feedback") {
+      continue;
+    }
+
+    const evidenceItems = Array.isArray(observation.evidence) ? observation.evidence : [];
+    for (const item of evidenceItems) {
+      const layerKey = item?.rejectedLayerKey;
+      if (getBusinessLayerByKey(layerKey)) {
+        layers.add(layerKey);
+      }
+    }
+  }
+
+  return layers;
 }
 
 function buildExplanation(candidate) {
@@ -379,6 +403,7 @@ export class ConstraintReasoner {
     const problemText = getProblemText({ problemContext, companyProfile });
     const requestRelevance = calculateRequestRelevance(problemText);
     const observationsByLayer = groupObservationsByLayer(observations);
+    const rejectedLayersWithFeedback = extractRejectedLayersWithFeedback(observations);
     const observationWeightsByLayer = Object.fromEntries(
       BUSINESS_LAYERS_V1.map((layer) => {
         const layerObservations = observationsByLayer.get(layer.key) || [];
@@ -400,12 +425,14 @@ export class ConstraintReasoner {
         ? CLASS_PRIORITY[layer.classKey]
         : 0;
       const dLayerPenalty = layer.classKey === "D" && (requestScore + observationScore) < 0.75 ? 0.04 : 0;
+      const rejectionPenalty = rejectedLayersWithFeedback.has(layer.key) ? 0.18 : 0;
       const candidateScore = clamp(
         normalizedGap * 0.32 +
           requestScore * 0.28 +
           observationScore * 0.26 +
           upperLayerBonus -
-          dLayerPenalty,
+          dLayerPenalty -
+          rejectionPenalty,
         0,
         1
       );
@@ -429,6 +456,7 @@ export class ConstraintReasoner {
         observationScore,
         observationCount: supportingObservations.length,
         supportingObservations,
+        rejectionPenalty,
         candidateScore: Number(candidateScore.toFixed(3)),
         confidence: Number(confidence.toFixed(2))
       };

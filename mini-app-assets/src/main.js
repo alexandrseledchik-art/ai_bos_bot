@@ -35,6 +35,8 @@ const state = {
     data: null,
     loading: false,
     actionSaving: "",
+    chatRequesting: false,
+    message: "",
     error: ""
   },
   nextStep: {
@@ -759,6 +761,10 @@ function renderConstraint() {
   }
 
   const hypothesis = block.data.constraintHypothesis;
+  if (hypothesis.status === "rejected") {
+    return renderRejectedConstraintHandoff(hypothesis);
+  }
+
   const confidence = Math.round(Number(hypothesis.confidence || 0) * 100);
   const isLowConfidence = Number(hypothesis.confidence || 0) < 0.55;
   const constraintMeaning = getConstraintMeaning(hypothesis);
@@ -853,6 +859,43 @@ function renderConstraint() {
     <section class="card list-card">
       <h3>Альтернативные версии</h3>
       ${renderAlternativeList(hypothesis.alternatives)}
+    </section>
+  `;
+}
+
+function renderRejectedConstraintHandoff(hypothesis) {
+  const block = state.constraint;
+  const title = hypothesis.layerTitle || hypothesis.title || "предыдущая версия";
+
+  return `
+    <section class="hero compact">
+      <p>Версия отклонена</p>
+      <h2>Уточним, что не сходится</h2>
+      <p>Мы не ведём маршрут от гипотезы «${escapeHtml(title)}». Чтобы выбрать более точную версию, лучше дать живое объяснение в чате: какой факт я не учёл, почему это похоже на следствие или какая область кажется ближе к корню.</p>
+    </section>
+
+    <section class="card next-card">
+      <h3>Следующий ход</h3>
+      <p>Нажми кнопку ниже — я отправлю в Telegram короткий вопрос. Ответь на него одним сообщением, и этот ответ сохранится как новый сигнал для пересборки гипотезы.</p>
+      <div class="decision-note">
+        <strong>Что изменится после ответа</strong>
+        <span>AI-BOSS перестанет опираться на отклонённую версию как на рабочую.</span>
+        <span>Твоё объяснение попадёт в кейс как факт обратной связи.</span>
+        <span>Новая гипотеза будет пересчитана с учётом этого сигнала.</span>
+      </div>
+      <div class="actions">
+        <button
+          class="primary-button"
+          type="button"
+          data-constraint-chat="${escapeAttribute(hypothesis.id)}"
+          ${block.chatRequesting ? "disabled" : ""}
+        >
+          ${block.chatRequesting ? "Отправляю в чат..." : "Объяснить в чате"}
+        </button>
+        <button class="secondary-button" type="button" data-reload-route>Пересобрать гипотезу</button>
+        <button class="secondary-button" type="button" data-navigate="/mini-app/maturity">К матрице</button>
+      </div>
+      ${block.message ? `<p class="hint-text">${escapeHtml(block.message)}</p>` : ""}
     </section>
   `;
 }
@@ -2002,6 +2045,10 @@ function bindEvents() {
     button.addEventListener("click", () => applyConstraintAction(button.dataset.constraintId, button.dataset.constraintAction));
   });
 
+  appRoot.querySelectorAll("[data-constraint-chat]").forEach((button) => {
+    button.addEventListener("click", () => requestConstraintRejectionChat(button.dataset.constraintChat));
+  });
+
   appRoot.querySelectorAll("[data-next-step-action]").forEach((button) => {
     button.addEventListener("click", () => updateNextStep(button.dataset.nextStepId, button.dataset.nextStepAction));
   });
@@ -2447,6 +2494,7 @@ async function loadConstraint({ force = false } = {}) {
 
   state.constraint.loading = true;
   state.constraint.error = "";
+  state.constraint.message = "";
   render();
 
   try {
@@ -2468,6 +2516,7 @@ async function applyConstraintAction(id, action) {
 
   state.constraint.actionSaving = action;
   state.constraint.error = "";
+  state.constraint.message = "";
   render();
 
   try {
@@ -2488,6 +2537,35 @@ async function applyConstraintAction(id, action) {
     state.constraint.error = errorMessage(error, "Не удалось обновить гипотезу.");
   } finally {
     state.constraint.actionSaving = "";
+    render();
+  }
+}
+
+async function requestConstraintRejectionChat(id) {
+  if (!id) {
+    return;
+  }
+
+  state.constraint.chatRequesting = true;
+  state.constraint.error = "";
+  state.constraint.message = "";
+  render();
+
+  try {
+    const result = await api.requestConstraintRejectionChat({ id });
+    state.constraint.data = {
+      ...(state.constraint.data || {}),
+      chatHandoff: result.chatHandoff || null
+    };
+    state.constraint.message = "Я отправил вопрос в Telegram. Ответь там одним сообщением — и я сохраню это как новый сигнал для пересборки гипотезы.";
+
+    if (window.Telegram?.WebApp?.close) {
+      window.setTimeout(() => window.Telegram.WebApp.close(), 450);
+    }
+  } catch (error) {
+    state.constraint.error = errorMessage(error, "Не удалось отправить вопрос в чат.");
+  } finally {
+    state.constraint.chatRequesting = false;
     render();
   }
 }

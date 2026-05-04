@@ -1,6 +1,7 @@
 import { MiniAppAnalyticsService } from "../../src/application/mini-app-analytics-service.js";
 import { handleMiniAppRoute, jsonResponse, readJsonBody } from "../../src/application/mini-app-api-context.js";
 import { MiniAppDiagnosticsService } from "../../src/application/mini-app-diagnostics-service.js";
+import { TelegramApiClient } from "../../src/infrastructure/telegram/telegram-api.js";
 
 function miniAppPath(request) {
   const url = new URL(request.url);
@@ -139,6 +140,24 @@ async function dispatchMiniAppRoute(request) {
 
       const payload = await readJsonBody(request);
       const result = await service.applyConstraintAction({ bootstrap, payload });
+      return jsonResponse({ ok: true, ...result });
+    });
+  }
+
+  if (path === "constraint/rejection-chat") {
+    return handleMiniAppRoute(request, ["POST"], async ({ config, syncClient, bootstrap, telegramUser }) => {
+      const service = createService(syncClient);
+      const payload = await readJsonBody(request);
+      const result = await service.requestConstraintRejectionChat({ bootstrap, payload });
+
+      if (config.telegramToken && telegramUser?.id) {
+        const telegramApi = new TelegramApiClient({
+          token: config.telegramToken,
+          apiBaseUrl: config.telegramApiBaseUrl
+        });
+        await telegramApi.sendMessage(telegramUser.id, result.chatHandoff.chatMessage);
+      }
+
       return jsonResponse({ ok: true, ...result });
     });
   }

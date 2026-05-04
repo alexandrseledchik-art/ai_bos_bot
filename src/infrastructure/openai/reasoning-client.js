@@ -2261,6 +2261,87 @@ function buildUnknownDecision(context) {
   };
 }
 
+function buildConstraintRejectionFeedbackDecision(context) {
+  const handoff = context.userMeta?.miniAppHandoff || {};
+  const rejectedTitle = handoff.layerTitle || handoff.constraintTitle || "предыдущая версия";
+  const inferredLayer = handoff.inferredLayerKey || "";
+  const entryState = {
+    ...buildEntryState(context, "general", "partial", "", "ready_for_diagnostic_case"),
+    selectedConstraint: "",
+    miniAppHandoff: {
+      type: "constraint_rejection_feedback",
+      rejectedLayerKey: handoff.layerKey || "",
+      inferredLayerKey: inferredLayer
+    }
+  };
+
+  return {
+    selectedMode: "diagnostic_mode",
+    decision: {
+      action: "answer",
+      signalSufficiency: "partial",
+      confidence: 0.78,
+      rationale: "Пользователь объяснил, почему отклоняет гипотезу из Кабинета; это новый факт обратной связи, а не обычный свободный запрос."
+    },
+    response: {
+      whatIUnderstood:
+        `Ты отклонил версию «${rejectedTitle}» и дал причину, почему она не должна быть рабочей основой.`,
+      hypotheses: [
+        "Предыдущая версия может быть следствием, а не главным ограничением.",
+        "Новую гипотезу нужно пересобрать с учётом этого объяснения и соседних областей."
+      ],
+      whyItMatters:
+        "Так мы не спорим с пользователем и не тянем маршрут от версии, которой он не доверяет.",
+      nextStep:
+        "Вернись в Кабинет и пересобери гипотезу ограничения. Если есть ещё один факт, который ломает старую версию, напиши его следующим сообщением.",
+      responseText:
+        `Ок, принял. Я не буду вести маршрут от версии «${rejectedTitle}» как от рабочей основы.\n\n` +
+        "Сохранил твоё объяснение как новый сигнал к кейсу. Теперь логичный ход — пересобрать гипотезу в Кабинете: новая версия должна учитывать, почему прежняя не сходится.\n\n" +
+        "Если есть ещё один факт, который точно ломает старую версию, напиши его следующим сообщением."
+    },
+    guardrails: {
+      knownFacts: [
+        `Пользователь отклонил гипотезу «${rejectedTitle}».`,
+        "Пользователь дал объяснение в чате после отклонения версии в Кабинете."
+      ],
+      observations: ["Отклонение гипотезы сохранено как обратная связь и должно повлиять на пересборку версии."],
+      workingHypotheses: [
+        "Прежняя гипотеза может быть следствием.",
+        "Главное ограничение может находиться в соседнем слое."
+      ],
+      canNotAssert: ["Нельзя автоматически считать новую версию доказанной только по одному комментарию."],
+      confidenceNote: "Это новый сигнал для пересборки гипотезы, а не финальный диагноз."
+    },
+    graphAnalysis: buildGraphAnalysisPacket(context.graphPacket),
+    entryState,
+    memory: {
+      companyName: "",
+      caseKind: "diagnostic_case",
+      goal: "Пересобрать гипотезу ограничения после обратной связи пользователя.",
+      symptoms: [context.userText],
+      hypotheses: [
+        "Предыдущая версия может быть следствием.",
+        "Нужно проверить соседнюю область как возможный корень."
+      ],
+      constraint: "Пересобрать гипотезу ограничения с учётом отклонения пользователем.",
+      situation: "Пользователь дал обратную связь после отклонения гипотезы в Кабинете.",
+      actionWave: {
+        enabled: false,
+        firstStep: "",
+        notNow: "Не продолжать следующий шаг от отклонённой гипотезы.",
+        whyThisFirst: ""
+      },
+      toolRecommendations: [],
+      artifact: {
+        shouldSave: false,
+        title: "",
+        summary: "",
+        kind: "snapshot"
+      }
+    }
+  };
+}
+
 function buildProblemDecision(context) {
   const focus = detectFocus(context.userText);
   const hardSignal = detectHardSignal(context.userText);
@@ -2394,6 +2475,10 @@ function buildHeuristicDecision(context) {
   const { classification, userText } = context;
   const focus = detectFocus(userText);
 
+  if (context.userMeta?.miniAppHandoff?.type === "constraint_rejection_feedback") {
+    return buildConstraintRejectionFeedbackDecision(context);
+  }
+
   if (classification.entryMode === "specific_tool_request" || classification.entryMode === "tool_discovery") {
     return buildToolFirstDecision(context);
   }
@@ -2518,6 +2603,10 @@ export class ReasoningClient {
   }
 
   async decide(context) {
+    if (context.userMeta?.miniAppHandoff?.type === "constraint_rejection_feedback") {
+      return this.fallback.decide(context);
+    }
+
     if (context.classification?.entryMode === "meta_role") {
       return this.fallback.decide(context);
     }

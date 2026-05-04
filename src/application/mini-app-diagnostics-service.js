@@ -15,6 +15,8 @@ const OFFICIAL_ANSWER_SOURCES = new Set([
 ]);
 
 const OFFICIAL_ANSWER_STATUSES = new Set(["confirmed", "corrected"]);
+const CONSTRAINT_REJECTION_CHAT_EVENT = "constraint_rejection_chat_requested";
+const CONSTRAINT_REJECTION_FEEDBACK_SIGNAL = "constraint_rejection_feedback";
 
 function firstRow(rows) {
   return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
@@ -22,6 +24,48 @@ function firstRow(rows) {
 
 function trimString(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeText(value) {
+  return trimString(value).toLowerCase();
+}
+
+function truncateText(value, maxLength = 900) {
+  const text = trimString(value);
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  return `${text.slice(0, maxLength - 1).trim()}…`;
+}
+
+function hasUsefulChatFeedback(value) {
+  const text = trimString(value);
+  return text.length >= 12 && !text.startsWith("/");
+}
+
+function inferLayerFromRejectionFeedback(text, fallbackLayer = "") {
+  const normalized = normalizeText(text);
+  const rules = [
+    { layerKey: "owner_context", pattern: /собственник|партн[её]р|цель|роль|решени|приоритет|фокус/ },
+    { layerKey: "external_environment", pattern: /рынок|спрос|конкурент|отрасл|внешн/ },
+    { layerKey: "strategy", pattern: /стратег|сегмент|позиционир|фокус|направлен|рынок/ },
+    { layerKey: "product_value_proposition", pattern: /продукт|ценност|оффер|предложени|упаковк|результат|клиентск/ },
+    { layerKey: "commercial", pattern: /продаж|лид|заяв|ворон|конверс|трафик|клиент/ },
+    { layerKey: "operating_model", pattern: /процесс|операцион|исполн|срок|качест|delivery|передач/ },
+    { layerKey: "finance", pattern: /деньг|финанс|прибыл|марж|касс|выруч|расход/ },
+    { layerKey: "people_organization", pattern: /команд|люд|сотруд|менедж|компетенц|нагруз|выгор/ },
+    { layerKey: "governance_risks", pattern: /управлен|контрол|ответствен|риск|ритм|хаос/ },
+    { layerKey: "technology", pattern: /технолог|автомат|crm|инструмент|систем|интеграц/ },
+    { layerKey: "data_analytics", pattern: /данн|цифр|аналит|отч[её]т|метрик|неточн|факт/ }
+  ];
+  const match = rules.find((rule) => rule.pattern.test(normalized));
+
+  if (match) {
+    return match.layerKey;
+  }
+
+  return getBusinessLayerByKey(fallbackLayer) ? fallbackLayer : "data_analytics";
 }
 
 function normalizeUrl(value) {
@@ -214,6 +258,25 @@ export class MiniAppDiagnosticsService {
       prefer: "return=representation",
       body
     });
+  }
+
+  async findLatestPendingConstraintRejectionChat({ bootstrap }) {
+    if (!bootstrap?.appUser?.id) {
+      return null;
+    }
+
+    const rows = await this.findMany("mini_app_analytics_events", {
+      app_user_id: `eq.${bootstrap.appUser.id}`,
+      event_name: `eq.${CONSTRAINT_REJECTION_CHAT_EVENT}`,
+      order: "created_at.desc",
+      select: "*",
+      limit: 8
+    });
+
+    return (rows || []).find((row) => {
+      const metadata = row.metadata && typeof row.metadata === "object" ? row.metadata : {};
+      return metadata.status !== "consumed";
+    }) || null;
   }
 
   buildContextIds(bootstrap) {
@@ -777,10 +840,16 @@ export class MiniAppDiagnosticsService {
 
   async getConstraintInputs({ bootstrap }) {
     const run = await this.resolveExpressDiagnosticRun({ bootstrap });
-    const [answers, observations, problemContext] = await Promise.all([
+    const [answers, observations, problemContext, rejectedHypotheses] = await Promise.all([
       this.getExpressAnswers(run.id),
       this.getCaseObservations({ bootstrap }),
-      this.getActiveProblemContext({ bootstrap })
+      this.getActiveProblemContext({ bootstrap }),
+      this.findMany("constraint_hypotheses", {
+        case_id: `eq.${bootstrap.activeCase.id}`,
+        status: "eq.rejected",
+        order: "updated_at.desc",
+        select: "*"
+      })
     ]);
     const maturity = calculateExpressMaturity(answers);
 
@@ -790,6 +859,7 @@ export class MiniAppDiagnosticsService {
       maturity,
       observations,
       problemContext,
+      rejectedHypotheses: rejectedHypotheses || [],
       companyProfile: bootstrap.companyProfile
     };
   }
@@ -942,6 +1012,145 @@ export class MiniAppDiagnosticsService {
     return {
       action,
       constraintHypothesis: decorated
+    };
+  }
+
+  buildConstraintRejectionChatMessage(constraintHypothesis) {
+    const title = constraintHypothesis?.layerTitle || constraintHypothesis?.title || "предыдущая версия";
+
+    return [
+      `Ок, версию «${title}» не берём как рабочую.`,
+      "",
+      "Напиши одним сообщением, что в ней не сходится: почему это не похоже на главное ограничение, что выглядит следствием, где данные неточные или какой факт я не учёл.",
+      "",
+      "Я сохраню это как новый сигнал и пересоберу гипотезу уже с учётом твоего ответа."
+    ].join("\n");
+  }
+
+  async requestConstraintRejectionChat({ bootstrap, payload }) {
+    const id = trimString(payload.id || payload.constraintHypothesisId);
+
+    if (!id) {
+      throw new Error("Constraint hypothesis id is required.");
+    }
+
+    const existing = await this.findOne("constraint_hypotheses", {
+      id: `eq.${id}`,
+      case_id: `eq.${bootstrap.activeCase.id}`,
+      select: "*"
+    });
+
+    if (!existing) {
+      throw new Error("Constraint hypothesis was not found.");
+    }
+
+    const constraintHypothesis = this.decorateConstraintHypothesis(existing);
+    const chatMessage = this.buildConstraintRejectionChatMessage(constraintHypothesis);
+    const event = await this.logMiniAppEvent({
+      bootstrap,
+      eventName: CONSTRAINT_REJECTION_CHAT_EVENT,
+      metadata: {
+        status: "pending",
+        constraintHypothesisId: constraintHypothesis.id,
+        title: constraintHypothesis.title,
+        layerKey: constraintHypothesis.layerKey,
+        layerTitle: constraintHypothesis.layerTitle,
+        chatMessage
+      }
+    });
+
+    return {
+      constraintHypothesis,
+      chatHandoff: {
+        eventId: event?.id || "",
+        status: "pending",
+        chatMessage,
+        title: constraintHypothesis.title,
+        layerKey: constraintHypothesis.layerKey,
+        layerTitle: constraintHypothesis.layerTitle
+      }
+    };
+  }
+
+  async recordConstraintRejectionChatReply({ bootstrap, payload }) {
+    const text = truncateText(payload?.text || payload?.message || "");
+
+    if (!hasUsefulChatFeedback(text)) {
+      return null;
+    }
+
+    const event = await this.findLatestPendingConstraintRejectionChat({ bootstrap });
+    if (!event) {
+      return null;
+    }
+
+    const metadata = event.metadata && typeof event.metadata === "object" ? event.metadata : {};
+    const rejectedLayerKey = metadata.layerKey || "";
+    const inferredLayerKey = inferLayerFromRejectionFeedback(text, rejectedLayerKey);
+    const layer = getBusinessLayerByKey(inferredLayerKey) || getBusinessLayerByKey(rejectedLayerKey) || getBusinessLayerByKey("data_analytics");
+    const contextIds = this.buildContextIds(bootstrap);
+    const statement = [
+      `Пользователь отклонил гипотезу «${metadata.layerTitle || metadata.title || "предыдущая версия"}».`,
+      `Причина: ${text}`
+    ].join(" ");
+    const observation = await this.upsertOne(
+      "observations",
+      {
+        ...contextIds,
+        source_type: "chat",
+        source_id: `constraint_rejection_feedback:${event.id}`,
+        statement,
+        normalized_signal: CONSTRAINT_REJECTION_FEEDBACK_SIGNAL,
+        layer: layer.key,
+        layer_class: layer.classKey,
+        flow_type: "constraint_rejection_feedback",
+        confidence: 0.95,
+        evidence: [{
+          text,
+          rejectedLayerKey,
+          rejectedConstraintHypothesisId: metadata.constraintHypothesisId || "",
+          inferredLayerKey: layer.key
+        }],
+        status: "active"
+      },
+      {
+        onConflict: "case_id,source_type,source_id,normalized_signal"
+      }
+    );
+
+    const consumedAt = new Date().toISOString();
+    await this.patchOne("mini_app_analytics_events", event.id, {
+      metadata: {
+        ...metadata,
+        status: "consumed",
+        consumedAt,
+        responseText: text,
+        feedbackObservationId: observation?.id || "",
+        inferredLayerKey: layer.key
+      }
+    });
+    await this.logMiniAppEvent({
+      bootstrap,
+      eventName: "constraint_rejection_chat_received",
+      metadata: {
+        sourceEventId: event.id,
+        constraintHypothesisId: metadata.constraintHypothesisId || "",
+        rejectedLayerKey,
+        inferredLayerKey: layer.key,
+        feedbackObservationId: observation?.id || ""
+      }
+    });
+
+    return {
+      type: "constraint_rejection_feedback",
+      observation,
+      eventId: event.id,
+      constraintHypothesisId: metadata.constraintHypothesisId || "",
+      constraintTitle: metadata.title || "",
+      layerKey: rejectedLayerKey,
+      layerTitle: metadata.layerTitle || "",
+      inferredLayerKey: layer.key,
+      text
     };
   }
 

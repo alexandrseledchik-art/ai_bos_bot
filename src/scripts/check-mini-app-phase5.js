@@ -256,6 +256,45 @@ async function assertConstraintFlow() {
   assert.equal(nextStepResult.nextStep.status, "suggested");
 }
 
+async function assertConstraintRejectionChatHandoff() {
+  const { service, bootstrap, syncClient } = await buildPhase5Case();
+  const result = await service.reasonConstraint({ bootstrap });
+  const hypothesis = result.constraintHypothesis;
+
+  await service.applyConstraintAction({
+    bootstrap,
+    payload: {
+      id: hypothesis.id,
+      action: "reject"
+    }
+  });
+
+  const handoff = await service.requestConstraintRejectionChat({
+    bootstrap,
+    payload: {
+      id: hypothesis.id
+    }
+  });
+  assert.match(handoff.chatHandoff.chatMessage, /Напиши одним сообщением/);
+  assert.equal(handoff.chatHandoff.status, "pending");
+
+  const feedback = await service.recordConstraintRejectionChatReply({
+    bootstrap,
+    payload: {
+      text: "Это похоже на следствие. Корень скорее в продукте и оффере, а не в коммерции."
+    }
+  });
+  assert.equal(feedback.type, "constraint_rejection_feedback");
+  assert.equal(feedback.layerKey, hypothesis.layerKey);
+  assert.equal(feedback.inferredLayerKey, "product_value_proposition");
+  assert.equal(syncClient.getTable("observations").some((row) => row.normalized_signal === "constraint_rejection_feedback"), true);
+
+  const event = syncClient.getTable("mini_app_analytics_events")
+    .find((row) => row.event_name === "constraint_rejection_chat_requested");
+  assert.equal(event.metadata.status, "consumed");
+  assert.match(event.metadata.responseText, /Корень скорее/);
+}
+
 function assertReasonerDoesNotUseLowestScoreOnly() {
   const reasoner = new ConstraintReasoner();
   const result = reasoner.reason({
@@ -323,17 +362,20 @@ async function assertApiClient() {
 
   await client.reasonConstraint();
   await client.applyConstraintAction({ id: "constraint_1", action: "confirm" });
+  await client.requestConstraintRejectionChat({ id: "constraint_1" });
   await client.getNextStep();
   await client.updateNextStep({ id: "step_1", action: "accept" });
 
   assert.deepEqual(calls.map((call) => call.path), [
     "/api/mini-app/constraint/reason",
     "/api/mini-app/constraint/reason",
+    "/api/mini-app/constraint/rejection-chat",
     "/api/mini-app/next-step",
     "/api/mini-app/next-step"
   ]);
   assert.equal(calls[1].method, "POST");
-  assert.equal(calls[3].body.action, "accept");
+  assert.equal(calls[2].method, "POST");
+  assert.equal(calls[4].body.action, "accept");
   assert.equal(calls.every((call) => call.initData === "signed-init-data"), true);
 }
 
@@ -357,14 +399,18 @@ function assertFrontendAndRoutes() {
   assert.match(mainJs, /Что проверяем/);
   assert.match(mainJs, /Зачем это знать/);
   assert.match(mainJs, /data-constraint-action/);
+  assert.match(mainJs, /data-constraint-chat/);
+  assert.match(mainJs, /Объяснить в чате/);
   assert.match(mainJs, /data-next-step-action/);
   assert.match(styles, /\.insight-card/);
   assert.match(styles, /\.decision-note/);
   assert.match(styles, /\.selection-breakdown/);
   assert.match(styles, /\.growth-row/);
   assert.match(apiClient, /reasonConstraint/);
+  assert.match(apiClient, /requestConstraintRejectionChat/);
   assert.match(apiClient, /getNextStep/);
   assert.match(miniAppApi, /reasonConstraint/);
+  assert.match(miniAppApi, /constraint\/rejection-chat/);
   assert.match(miniAppApi, /getOrCreateNextStep/);
 }
 
@@ -372,6 +418,7 @@ async function main() {
   assertReasonerDoesNotUseLowestScoreOnly();
   assertNextStepSelector();
   await assertConstraintFlow();
+  await assertConstraintRejectionChatHandoff();
   await assertApiClient();
   assertFrontendAndRoutes();
 

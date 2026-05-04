@@ -102,6 +102,13 @@ export class MiniAppApiClient {
     });
   }
 
+  requestConstraintRejectionChat(payload) {
+    return this.request("/api/mini-app/constraint/rejection-chat", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  }
+
   getNextStep() {
     return this.request("/api/mini-app/next-step");
   }

@@ -4,6 +4,8 @@ import {
   buildAccessRequestAdminMessage
 } from "../src/application/access-control-service.js";
 import { handleAccessAdminCommand, looksLikeAdminCommand } from "../src/application/access-admin-commands.js";
+import { MiniAppDiagnosticsService } from "../src/application/mini-app-diagnostics-service.js";
+import { MiniAppCompatSyncClient } from "../src/infrastructure/storage/mini-app-compat-sync.js";
 import { extractTelegramMessagePayload } from "../src/infrastructure/telegram/telegram-api.js";
 import { buildMiniAppReplyMarkup } from "../src/infrastructure/telegram/mini-app-webapp.js";
 import {
@@ -52,6 +54,64 @@ async function recordAndSendTelegramReply({
   }
 
   await telegramApi.sendMessage(payload.chatId, reply, options);
+}
+
+async function captureMiniAppChatHandoffFeedback({ config, payload, text }) {
+  if (!config.supabaseUrl || !config.supabaseServiceRoleKey || !text) {
+    return null;
+  }
+
+  try {
+    const telegramUserId = payload.userMeta?.telegramUserId || payload.userMeta?.id || payload.chatId;
+    const syncClient = new MiniAppCompatSyncClient({
+      url: config.supabaseUrl,
+      serviceRoleKey: config.supabaseServiceRoleKey
+    });
+    const appUsers = await syncClient.request("/rest/v1/app_users", {
+      query: {
+        telegram_user_id: `eq.${telegramUserId}`,
+        select: "*",
+        limit: 1
+      }
+    });
+    const appUser = Array.isArray(appUsers) ? appUsers[0] : null;
+    if (!appUser?.id) {
+      return null;
+    }
+
+    const events = await syncClient.request("/rest/v1/mini_app_analytics_events", {
+      query: {
+        app_user_id: `eq.${appUser.id}`,
+        event_name: "eq.constraint_rejection_chat_requested",
+        order: "created_at.desc",
+        select: "*",
+        limit: 8
+      }
+    });
+    const pendingEvent = (events || []).find((event) => {
+      const metadata = event.metadata && typeof event.metadata === "object" ? event.metadata : {};
+      return metadata.status !== "consumed";
+    });
+    if (!pendingEvent?.case_id || !pendingEvent?.workspace_id || !pendingEvent?.company_id) {
+      return null;
+    }
+
+    const diagnosticsService = new MiniAppDiagnosticsService({ syncClient });
+
+    return diagnosticsService.recordConstraintRejectionChatReply({
+      bootstrap: {
+        appUser,
+        workspace: { id: pendingEvent.workspace_id },
+        company: { id: pendingEvent.company_id },
+        activeCase: { id: pendingEvent.case_id },
+        companyProfile: {}
+      },
+      payload: { text }
+    });
+  } catch (error) {
+    console.warn("Mini App chat handoff feedback skipped:", error.message);
+    return null;
+  }
 }
 
 async function handleTelegramWebhook(request) {
@@ -149,10 +209,19 @@ async function handleTelegramWebhook(request) {
       return json({ ok: true, handled: "file-capability-question" });
     }
 
+    const miniAppHandoff = await captureMiniAppChatHandoffFeedback({
+      config,
+      payload,
+      text: resolved.text
+    });
+
     result = await conversationService.handleUserMessage({
       telegramChatId: String(payload.chatId),
       text: resolved.text,
-      userMeta: resolved.userMeta
+      userMeta: {
+        ...(resolved.userMeta || {}),
+        ...(miniAppHandoff ? { miniAppHandoff } : {})
+      }
     });
   } finally {
     stopTyping();
