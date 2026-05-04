@@ -33,6 +33,30 @@
     "mustNotContain": ["Где у тебя сейчас самое сильное напряжение", "прибыль, рост или управляемость", "выбрал контур"]
   },
   {
+    "id": "meta_role_alexander_consulting",
+    "input": "Как ты теперь понимаешь свою роль в упаковке консалтинга Александра?",
+    "expectedRoute": "free_text_vague",
+    "expectedEntryMode": "meta_role",
+    "expectedMode": "clarification_mode",
+    "expectedAction": "answer",
+    "artifactExpected": false,
+    "mustContain": ["управляющим контуром", "CEO-слой", "Александра", "согласование"],
+    "mustContainAny": ["собственника", "носителя методологии"],
+    "mustNotContain": ["Где у тебя сейчас самое сильное напряжение", "прибыль, рост или управляемость", "Открыть инструменты"]
+  },
+  {
+    "id": "business_layers_method_question",
+    "input": "а что если это все разложить по 11 слоям?",
+    "expectedRoute": "free_text_vague",
+    "expectedEntryMode": "meta_role",
+    "expectedMode": "clarification_mode",
+    "expectedAction": "answer",
+    "artifactExpected": false,
+    "mustContain": ["11 слоям", "карту решений", "не как анкету"],
+    "mustContainAny": ["консалтинг", "нашего кейса", "рабочую карту"],
+    "mustNotContain": ["прибыль, рост или управляемость", "Открыть инструменты", "нужен инструмент"]
+  },
+  {
     "id": "vague_profit_goal",
     "input": "Хочу увеличить прибыль",
     "expectedRoute": "free_text_vague",

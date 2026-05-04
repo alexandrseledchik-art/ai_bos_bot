@@ -17,6 +17,23 @@
     ]
   },
   {
+    "id": "role_alexander_consulting_ceo_layer",
+    "turns": [
+      "Как ты теперь понимаешь свою роль в упаковке консалтинга Александра?"
+    ],
+    "expectedEntryMode": "meta_role",
+    "expectedAction": "answer",
+    "turnChecks": [
+      {
+        "mustContain": ["управляющим контуром", "CEO-слой", "Александра", "согласование"],
+        "mustContainAny": ["собственника", "носителя методологии"],
+        "mustNotContain": ["Открыть инструменты", "прибыль, рост или управляемость", "Где у тебя сейчас самое сильное напряжение"],
+        "maxParagraphs": 4,
+        "maxChars": 1200
+      }
+    ]
+  },
+  {
     "id": "start_explains_value_and_how_to_talk",
     "turns": [
       "/start"
