@@ -115,7 +115,7 @@ function pickScreen(screenId, stage, reason) {
 
 function isCeoLayerQuestion(classification = {}) {
   const text = String(classification.cleanText || "").toLowerCase();
-  return /александр|селедчик|консалтинг|ceo|co-ceo|управляющ|контур|11\s+сло|слоям|слоях|упаковк|наш\s+проект|этот\s+проект/.test(text);
+  return /кто\s+ты|чем\s+ты\s+полез|твоя\s+роль|роль|александр|селедчик|консалтинг|ceo|co-ceo|управляющ|контур|11\s+сло|слоям|слоях|упаковк|наш\s+проект|этот\s+проект/.test(text);
 }
 
 function isBusinessAssemblyRequest(classification = {}) {

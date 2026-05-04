@@ -8,11 +8,28 @@
     "expectedAction": "answer",
     "turnChecks": [
       {
-        "mustContain": ["не держусь за одну фиксированную роль", "главное ограничение"],
-        "mustContainAny": ["диагност", "архитектор", "навигатор", "партнёр"],
+        "mustContain": ["CEO-контур", "собственник", "следующего действия"],
+        "mustContainAny": ["диагност", "архитектор", "навигатор", "партнёр", "управленческий слой"],
         "mustNotContain": ["Где у тебя сейчас самое сильное напряжение", "прибыль, рост или управляемость", "выбрал контур"],
         "maxParagraphs": 5,
-        "maxChars": 1200
+        "maxChars": 1500
+      }
+    ]
+  },
+  {
+    "id": "short_who_are_you_uses_ceo_contour",
+    "turns": [
+      "кто ты?"
+    ],
+    "expectedEntryMode": "meta_role",
+    "expectedAction": "answer",
+    "turnChecks": [
+      {
+        "mustContain": ["AI-BOSS", "CEO-контур", "собственник"],
+        "mustContainAny": ["управленческий цикл", "последовательностью решений", "следующий управленческий ход"],
+        "mustNotContain": ["я не держусь за одну фиксированную роль", "только диагност", "11 слоёв", "A-D"],
+        "maxParagraphs": 5,
+        "maxChars": 1500
       }
     ]
   },
