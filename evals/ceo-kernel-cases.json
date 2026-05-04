@@ -1,0 +1,425 @@
+[
+  {
+    "id": "crm_is_solution_not_problem",
+    "title": "CRM is treated as proposed solution, not the real problem",
+    "turns": [
+      "Нам нужна CRM"
+    ],
+    "expected": {
+      "intentIntegrity": {
+        "type": "proposed_solution",
+        "mustReframe": true,
+        "underlyingProblemRequired": true
+      },
+      "referenceGate": {
+        "mustTrigger": true,
+        "candidateLayers": ["technology", "commercial", "data_analytics", "operating_model"],
+        "minimumReferenceNeeded": [
+          "какую проблему должна решить CRM",
+          "как сейчас проходит заявка или клиент",
+          "что именно теряется без системы"
+        ]
+      },
+      "dataBehavior": {
+        "mustSearchExistingContextFirst": true,
+        "maxUserQuestions": 1
+      },
+      "responseChecks": {
+        "mustContainAny": [
+          "ты предлагаешь инструмент",
+          "это уже вариант решения",
+          "сначала зафиксируем проблему",
+          "какую проблему он должен решить"
+        ],
+        "mustNotContain": [
+          "CRM вам точно нужна",
+          "внедрите CRM",
+          "начните с выбора CRM",
+          "11 слоев",
+          "A-D"
+        ],
+        "requireQuestion": true,
+        "maxParagraphs": 3,
+        "maxChars": 1200
+      }
+    }
+  },
+  {
+    "id": "many_leads_low_sales",
+    "title": "High lead volume with low sales is handled as cross-layer constraint search",
+    "turns": [
+      "Лидов много, продаж мало"
+    ],
+    "expected": {
+      "intentIntegrity": {
+        "type": "problem_or_symptom",
+        "mustReframe": false
+      },
+      "referenceGate": {
+        "mustTrigger": true,
+        "candidateLayers": ["commercial", "product_value_proposition", "operating_model", "data_analytics"],
+        "minimumReferenceNeeded": [
+          "профиль целевого клиента",
+          "критерии качественного лида",
+          "этапы воронки",
+          "правила передачи лида"
+        ]
+      },
+      "hypothesisBehavior": {
+        "minHypotheses": 2,
+        "maxPrimaryHypotheses": 1,
+        "mustIncludeAlternativesAny": [
+          "качество входящего потока",
+          "обработка продаж",
+          "оффер или ценность",
+          "маршрутизация"
+        ],
+        "mustNotJumpTo": [
+          "нанять продавцов",
+          "увеличить рекламный бюджет"
+        ]
+      },
+      "nextStep": {
+        "mustBeOne": true,
+        "mustContainAny": [
+          "20 последних лидов",
+          "разобрать последние заявки",
+          "целевость",
+          "где остановилось"
+        ]
+      },
+      "responseChecks": {
+        "mustContainAny": [
+          "сначала отделить",
+          "качество лидов",
+          "обработка",
+          "целевые",
+          "маршрут"
+        ],
+        "mustNotContain": [
+          "решение в найме",
+          "не хватает продавцов",
+          "11 слоев",
+          "A-D"
+        ],
+        "maxParagraphs": 4,
+        "maxChars": 1400
+      }
+    }
+  },
+  {
+    "id": "profit_is_falling",
+    "title": "Falling profit is not reduced to cost cutting without finance reference",
+    "turns": [
+      "Падает прибыль"
+    ],
+    "expected": {
+      "intentIntegrity": {
+        "type": "problem_or_symptom",
+        "mustReframe": false
+      },
+      "referenceGate": {
+        "mustTrigger": true,
+        "candidateLayers": ["finance", "commercial", "strategy", "operating_model"],
+        "minimumReferenceNeeded": [
+          "выручка",
+          "маржа",
+          "структура расходов",
+          "денежный поток",
+          "период сравнения"
+        ]
+      },
+      "hypothesisBehavior": {
+        "minHypotheses": 2,
+        "maxPrimaryHypotheses": 1,
+        "mustValidateCauseVsEffect": true,
+        "mustNotJumpTo": [
+          "сократить расходы",
+          "уволить людей"
+        ]
+      },
+      "decisionEconomics": {
+        "mustConsider": ["cost_of_delay", "cost_of_error"],
+        "cashRiskEscalates": true
+      },
+      "nextStep": {
+        "mustBeOne": true,
+        "mustContainAny": [
+          "короткий срез денег",
+          "выручку",
+          "маржу",
+          "расходы",
+          "кассовый остаток"
+        ]
+      },
+      "responseChecks": {
+        "mustContainAny": [
+          "прибыль может быть следствием",
+          "сначала нужен срез",
+          "выручка",
+          "маржа",
+          "расходы"
+        ],
+        "mustNotContain": [
+          "просто сократите расходы",
+          "главная причина уже в расходах",
+          "11 слоев"
+        ],
+        "maxParagraphs": 4,
+        "maxChars": 1400
+      }
+    }
+  },
+  {
+    "id": "team_cannot_handle_work",
+    "title": "Team weakness claim is treated as interpretation requiring roles/process reference",
+    "turns": [
+      "Команда не тянет"
+    ],
+    "expected": {
+      "intentIntegrity": {
+        "type": "interpretation",
+        "mustReframe": true
+      },
+      "referenceGate": {
+        "mustTrigger": true,
+        "candidateLayers": ["people_organization", "operating_model", "governance_risks"],
+        "minimumReferenceNeeded": [
+          "роли",
+          "зоны ответственности",
+          "нагрузка",
+          "целевой процесс",
+          "где возникает очередь"
+        ]
+      },
+      "hypothesisBehavior": {
+        "minHypotheses": 2,
+        "maxPrimaryHypotheses": 1,
+        "mustIncludeAlternativesAny": [
+          "нагрузка",
+          "роль",
+          "процесс",
+          "ответственность",
+          "компетенция"
+        ],
+        "mustNotJumpTo": [
+          "нанять людей",
+          "уволить",
+          "заменить команду"
+        ]
+      },
+      "responseChecks": {
+        "mustContainAny": [
+          "это пока интерпретация",
+          "нужно отделить",
+          "нагрузка",
+          "роли",
+          "процесс"
+        ],
+        "mustNotContain": [
+          "команда слабая",
+          "нужно менять людей",
+          "11 слоев"
+        ],
+        "requireQuestion": true,
+        "maxParagraphs": 4,
+        "maxChars": 1300
+      }
+    }
+  },
+  {
+    "id": "new_niche_strategy_choice",
+    "title": "New niche is treated as strategic owner-level decision with scenario check",
+    "turns": [
+      "Хочу выйти в новую нишу"
+    ],
+    "expected": {
+      "intentIntegrity": {
+        "type": "strategic_intent",
+        "mustReframe": false
+      },
+      "referenceGate": {
+        "mustTrigger": true,
+        "candidateLayers": ["owner_context", "external_environment", "strategy", "product_value_proposition"],
+        "minimumReferenceNeeded": [
+          "зачем выходить в нишу",
+          "цель собственника",
+          "горизонт",
+          "текущая модель",
+          "критерий успеха"
+        ]
+      },
+      "escalation": {
+        "mustEscalateToOwner": true,
+        "reasonAny": ["strategic_choice", "risk_profile_change", "owner_will_required"]
+      },
+      "scenarioBehavior": {
+        "mustConsider": ["base_case", "upside_case", "downside_case"],
+        "mustNotOverloadVisibleResponse": true
+      },
+      "nextStep": {
+        "mustBeOne": true,
+        "mustContainAny": [
+          "проверить спрос",
+          "минимальный тест",
+          "критерий успеха",
+          "сегмент"
+        ]
+      },
+      "responseChecks": {
+        "mustContainAny": [
+          "это стратегическая развилка",
+          "сначала зафиксировать зачем",
+          "минимальный тест",
+          "риск"
+        ],
+        "mustNotContain": [
+          "просто выходите",
+          "сразу запускайте",
+          "11 слоев"
+        ],
+        "maxParagraphs": 4,
+        "maxChars": 1500
+      }
+    }
+  },
+  {
+    "id": "cash_gap_two_weeks",
+    "title": "Cash gap triggers cost of delay and owner escalation",
+    "turns": [
+      "Кассовый разрыв через 2 недели"
+    ],
+    "expected": {
+      "intentIntegrity": {
+        "type": "urgent_problem",
+        "mustReframe": false
+      },
+      "referenceGate": {
+        "mustTrigger": true,
+        "candidateLayers": ["finance", "governance_risks", "owner_context"],
+        "minimumReferenceNeeded": [
+          "кассовый остаток",
+          "обязательства",
+          "дебиторка",
+          "дата разрыва",
+          "минимальные платежи"
+        ]
+      },
+      "decisionEconomics": {
+        "mustConsider": ["cost_of_delay", "downside", "cash_safety"],
+        "mustPrioritizeUrgency": true
+      },
+      "escalation": {
+        "mustEscalateToOwner": true,
+        "reasonAny": ["cash_risk", "financial_obligation", "high_cost_of_delay"]
+      },
+      "nextStep": {
+        "mustBeOne": true,
+        "mustContainAny": [
+          "кассовый остаток",
+          "обязательства",
+          "дебиторку",
+          "платежный календарь",
+          "на 2 недели"
+        ]
+      },
+      "responseChecks": {
+        "mustContainAny": [
+          "тут цена промедления высокая",
+          "сначала безопасность денег",
+          "кассовый остаток",
+          "обязательства"
+        ],
+        "mustNotContain": [
+          "давайте спокойно пройдём диагностику",
+          "можно рассмотреть много вариантов",
+          "11 слоев"
+        ],
+        "maxParagraphs": 4,
+        "maxChars": 1500
+      }
+    }
+  },
+  {
+    "id": "hire_coo_is_solution_not_root",
+    "title": "Hiring COO is treated as proposed solution and owner-level people decision",
+    "turns": [
+      "Нужно нанять операционного директора"
+    ],
+    "expected": {
+      "intentIntegrity": {
+        "type": "proposed_solution",
+        "mustReframe": true
+      },
+      "referenceGate": {
+        "mustTrigger": true,
+        "candidateLayers": ["owner_context", "operating_model", "governance_risks", "people_organization"],
+        "minimumReferenceNeeded": [
+          "что должен снять операционный директор",
+          "какие решения зависают",
+          "где перегруз собственника",
+          "какие процессы не удерживаются"
+        ]
+      },
+      "escalation": {
+        "mustEscalateToOwner": true,
+        "reasonAny": ["team_decision", "cost", "role_design", "owner_will_required"]
+      },
+      "hypothesisBehavior": {
+        "minHypotheses": 2,
+        "mustIncludeAlternativesAny": [
+          "роль не описана",
+          "решения централизованы",
+          "процессы не собраны",
+          "не хватает операционного контура"
+        ]
+      },
+      "responseChecks": {
+        "mustContainAny": [
+          "это уже решение",
+          "сначала понять",
+          "какую проблему должен снять",
+          "роль",
+          "операционный контур"
+        ],
+        "mustNotContain": [
+          "нанимайте операционного директора",
+          "сразу ищите кандидата",
+          "11 слоев"
+        ],
+        "requireQuestion": true,
+        "maxParagraphs": 4,
+        "maxChars": 1500
+      }
+    }
+  },
+  {
+    "id": "simple_document_naming_light_mode",
+    "title": "Simple naming task uses light mode and avoids CEO cycle",
+    "turns": [
+      "Как лучше назвать этот документ?"
+    ],
+    "expected": {
+      "interventionDepth": {
+        "mode": "light",
+        "mustNotRunFullCycle": true
+      },
+      "responseChecks": {
+        "mustContainAny": [
+          "можно назвать",
+          "варианты",
+          "я бы выбрал"
+        ],
+        "mustNotContain": [
+          "главное ограничение",
+          "эталон",
+          "Decision Lock",
+          "11 слоев",
+          "диагностика"
+        ],
+        "maxParagraphs": 4,
+        "maxChars": 900
+      }
+    }
+  }
+]

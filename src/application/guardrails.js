@@ -952,6 +952,9 @@ function ensureMultiLayerSpread(candidateConstraints, context, entryState) {
 
 function pickBestNextQuestion(context, entryState, graphAnalysis) {
   const current = ensureString(entryState.nextBestQuestion);
+  if (/последн(?:ие|им)\s+20|20\s+последн|20\s+(входящ|лид|заяв)/i.test(current)) {
+    return current;
+  }
   const candidates = normalizeDiscriminatingSignals([
     ...(entryState.discriminatingSignals || []),
     ...(graphAnalysis?.discriminatingSignals || []),
@@ -2238,6 +2241,94 @@ export function applyGuardrails(rawDecision, context) {
   decision.memory.actionWave = decision.memory.actionWave || {};
   decision.memory.artifact = decision.memory.artifact || {};
 
+  if (context.intentIntegrity?.integrityType === "proposed_solution") {
+    const proposedSolution = ensureString(
+      context.intentIntegrity.proposedSolution,
+      context.classification?.cleanText || context.userText
+    );
+    const minimumQuestion = ensureString(
+      context.intentIntegrity.minimumQuestion,
+      `Какую проблему должен решить «${proposedSolution}»: что сейчас теряется, зависает или не видно?`
+    );
+    const responseText = ensureString(decision.response.responseText);
+
+    decision.selectedMode = "clarification_mode";
+    decision.decision.action = "clarify";
+    decision.decision.signalSufficiency = "weak";
+    decision.entryState.signalSufficiency = "weak";
+    decision.entryState.selectedConstraint = "";
+    decision.entryState.nextBestQuestion = ensureString(decision.entryState.nextBestQuestion, minimumQuestion);
+    decision.entryState.nextBestStep = ensureString(
+      decision.entryState.nextBestStep,
+      "Восстановить проблему, которую должно решить предложенное решение."
+    );
+    decision.entryState.whyThisStep = ensureString(
+      decision.entryState.whyThisStep,
+      "Так не принимаем готовое решение за доказанную причину."
+    );
+    decision.memory.constraint = "";
+    decision.memory.actionWave.enabled = false;
+    decision.memory.artifact.shouldSave = false;
+
+    if (!/решени|инструмент|проблем/i.test(responseText)) {
+      decision.response.responseText = [
+        `Вижу, что ты предлагаешь уже вариант решения: ${proposedSolution}. Я бы сначала не выбирал инструмент или роль, а зафиксировал, какую проблему это должно снять.`,
+        minimumQuestion
+      ].join("\n\n");
+    }
+  }
+
+  if (context.intentIntegrity?.integrityType === "light_task") {
+    decision.selectedMode = "clarification_mode";
+    decision.decision.action = "answer";
+    decision.decision.signalSufficiency = "weak";
+    decision.entryState.signalSufficiency = "weak";
+    decision.entryState.selectedConstraint = "";
+    decision.entryState.promotionReadiness = "keep_in_entry";
+    decision.memory.constraint = "";
+    decision.memory.actionWave.enabled = false;
+    decision.memory.artifact.shouldSave = false;
+  }
+
+  if (
+    context.referenceGate?.shouldBlockDiagnosis &&
+    context.intentIntegrity?.integrityType !== "proposed_solution" &&
+    context.intentIntegrity?.integrityType !== "light_task"
+  ) {
+    const reference = context.referenceGate.primaryReference || {};
+    const question = ensureString(
+      context.referenceGate.minimumQuestion || reference.minimumQuestion,
+      "Какой нормальный результат считаем рабочим, чтобы сравнить с текущей реальностью?"
+    );
+    const layerTitle = ensureString(reference.layerTitle, "этой области");
+    const responseText = ensureString(decision.response.responseText);
+
+    decision.selectedMode = "clarification_mode";
+    decision.decision.action = "clarify";
+    decision.decision.signalSufficiency = "weak";
+    decision.entryState.signalSufficiency = "weak";
+    decision.entryState.selectedConstraint = "";
+    decision.entryState.nextBestQuestion = ensureString(decision.entryState.nextBestQuestion, question);
+    decision.entryState.nextBestStep = ensureString(
+      decision.entryState.nextBestStep,
+      "Собрать минимальную рамку сравнения перед диагностикой."
+    );
+    decision.entryState.whyThisStep = ensureString(
+      decision.entryState.whyThisStep,
+      "Без рамки сравнения можно принять симптом или интерпретацию за причину."
+    );
+    decision.memory.constraint = "";
+    decision.memory.actionWave.enabled = false;
+    decision.memory.artifact.shouldSave = false;
+
+    if (!responseText || /главн[а-яё]+\s+ограничени[ея]\s+.*(уже|это)/i.test(responseText)) {
+      decision.response.responseText = [
+        `Я бы пока не фиксировал ограничение. В области «${layerTitle}» сначала нужно понять, с чем сравниваем текущую реальность.`,
+        question
+      ].join("\n\n");
+    }
+  }
+
   if (shouldHoldLeadFlowInClarify(context, decision.entryState)) {
     decision.selectedMode = "diagnostic_mode";
     decision.decision.action = "clarify";
@@ -2354,6 +2445,7 @@ export function applyGuardrails(rawDecision, context) {
   ], 8);
 
   if (
+    context.intentIntegrity?.integrityType !== "light_task" &&
     context.classification.entryMode !== "meta_role" &&
     decision.entryState.candidateConstraints.length >= 2 &&
     decision.decision.action === "answer" &&

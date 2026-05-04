@@ -1503,6 +1503,14 @@ function buildEntryState(context, focus, signalSufficiency, selectedConstraint =
     nextBestQuestion = "По последним 20 входящим: лид уже приходит с понятным приоритетом и статусом «целевой/нецелевой», или продавцы сами разбирают всё подряд?";
   }
 
+  if (
+    /заяв|лид|входящ/.test(text.toLowerCase()) &&
+    /продаж|сделк|конверс|мало/i.test(text.toLowerCase()) &&
+    !/не\s+хватает\s+(люд|продав|менеджер)|нехватк/i.test(text.toLowerCase())
+  ) {
+    nextBestQuestion = "По 20 последним лидам что видно: источник, целевость, качество лидов, первый контакт и где остановилась сделка?";
+  }
+
   const symptoms = uniqueStrings([
     ...(previous.symptoms || []),
     text
@@ -2204,6 +2212,305 @@ function buildClarificationDecision(context, focus, claimedProblemText) {
   };
 }
 
+function buildProposedSolutionDecision(context) {
+  const integrity = context.intentIntegrity || {};
+  const focus = detectFocus(context.userText);
+  const entryState = buildEntryState(context, focus, "weak", "", "keep_in_entry");
+  const proposedSolution = normalizeText(integrity.proposedSolution || context.classification?.cleanText || context.userText);
+  const candidates = Array.isArray(integrity.underlyingProblemCandidates)
+    ? integrity.underlyingProblemCandidates.slice(0, 4)
+    : [];
+  const candidateText = candidates.length
+    ? `Чаще всего за этим может стоять: ${candidates.join(", ")}.`
+    : "За этим может стоять разная проблема: потеря заявок, слабый контроль, ручная работа или неясная ответственность.";
+  const minimumQuestion = normalizeText(integrity.minimumQuestion) ||
+    `Какую проблему должен решить «${proposedSolution}»: что сейчас теряется, зависает или не видно?`;
+  const responseText = [
+    `Вижу, что ты предлагаешь ${proposedSolution}. Это уже вариант решения: сначала понять, какую проблему должен снять этот шаг, и только потом выбирать роль или инструмент.`,
+    `${candidateText}`,
+    minimumQuestion
+  ].join("\n\n");
+
+  return {
+    selectedMode: "clarification_mode",
+    decision: {
+      action: "clarify",
+      signalSufficiency: "weak",
+      confidence: 0.74,
+      rationale: "Пользователь принёс solution-first запрос, поэтому сначала нужно восстановить проблему, а не принимать решение на веру."
+    },
+    response: {
+      whatIUnderstood: `Пользователь предложил решение: ${proposedSolution}.`,
+      hypotheses: [
+        "За готовым решением может стоять реальная операционная, коммерческая или управленческая проблема.",
+        "Если не выяснить исходную проблему, можно внедрить правильный инструмент не туда."
+      ],
+      whyItMatters: "Решение должно проверяться относительно проблемы, которую оно должно снять.",
+      nextStep: minimumQuestion,
+      responseText
+    },
+    guardrails: {
+      knownFacts: [`Пользователь предложил решение: ${proposedSolution}.`],
+      observations: ["Это solution-first вход, а не доказанная проблема."],
+      workingHypotheses: candidates.length ? candidates : ["Нужно понять исходную проблему."],
+      canNotAssert: ["Нельзя утверждать, что это решение нужно, пока не названа проблема и критерий результата."],
+      confidenceNote: "Сейчас это проверка фокуса, а не диагноз."
+    },
+    graphAnalysis: buildGraphAnalysisPacket(context.graphPacket),
+    entryState: {
+      ...entryState,
+      claimedProblem: normalizeText(context.classification?.cleanText || context.userText),
+      claimedCause: proposedSolution,
+      knownFacts: uniqueStrings([...(entryState.knownFacts || []), `Предложенное решение: ${proposedSolution}`], 8),
+      nextBestQuestion: minimumQuestion,
+      nextBestStep: "Сначала восстановить проблему, которую должно решить предложенное решение.",
+      whyThisStep: "Так AI-BOSS не оптимизирует ложный фокус и не внедряет инструмент до понимания причины."
+    },
+    memory: {
+      companyName: "",
+      caseKind: "diagnostic_case",
+      goal: "Проверить, какую проблему должно решить предложенное пользователем решение.",
+      symptoms: [],
+      hypotheses: candidates.length ? candidates : ["За решением может стоять скрытая бизнес-проблема."],
+      constraint: "",
+      situation: "Пользователь пришёл с готовым решением, а не с проверенной проблемой.",
+      actionWave: {
+        enabled: false,
+        firstStep: "",
+        notNow: "",
+        whyThisFirst: ""
+      },
+      toolRecommendations: [],
+      artifact: {
+        shouldSave: false,
+        title: "",
+        summary: "",
+        kind: "snapshot"
+      }
+    }
+  };
+}
+
+function buildLightTaskDecision(context) {
+  const rawText = normalizeText(context.classification?.cleanText || context.userText);
+  const entryState = buildEntryState(context, "general", "weak", "", "keep_in_entry");
+  const responseText = /назвать|переимен/i.test(rawText)
+    ? [
+        "Я бы назвал проще и по функции документа. Варианты:",
+        "1. AI-BOSS CEO Logic",
+        "2. Логика управления AI-BOSS",
+        "3. CEO-контур AI-BOSS",
+        "Я бы выбрал первый, если документ для разработки, и второй, если он для обсуждения логики продукта."
+      ].join("\n")
+    : "Могу помочь коротко, без запуска большого разбора. Пришли текст или фразу, и я предложу более ясную формулировку.";
+
+  return {
+    selectedMode: "clarification_mode",
+    decision: {
+      action: "answer",
+      signalSufficiency: "weak",
+      confidence: 0.72,
+      rationale: "Запрос маленький и не требует полного CEO-цикла."
+    },
+    response: {
+      whatIUnderstood: "Пользователь просит небольшую формулировочную помощь.",
+      hypotheses: ["Это light mode, а не бизнес-диагностика."],
+      whyItMatters: "Если запускать полный управленческий цикл на маленький вопрос, система станет тяжёлой.",
+      nextStep: "Дать короткие варианты и не открывать диагностический цикл.",
+      responseText
+    },
+    guardrails: {
+      knownFacts: ["Пользователь задал небольшой вопрос по формулировке."],
+      observations: ["Запрос подходит для light mode."],
+      workingHypotheses: ["Нужно помочь с формулировкой, а не диагностировать бизнес."],
+      canNotAssert: [],
+      confidenceNote: "Это лёгкий ответ без управленческого lock."
+    },
+    graphAnalysis: buildGraphAnalysisPacket(context.graphPacket),
+    entryState: {
+      ...entryState,
+      claimedProblem: rawText,
+      nextBestStep: "Помочь с формулировкой.",
+      whyThisStep: "Минимально достаточная глубина лучше полного CEO-цикла."
+    },
+    memory: {
+      companyName: "",
+      caseKind: "diagnostic_case",
+      goal: "Помочь с лёгкой формулировочной задачей.",
+      symptoms: [],
+      hypotheses: [],
+      constraint: "",
+      situation: "Light mode request.",
+      actionWave: {
+        enabled: false,
+        firstStep: "",
+        notNow: "",
+        whyThisFirst: ""
+      },
+      toolRecommendations: [],
+      artifact: {
+        shouldSave: false,
+        title: "",
+        summary: "",
+        kind: "snapshot"
+      }
+    }
+  };
+}
+
+function buildReferenceGateDecision(context) {
+  const gate = context.referenceGate || {};
+  const reference = gate.primaryReference || {};
+  const focus = detectFocus(context.userText);
+  const entryState = buildEntryState(context, focus, "weak", "", "keep_in_entry");
+  const integrityType = context.intentIntegrity?.integrityType || "";
+  const question = normalizeText(
+    integrityType === "strategic_intent"
+      ? context.intentIntegrity?.minimumQuestion || gate.minimumQuestion || reference.minimumQuestion
+      : gate.minimumQuestion || reference.minimumQuestion || context.intentIntegrity?.minimumQuestion
+  ) ||
+    "Какой нормальный результат считаем рабочим, чтобы сравнить с текущей реальностью?";
+  const layerTitle = normalizeText(reference.layerTitle || "этой области");
+  const intro = integrityType === "interpretation"
+    ? "Здесь я бы сначала не принимал формулировку как факт. Это пока версия причины, а не проверенное ограничение."
+    : integrityType === "strategic_intent"
+      ? "Это похоже на стратегическую развилку, поэтому сначала нужна рамка выбора, а не список действий."
+      : "Перед выводом нужно понять, с чем сравниваем текущую реальность.";
+  const responseText = [
+    intro,
+    `В области «${layerTitle}» пока не хватает рабочей рамки: что должно считаться нормой, правилом или целевым состоянием.`,
+    question
+  ].join("\n\n");
+
+  return {
+    selectedMode: "clarification_mode",
+    decision: {
+      action: "clarify",
+      signalSufficiency: "weak",
+      confidence: 0.72,
+      rationale: "Reference Model Gate не пропускает к диагнозу без минимальной рамки сравнения."
+    },
+    response: {
+      whatIUnderstood: "Пользователь дал сигнал, но для вывода не хватает рамки сравнения.",
+      hypotheses: [
+        "Проблема может быть реальной, но без эталона легко спутать норму, симптом и причину."
+      ],
+      whyItMatters: "Если анализировать факты без рамки, AI-BOSS начнёт спорить о симптомах вместо поиска ограничения.",
+      nextStep: integrityType === "strategic_intent"
+        ? `${question} После этого выбрать один минимальный тест спроса или сегмента, а не запускать новую нишу вслепую.`
+        : question,
+      responseText
+    },
+    guardrails: {
+      knownFacts: ["Есть пользовательский сигнал, но эталон слоя пока неполный."],
+      observations: [`Проверяем область: ${layerTitle}.`],
+      workingHypotheses: ["Нужно сначала собрать минимальную рамку сравнения."],
+      canNotAssert: ["Нельзя уверенно назвать ограничение до минимального эталона."],
+      confidenceNote: "Сейчас это вход в reference gate, а не диагноз."
+    },
+    graphAnalysis: buildGraphAnalysisPacket(context.graphPacket),
+    entryState: {
+      ...entryState,
+      claimedProblem: normalizeText(context.classification?.cleanText || context.userText),
+      nextBestQuestion: question,
+      nextBestStep: integrityType === "strategic_intent"
+        ? "Сначала зафиксировать цель собственника, затем выбрать минимальный тест спроса, сегмента или критерия успеха."
+        : "Собрать минимальную рамку сравнения перед диагностикой.",
+      whyThisStep: "Без рамки сравнения можно принять интерпретацию или симптом за причину."
+    },
+    memory: {
+      companyName: "",
+      caseKind: "diagnostic_case",
+      goal: "Собрать минимальную рамку сравнения перед выбором ограничения.",
+      symptoms: entryState.symptoms,
+      hypotheses: ["Пока не хватает эталона для анализа."],
+      constraint: "",
+      situation: "Reference Model Gate остановил преждевременный вывод.",
+      actionWave: {
+        enabled: false,
+        firstStep: "",
+        notNow: "",
+        whyThisFirst: ""
+      },
+      toolRecommendations: [],
+      artifact: {
+        shouldSave: false,
+        title: "",
+        summary: "",
+        kind: "snapshot"
+      }
+    }
+  };
+}
+
+function buildUrgentProblemDecision(context) {
+  const focus = detectFocus(context.userText);
+  const entryState = buildEntryState(context, focus, "partial", "", "keep_in_entry");
+  const question = normalizeText(context.dataSufficiency?.minimumQuestion || context.intentIntegrity?.minimumQuestion) ||
+    "Какой текущий остаток денег, обязательства, ожидаемые поступления и дата риска?";
+  const responseText = [
+    "Тут цена промедления высокая, поэтому я бы не начинал с общей диагностики.",
+    "Сначала безопасность денег: нужен короткий срез на 2 недели — кассовый остаток, обязательства, ожидаемые поступления и минимальные платежи, которые нельзя сорвать.",
+    question
+  ].join("\n\n");
+
+  return {
+    selectedMode: "diagnostic_mode",
+    decision: {
+      action: "clarify",
+      signalSufficiency: "partial",
+      confidence: 0.78,
+      rationale: "Срочный финансовый риск требует owner-level развилки и минимального денежного среза до выбора гипотезы."
+    },
+    response: {
+      whatIUnderstood: "Есть срочный риск кассового разрыва.",
+      hypotheses: [
+        "Первое ограничение может быть в ближайшем денежном потоке и обязательствах.",
+        "До общей диагностики нужно защитить краткосрочную финансовую безопасность."
+      ],
+      whyItMatters: "При кассовом риске цена промедления выше цены неполного анализа.",
+      nextStep: "Собрать кассовый остаток, обязательства, дебиторку, ожидаемые поступления и минимальные платежи на ближайшие 2 недели.",
+      responseText
+    },
+    guardrails: {
+      knownFacts: ["Пользователь сообщил о кассовом разрыве через короткий срок."],
+      observations: ["Это срочный финансовый риск, где решение может затрагивать обязательства собственника."],
+      workingHypotheses: entryState.candidateConstraints.map((item) => item.label),
+      canNotAssert: ["Нельзя выбирать сокращения, кредиты или задержки платежей без денежного среза и решения собственника."],
+      confidenceNote: "Сейчас цель — не финальный диагноз, а управленческая безопасность денег."
+    },
+    graphAnalysis: buildGraphAnalysisPacket(context.graphPacket),
+    entryState: {
+      ...entryState,
+      nextBestQuestion: question,
+      nextBestStep: "Собрать платежный календарь и денежный срез на ближайшие 2 недели.",
+      whyThisStep: "Это самый быстрый способ снизить риск ошибочного решения при высокой цене промедления."
+    },
+    memory: {
+      companyName: "",
+      caseKind: "diagnostic_case",
+      goal: "Снизить риск кассового разрыва и вынести собственнику безопасную развилку.",
+      symptoms: entryState.symptoms,
+      hypotheses: entryState.candidateConstraints.map((item) => item.label).slice(0, 3),
+      constraint: "",
+      situation: "Срочный риск кассового разрыва.",
+      actionWave: {
+        enabled: false,
+        firstStep: "",
+        notNow: "",
+        whyThisFirst: ""
+      },
+      toolRecommendations: mergeSuggestions(suggestionPack(focus, context.userText), context.graphPacket),
+      artifact: {
+        shouldSave: false,
+        title: "",
+        summary: "",
+        kind: "snapshot"
+      }
+    }
+  };
+}
+
 function buildUnknownDecision(context) {
   const entryState = buildEntryState(context, "general", "weak", "", "keep_in_entry");
 
@@ -2474,6 +2781,7 @@ function buildProblemDecision(context) {
 function buildHeuristicDecision(context) {
   const { classification, userText } = context;
   const focus = detectFocus(userText);
+  const integrityType = context.intentIntegrity?.integrityType || "";
 
   if (context.userMeta?.miniAppHandoff?.type === "constraint_rejection_feedback") {
     return buildConstraintRejectionFeedbackDecision(context);
@@ -2497,6 +2805,22 @@ function buildHeuristicDecision(context) {
 
   if (classification.type === "url_plus_problem") {
     return buildWebsiteDecision(context, true);
+  }
+
+  if (integrityType === "light_task") {
+    return buildLightTaskDecision(context);
+  }
+
+  if (integrityType === "proposed_solution") {
+    return buildProposedSolutionDecision(context);
+  }
+
+  if (integrityType === "urgent_problem") {
+    return buildUrgentProblemDecision(context);
+  }
+
+  if (context.referenceGate?.shouldBlockDiagnosis) {
+    return buildReferenceGateDecision(context);
   }
 
   if (classification.type === "free_text_vague") {

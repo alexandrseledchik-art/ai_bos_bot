@@ -18,10 +18,14 @@ import {
   nowIso
 } from "../domain/entities.js";
 import { classifyInput } from "./classify-input.js";
+import { checkIntentIntegrity } from "./intent-integrity-checker.js";
 import { extractObservations } from "./observation-extractor.js";
 import { analyzeWithGraph } from "./graph-reasoner.js";
 import { applyGuardrails } from "./guardrails.js";
 import { buildMiniAppInvite, createMiniAppInviteSnapshot } from "./mini-app-invite-policy.js";
+import { AutonomousDataCollector } from "./autonomous-data-collector.js";
+import { DataSufficiencyChecker } from "./data-sufficiency-checker.js";
+import { ReferenceModelService } from "./reference-model-service.js";
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
@@ -685,6 +689,12 @@ export class ConversationService {
       const company = ensureCompany(state, thread, userMeta);
       const history = recentHistory(state, thread.id, this.maxHistoryMessages);
       const classification = contextualizeClassification(classifyInput(text), thread, history);
+      const intentIntegrity = checkIntentIntegrity({
+        text,
+        classification,
+        entryState: thread.entryState || emptyEntryState(),
+        history
+      });
       const currentCase = selectRelevantCase(state, thread, classification);
       const screening = [];
 
@@ -697,6 +707,7 @@ export class ConversationService {
         userText: text,
         userMeta,
         classification,
+        intentIntegrity,
         screening,
         company: {
           id: company.id,
@@ -725,8 +736,38 @@ export class ConversationService {
         entryState: context.entryState,
         memorySummary: context.memorySummary
       });
+      const referenceGate = new ReferenceModelService().evaluate({
+        ...context,
+        observationPacket: extracted,
+        graphPacket
+      });
+      const contextWithReasoningPackets = {
+        ...context,
+        observationPacket: extracted,
+        graphPacket,
+        referenceGate
+      };
+      const autonomousData = new AutonomousDataCollector().collect({
+        state,
+        context: contextWithReasoningPackets,
+        thread,
+        company,
+        activeCase: currentCase,
+        referenceGate
+      });
+      const dataSufficiency = new DataSufficiencyChecker().check({
+        context: {
+          ...contextWithReasoningPackets,
+          autonomousData
+        },
+        referenceGate,
+        autonomousData
+      });
       context.observationPacket = extracted;
       context.graphPacket = graphPacket;
+      context.referenceGate = referenceGate;
+      context.autonomousData = autonomousData;
+      context.dataSufficiency = dataSufficiency;
 
       let decision = await this.reasoner.decide(context);
       decision = applyGuardrails(decision, context);
@@ -980,6 +1021,10 @@ export class ConversationService {
         reply: decision.response.responseText,
         decision,
         classification,
+        intentIntegrity,
+        referenceGate,
+        autonomousData,
+        dataSufficiency,
         miniAppInvite,
         artifactPath,
         runtime
