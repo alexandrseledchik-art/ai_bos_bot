@@ -9,6 +9,7 @@ import { buildMiniAppReplyMarkup } from "../src/infrastructure/telegram/mini-app
 import {
   buildFileCapabilityReply,
   buildVoiceCapabilityReply,
+  describeTelegramPayloadForLog,
   isFileCapabilityQuestion,
   isVoiceCapabilityQuestion
 } from "../src/infrastructure/telegram/telegram-meta.js";
@@ -29,6 +30,28 @@ function validateWebhookSecret(request, expectedSecret) {
   }
 
   return request.headers.get("x-telegram-bot-api-secret-token") === expectedSecret;
+}
+
+async function recordAndSendTelegramReply({
+  conversationService,
+  telegramApi,
+  payload,
+  reply,
+  userText = "",
+  options = {}
+}) {
+  try {
+    await conversationService.recordTelegramExchange({
+      telegramChatId: String(payload.chatId),
+      userText: userText || describeTelegramPayloadForLog(payload),
+      assistantText: reply,
+      userMeta: payload.userMeta || {}
+    });
+  } catch (error) {
+    console.warn("Telegram exchange logging skipped:", error.message);
+  }
+
+  await telegramApi.sendMessage(payload.chatId, reply, options);
 }
 
 async function handleTelegramWebhook(request) {
@@ -67,7 +90,12 @@ async function handleTelegramWebhook(request) {
   });
 
   if (!accessDecision.allowed) {
-    await telegramApi.sendMessage(payload.chatId, buildAccessDeniedReply(accessDecision));
+    await recordAndSendTelegramReply({
+      conversationService,
+      telegramApi,
+      payload,
+      reply: buildAccessDeniedReply(accessDecision)
+    });
 
     if (accessDecision.shouldNotifyAdmin && config.accessRequestNotifyChatId) {
       await telegramApi.sendMessage(
@@ -90,20 +118,34 @@ async function handleTelegramWebhook(request) {
     });
 
     if (resolved.replyOnly) {
-      await telegramApi.sendMessage(payload.chatId, resolved.replyOnly);
+      await recordAndSendTelegramReply({
+        conversationService,
+        telegramApi,
+        payload,
+        reply: resolved.replyOnly
+      });
       return json({ ok: true, handled: payload.kind });
     }
 
     if (isVoiceCapabilityQuestion(resolved.text)) {
-      await telegramApi.sendMessage(
-        payload.chatId,
-        buildVoiceCapabilityReply({ voiceEnabled: Boolean(audioTranscriber?.isEnabled) })
-      );
+      await recordAndSendTelegramReply({
+        conversationService,
+        telegramApi,
+        payload,
+        userText: resolved.text,
+        reply: buildVoiceCapabilityReply({ voiceEnabled: Boolean(audioTranscriber?.isEnabled) })
+      });
       return json({ ok: true, handled: "voice-capability-question" });
     }
 
     if (isFileCapabilityQuestion(resolved.text)) {
-      await telegramApi.sendMessage(payload.chatId, buildFileCapabilityReply());
+      await recordAndSendTelegramReply({
+        conversationService,
+        telegramApi,
+        payload,
+        userText: resolved.text,
+        reply: buildFileCapabilityReply()
+      });
       return json({ ok: true, handled: "file-capability-question" });
     }
 

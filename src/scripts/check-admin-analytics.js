@@ -114,7 +114,7 @@ class FakeSyncClient {
 }
 
 function createSeed() {
-  return {
+  const seed = {
     workspaces: [
       { id: "workspace-1", name: "AI-BOSS", slug: "aiboss", created_at: "2026-05-01T10:00:00.000Z" }
     ],
@@ -126,6 +126,14 @@ function createSeed() {
         telegram_chat_id: "miniapp:1",
         created_at: "2026-05-01T10:00:00.000Z",
         updated_at: "2026-05-01T10:00:00.000Z"
+      },
+      {
+        id: "company-2",
+        workspace_id: "workspace-1",
+        name: "Большой диалог",
+        telegram_chat_id: "789",
+        created_at: "2026-05-01T10:00:00.000Z",
+        updated_at: "2026-05-01T10:05:00.000Z"
       }
     ],
     cases: [
@@ -139,6 +147,17 @@ function createSeed() {
         status: "active",
         created_at: "2026-05-01T10:00:00.000Z",
         updated_at: "2026-05-01T10:00:00.000Z"
+      },
+      {
+        id: "case-2",
+        workspace_id: "workspace-1",
+        company_id: "company-2",
+        summary: "Длинный диалог не должен съедать лимит сообщений",
+        kind: "diagnostic_case",
+        mode: "diagnostic_mode",
+        status: "active",
+        created_at: "2026-05-01T10:00:00.000Z",
+        updated_at: "2026-05-01T10:05:00.000Z"
       }
     ],
     threads: [
@@ -152,6 +171,17 @@ function createSeed() {
         entry_state: {},
         created_at: "2026-05-01T10:00:00.000Z",
         updated_at: "2026-05-01T10:03:00.000Z"
+      },
+      {
+        id: "thread-2",
+        external_id: "thread_external_2",
+        workspace_id: "workspace-1",
+        company_id: "company-2",
+        active_case_id: "case-2",
+        telegram_chat_id: "789",
+        entry_state: {},
+        created_at: "2026-05-01T10:00:00.000Z",
+        updated_at: "2026-05-01T10:05:00.000Z"
       }
     ],
     app_users: [
@@ -174,6 +204,16 @@ function createSeed() {
         access_status: "approved",
         created_at: "2026-05-01T11:00:00.000Z",
         updated_at: "2026-05-01T11:02:00.000Z"
+      },
+      {
+        id: "app-user-3",
+        telegram_user_id: 789,
+        username: "long_dialog_user",
+        first_name: "Long",
+        last_name: "Dialog",
+        access_status: "approved",
+        created_at: "2026-05-01T09:00:00.000Z",
+        updated_at: "2026-05-01T10:05:00.000Z"
       }
     ],
     messages: [
@@ -211,6 +251,18 @@ function createSeed() {
     admin_conversation_evaluations: [],
     admin_improvements: []
   };
+
+  for (let index = 0; index < 40; index += 1) {
+    seed.messages.push({
+      id: `message-long-${index}`,
+      thread_id: "thread-2",
+      role: index % 2 === 0 ? "user" : "assistant",
+      text: `Длинный диалог, сообщение ${index + 1}`,
+      created_at: `2026-05-01T10:${String(index).padStart(2, "0")}:00.000Z`
+    });
+  }
+
+  return seed;
 }
 
 function assert(condition, message) {
@@ -223,9 +275,10 @@ async function run() {
   const syncClient = new FakeSyncClient(createSeed());
   const service = new AdminAnalyticsService({ syncClient });
 
-  const conversations = await service.listConversations({ limit: 10 });
-  assert(conversations.count === 2, "expected real conversation plus access user placeholder");
+  const conversations = await service.listConversations({ limit: 2 });
+  assert(conversations.count === 3, "expected two real conversations plus access user placeholder");
   assert(conversations.conversations.some((item) => item.counters.messages === 3), "expected message counters");
+  assert(conversations.conversations.some((item) => item.thread?.id === "thread-2" && item.counters.messages === 40), "expected long dialog not to hide other message counters");
   assert(conversations.conversations.some((item) => item.id === "app_user:456" && item.isPlaceholder), "expected access user without dialog");
 
   const detail = await service.getConversation({ threadId: "thread-1" });

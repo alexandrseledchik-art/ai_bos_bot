@@ -25,3 +25,29 @@ export function buildVoiceCapabilityReply({ voiceEnabled }) {
 export function buildFileCapabilityReply() {
   return "Да, файлы принимаю. Сейчас надёжно читаю текстовые файлы: txt, md, csv, json. Excel, PDF, фото и скрины тоже можно прислать, но их содержимое я пока не извлекаю автоматически — лучше добавить подпись, ссылку на документ или короткую выжимку, что именно нужно разобрать.";
 }
+
+export function describeTelegramPayloadForLog(payload = {}) {
+  if (!payload) {
+    return "";
+  }
+
+  if (payload.kind === "text") {
+    return payload.text || "";
+  }
+
+  if (payload.kind === "voice") {
+    return `[Голосовое сообщение${payload.durationSeconds ? `, ${payload.durationSeconds} сек.` : ""}]`;
+  }
+
+  if (payload.kind === "audio") {
+    return `[Аудиофайл: ${payload.fileName || "без названия"}]`;
+  }
+
+  if (["document", "photo", "video"].includes(payload.kind)) {
+    const label = payload.kind === "photo" ? "Изображение" : payload.kind === "video" ? "Видео" : "Файл";
+    const caption = payload.caption ? ` Подпись: ${payload.caption}` : "";
+    return `[${label}: ${payload.fileName || "без названия"}]${caption}`;
+  }
+
+  return `[Telegram message: ${payload.kind || "unknown"}]`;
+}

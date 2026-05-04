@@ -646,6 +646,39 @@ export class ConversationService {
     this.maxHistoryMessages = maxHistoryMessages;
   }
 
+  async recordTelegramExchange({ telegramChatId, userText = "", assistantText = "", userMeta = {} }) {
+    return this.store.update(async (state) => {
+      const thread = ensureThread(state, telegramChatId);
+      const company = ensureCompany(state, thread, userMeta);
+      const now = nowIso();
+
+      if (userText) {
+        state.messages.push(createMessage({
+          threadId: thread.id,
+          role: "user",
+          text: userText
+        }));
+      }
+
+      if (assistantText) {
+        state.messages.push(createMessage({
+          threadId: thread.id,
+          role: "assistant",
+          text: assistantText
+        }));
+      }
+
+      thread.updatedAt = now;
+      company.updatedAt = now;
+
+      return {
+        threadId: thread.id,
+        companyId: company.id,
+        recordedMessages: Number(Boolean(userText)) + Number(Boolean(assistantText))
+      };
+    });
+  }
+
   async handleUserMessage({ telegramChatId, text, userMeta = {} }) {
     return this.store.update(async (state) => {
       const thread = ensureThread(state, telegramChatId);

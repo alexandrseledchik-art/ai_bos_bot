@@ -8,6 +8,7 @@ import { buildMiniAppReplyMarkup } from "./mini-app-webapp.js";
 import {
   buildFileCapabilityReply,
   buildVoiceCapabilityReply,
+  describeTelegramPayloadForLog,
   isFileCapabilityQuestion,
   isVoiceCapabilityQuestion
 } from "./telegram-meta.js";
@@ -51,6 +52,23 @@ export class TelegramBotRunner {
     return this.api.sendMessage(chatId, text, options);
   }
 
+  async recordAndSendReply({ payload, reply, userText = "", onMessage, options = {} }) {
+    try {
+      if (typeof onMessage.recordTelegramExchange === "function") {
+        await onMessage.recordTelegramExchange({
+          telegramChatId: String(payload.chatId),
+          userText: userText || describeTelegramPayloadForLog(payload),
+          assistantText: reply,
+          userMeta: payload.userMeta || {}
+        });
+      }
+    } catch (error) {
+      console.warn("Telegram exchange logging skipped:", error.message);
+    }
+
+    await this.sendMessage(payload.chatId, reply, options);
+  }
+
   async start(onMessage) {
     while (true) {
       try {
@@ -83,7 +101,11 @@ export class TelegramBotRunner {
             });
 
             if (!accessDecision.allowed) {
-              await this.sendMessage(payload.chatId, buildAccessDeniedReply(accessDecision));
+              await this.recordAndSendReply({
+                payload,
+                reply: buildAccessDeniedReply(accessDecision),
+                onMessage
+              });
 
               if (accessDecision.shouldNotifyAdmin && this.accessRequestNotifyChatId) {
                 await this.sendMessage(
@@ -107,20 +129,31 @@ export class TelegramBotRunner {
             });
 
             if (resolved.replyOnly) {
-              await this.sendMessage(payload.chatId, resolved.replyOnly);
+              await this.recordAndSendReply({
+                payload,
+                reply: resolved.replyOnly,
+                onMessage
+              });
               continue;
             }
 
             if (isVoiceCapabilityQuestion(resolved.text)) {
-              await this.sendMessage(
-                payload.chatId,
-                buildVoiceCapabilityReply({ voiceEnabled: Boolean(this.audioTranscriber?.isEnabled) })
-              );
+              await this.recordAndSendReply({
+                payload,
+                userText: resolved.text,
+                reply: buildVoiceCapabilityReply({ voiceEnabled: Boolean(this.audioTranscriber?.isEnabled) }),
+                onMessage
+              });
               continue;
             }
 
             if (isFileCapabilityQuestion(resolved.text)) {
-              await this.sendMessage(payload.chatId, buildFileCapabilityReply());
+              await this.recordAndSendReply({
+                payload,
+                userText: resolved.text,
+                reply: buildFileCapabilityReply(),
+                onMessage
+              });
               continue;
             }
 

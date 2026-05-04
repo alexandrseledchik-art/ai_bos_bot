@@ -17,6 +17,14 @@ function normalizeLimit(value, fallback = 30, max = 100) {
   return Math.min(max, Math.floor(numeric));
 }
 
+function normalizeMessageLimit(value, fallback = 1000, max = 3000) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return fallback;
+  }
+  return Math.min(max, Math.floor(numeric));
+}
+
 function inFilter(values = []) {
   const unique = [...new Set(values.map((value) => trimString(value)).filter(Boolean))];
   return unique.length ? `in.(${unique.join(",")})` : "";
@@ -267,15 +275,17 @@ export class AdminAnalyticsService {
     const companyIds = visibleThreads.map((thread) => thread.company_id);
     const caseIds = visibleThreads.map((thread) => thread.active_case_id).filter(Boolean);
 
-    const [companies, cases, messages, evaluations] = await Promise.all([
+    const [companies, cases, messagesByVisibleThread, evaluations] = await Promise.all([
       this.fetchByIds("companies", companyIds),
       this.fetchByIds("cases", caseIds),
-      this.safeFindMany("messages", {
-        thread_id: inFilter(threadIds),
-        select: "*",
-        order: "created_at.desc",
-        limit: normalizedLimit * 6
-      }),
+      Promise.all(visibleThreads.map((thread) =>
+        this.safeFindMany("messages", {
+          thread_id: `eq.${thread.id}`,
+          select: "*",
+          order: "created_at.desc",
+          limit: normalizeMessageLimit()
+        })
+      )),
       this.safeFindMany("admin_conversation_evaluations", {
         thread_id: inFilter(threadIds),
         select: "*",
@@ -284,6 +294,7 @@ export class AdminAnalyticsService {
       })
     ]);
 
+    const messages = messagesByVisibleThread.flat();
     const companyById = indexById(companies);
     const caseById = indexById(cases);
     const messagesByThread = groupBy(messages, "thread_id");

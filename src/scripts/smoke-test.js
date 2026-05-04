@@ -172,6 +172,21 @@ async function run() {
     maxHistoryMessages: 8
   });
 
+  await service.recordTelegramExchange({
+    telegramChatId: "direct-reply",
+    userText: "Файлы принимаешь?",
+    assistantText: buildFileCapabilityReply(),
+    userMeta: {
+      username: "direct_reply_user"
+    }
+  });
+  const directReplyState = await store.readState();
+  const directReplyThread = directReplyState.threads.find((thread) => thread.telegramChatId === "direct-reply");
+  const directReplyMessages = directReplyState.messages.filter((message) => message.threadId === directReplyThread?.id);
+  if (!directReplyThread || directReplyMessages.length !== 2) {
+    throw new Error("Direct Telegram replies should be persisted for admin analytics.");
+  }
+
   const inputs = [
     "Хочу разобрать бизнес",
     "Мне нужен RACI для ролей",

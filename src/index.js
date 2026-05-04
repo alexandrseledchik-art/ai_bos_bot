@@ -20,7 +20,9 @@ async function main() {
   });
 
   console.log("Business diagnostic bot is running.");
-  await bot.start((payload) => conversationService.handleUserMessage(payload));
+  const handleMessage = (payload) => conversationService.handleUserMessage(payload);
+  handleMessage.recordTelegramExchange = (payload) => conversationService.recordTelegramExchange(payload);
+  await bot.start(handleMessage);
 }
 
 main().catch((error) => {
