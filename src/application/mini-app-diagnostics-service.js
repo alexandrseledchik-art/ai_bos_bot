@@ -17,6 +17,116 @@ const OFFICIAL_ANSWER_SOURCES = new Set([
 const OFFICIAL_ANSWER_STATUSES = new Set(["confirmed", "corrected"]);
 const CONSTRAINT_REJECTION_CHAT_EVENT = "constraint_rejection_chat_requested";
 const CONSTRAINT_REJECTION_FEEDBACK_SIGNAL = "constraint_rejection_feedback";
+const BUSINESS_ASSEMBLY_ARTIFACT_PREFIX = "miniapp_assembly";
+const BUSINESS_ASSEMBLY_LAYER_ORDER = [
+  "owner_context",
+  "external_environment",
+  "strategy",
+  "product_value_proposition",
+  "commercial",
+  "operating_model",
+  "finance",
+  "people_organization",
+  "governance_risks",
+  "technology",
+  "data_analytics"
+];
+const BUSINESS_ASSEMBLY_ARTIFACTS = {
+  owner_context: [
+    {
+      id: "owner-decision-frame",
+      title: "Карта целей и роли собственника",
+      why: "Без этой карты бизнес легко начинает собираться вокруг разных ожиданий: рост, прибыль, свобода времени и роль Александра могут конфликтовать.",
+      fillPrompt: "Зафиксировать цель на 3-6 месяцев, желаемую роль Александра, правила ключевых решений и то, что больше не должно держаться только в голове собственника."
+    },
+    {
+      id: "owner-decision-rules",
+      title: "Правила CEO-решений",
+      why: "AI-BOSS сможет действовать проактивно только если понятно, какие решения он готовит сам, а какие выносит Александру как собственнику.",
+      fillPrompt: "Разделить решения на три группы: AI-BOSS делает сам, AI-BOSS предлагает варианты, Александр утверждает."
+    }
+  ],
+  external_environment: [
+    {
+      id: "market-reality-map",
+      title: "Карта рынка и спроса",
+      why: "Нужно понять, в какой реальности упаковывается консалтинг: кто уже покупает такие разборы, какие боли обострены и где есть платёжеспособный спрос.",
+      fillPrompt: "Описать сегменты собственников, частые триггеры обращения, альтернативы на рынке, уровень срочности и причины платить за разбор."
+    }
+  ],
+  strategy: [
+    {
+      id: "strategic-focus",
+      title: "Стратегический фокус консалтинга",
+      why: "Без выбора стартового фокуса AI-BOSS будет улучшать всё сразу и снова превратится в набор идей вместо управленческой системы.",
+      fillPrompt: "Выбрать стартовый сегмент, обещание результата, границы продукта, отказ от лишних направлений и критерий успеха на 4 недели."
+    }
+  ],
+  product_value_proposition: [
+    {
+      id: "offer-map",
+      title: "Карта оффера и результата",
+      why: "Пользователь должен понимать не методологию, а что он получает после входа: какой результат, какие артефакты и зачем это ему.",
+      fillPrompt: "Собрать первый платный оффер: кому, с какой болью, какой результат, какой маршрут, что получает после разбора."
+    }
+  ],
+  commercial: [
+    {
+      id: "client-route",
+      title: "Маршрут клиента от входа до разбора",
+      why: "Консалтинг должен продаваться не вручную каждый раз, а через понятный путь: бот, кабинет, резюме, консультация, следующий шаг.",
+      fillPrompt: "Описать этапы от первого сообщения до оплаты/разбора, критерии подходящего клиента, точки доверия и причины отказа."
+    }
+  ],
+  operating_model: [
+    {
+      id: "delivery-process",
+      title: "Процесс проведения разбора",
+      why: "Чтобы бизнес не упирался во время Александра, нужно зафиксировать, что делает бот, что делает эксперт и какой артефакт выходит после работы.",
+      fillPrompt: "Описать подготовку, сам разбор, фиксацию выводов, следующий шаг, контроль выполнения и обновление кейса."
+    }
+  ],
+  finance: [
+    {
+      id: "profit-model",
+      title: "Финансовая модель консалтинга",
+      why: "Цель 3 млн чистой прибыли невозможна без простой экономики: цена, мощность, маржа, нагрузка Александра и роль AI-BOSS.",
+      fillPrompt: "Посчитать цену оффера, количество разборов, долю ручного времени, расходы, чистую прибыль и ограничение по мощности."
+    }
+  ],
+  people_organization: [
+    {
+      id: "role-map",
+      title: "Карта ролей и ответственности",
+      why: "Даже если пока команда маленькая, нужно заранее отделить роль собственника, эксперта, AI-BOSS и будущих помощников.",
+      fillPrompt: "Разложить роли по задачам: кто собирает факты, кто принимает решения, кто ведёт клиента, кто фиксирует артефакты и кто контролирует выполнение."
+    }
+  ],
+  governance_risks: [
+    {
+      id: "management-rhythm",
+      title: "Ритм управления и контрольные петли",
+      why: "CEO-режим появляется не от названия, а от регулярного цикла: что проверяем, какие решения принимаем и когда возвращаемся к фактам.",
+      fillPrompt: "Задать еженедельный ритм: повестка, решения Александра, действия AI-BOSS, факты выполнения, риски и пересборка гипотез."
+    }
+  ],
+  technology: [
+    {
+      id: "systems-map",
+      title: "Карта систем и автоматизаций",
+      why: "Если документы, чат, кабинет и будущие интеграции не связаны, AI-BOSS не сможет сам собирать факты и управлять процессом.",
+      fillPrompt: "Описать текущие системы, где лежат документы, какие данные нужны из Telegram, Mini App, CRM, таблиц и что должно синхронизироваться."
+    }
+  ],
+  data_analytics: [
+    {
+      id: "metrics-map",
+      title: "Карта метрик и источников данных",
+      why: "Чтобы бот принимал решения не по ощущениям, нужно определить минимальные факты: лиды, конверсия, выручка, маржа, загрузка, выполнение шагов.",
+      fillPrompt: "Собрать список метрик, источников, частоту обновления, владельца данных и решения, которые принимаются по каждой метрике."
+    }
+  ]
+};
 
 function firstRow(rows) {
   return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
@@ -28,6 +138,26 @@ function trimString(value) {
 
 function normalizeText(value) {
   return trimString(value).toLowerCase();
+}
+
+function normalizeLookupText(value) {
+  return normalizeText(value)
+    .replace(/[^a-zа-яё0-9]+/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function assemblyArtifactExternalId(caseId, artifactId) {
+  return `${BUSINESS_ASSEMBLY_ARTIFACT_PREFIX}_${caseId}_${artifactId}`;
+}
+
+function getAssemblyArtifactDefinitions(layerKey) {
+  return BUSINESS_ASSEMBLY_ARTIFACTS[layerKey] || [];
+}
+
+function getBusinessAssemblyOrderIndex(layerKey) {
+  const index = BUSINESS_ASSEMBLY_LAYER_ORDER.indexOf(layerKey);
+  return index >= 0 ? index : BUSINESS_ASSEMBLY_LAYER_ORDER.length;
 }
 
 function truncateText(value, maxLength = 900) {
@@ -1591,6 +1721,301 @@ export class MiniAppDiagnosticsService {
     };
   }
 
+  findAssemblyArtifactMatch({ definition, layer, artifacts = [], documents = [], caseId }) {
+    const externalId = assemblyArtifactExternalId(caseId, definition.id);
+    const generatedArtifact = (artifacts || []).find((artifact) => artifact.external_id === externalId);
+
+    if (generatedArtifact) {
+      return {
+        status: "ready",
+        source: "artifact",
+        id: generatedArtifact.id,
+        title: generatedArtifact.title,
+        updatedAt: generatedArtifact.updated_at || generatedArtifact.created_at || ""
+      };
+    }
+
+    const definitionTitle = normalizeLookupText(definition.title);
+    const layerTitle = normalizeLookupText(layer.title);
+    const matchedDocument = (documents || []).find((document) => {
+      const title = normalizeLookupText(document.title || document.url);
+      if (!title) {
+        return false;
+      }
+      return title.includes(definitionTitle) ||
+        definitionTitle.includes(title) ||
+        (layerTitle && title.includes(layerTitle));
+    });
+
+    if (matchedDocument) {
+      return {
+        status: ["analyzed", "link_added"].includes(matchedDocument.status) ? "ready" : "in_progress",
+        source: "document",
+        id: matchedDocument.id,
+        title: matchedDocument.title || matchedDocument.url,
+        updatedAt: matchedDocument.updated_at || matchedDocument.created_at || ""
+      };
+    }
+
+    return {
+      status: "missing",
+      source: "",
+      id: "",
+      title: "",
+      updatedAt: ""
+    };
+  }
+
+  buildAssemblyLayer({ layer, index, artifacts, documents, observations, answers, catalogTools, caseId }) {
+    const definitions = getAssemblyArtifactDefinitions(layer.key);
+    const answer = (answers || []).find((item) => item.subject_key === layer.key && isOfficialAnswer(item));
+    const layerObservations = (observations || []).filter((item) => item.layer === layer.key);
+    const layerTools = (catalogTools || [])
+      .filter((tool) => (tool.layer_keys || tool.layerKeys || []).includes(layer.key));
+    const recommendedTools = layerTools
+      .slice(0, 3)
+      .map((tool) => this.decorateTool(tool));
+    const requiredArtifacts = definitions.map((definition) => ({
+      ...definition,
+      match: this.findAssemblyArtifactMatch({
+        definition,
+        layer,
+        artifacts,
+        documents,
+        caseId
+      })
+    }));
+    const readyArtifactsCount = requiredArtifacts.filter((artifact) => artifact.match.status === "ready").length;
+    const status = requiredArtifacts.length > 0 && readyArtifactsCount >= requiredArtifacts.length
+      ? "ready"
+      : readyArtifactsCount > 0 || layerObservations.length > 0 || Number.isFinite(Number(answer?.score))
+        ? "in_progress"
+        : "missing";
+
+    return {
+      order: index + 1,
+      layerKey: layer.key,
+      classKey: layer.classKey,
+      title: layer.title,
+      shortDescription: layer.shortDescription,
+      role: layer.role,
+      priorityReason: layer.priorityWhen,
+      maturityScore: Number.isFinite(Number(answer?.score)) ? Number(answer.score) : null,
+      observationCount: layerObservations.length,
+      status,
+      requiredArtifacts,
+      toolCount: layerTools.length,
+      recommendedTools,
+      toolGap: recommendedTools.length
+        ? null
+        : "В каталоге пока нет привязанного инструмента для этого слоя. Нужно добавить инструмент или создать рабочий документ вручную."
+    };
+  }
+
+  buildAssemblySummary(layers) {
+    const totalLayers = layers.length;
+    const completedLayers = layers.filter((layer) => layer.status === "ready").length;
+    const totalArtifacts = layers.reduce((sum, layer) => sum + layer.requiredArtifacts.length, 0);
+    const readyArtifacts = layers.reduce(
+      (sum, layer) => sum + layer.requiredArtifacts.filter((artifact) => artifact.match.status === "ready").length,
+      0
+    );
+    const percent = totalArtifacts > 0 ? Math.round((readyArtifacts / totalArtifacts) * 100) : 0;
+
+    return {
+      totalLayers,
+      completedLayers,
+      artifactProgress: {
+        ready: readyArtifacts,
+        total: totalArtifacts,
+        percent
+      }
+    };
+  }
+
+  buildAssemblyNextRequest(layers) {
+    const nextLayer = layers.find((layer) => layer.status !== "ready") || null;
+
+    if (!nextLayer) {
+      return {
+        status: "complete",
+        title: "Бизнес собран по текущей карте",
+        text: "Все базовые артефакты созданы или добавлены. Дальше можно переходить к регулярному CEO-циклу: факты, решения, действия, контроль.",
+        layer: null,
+        artifact: null,
+        route: "/mini-app/ceo"
+      };
+    }
+
+    const nextArtifact = nextLayer.requiredArtifacts.find((artifact) => artifact.match.status !== "ready") ||
+      nextLayer.requiredArtifacts[0] ||
+      null;
+
+    return {
+      status: "needs_artifact",
+      title: nextArtifact
+        ? `Нужен документ: ${nextArtifact.title}`
+        : `Нужен рабочий материал по слою: ${nextLayer.title}`,
+      text: nextArtifact
+        ? nextArtifact.fillPrompt
+        : "Нужно создать или прислать документ, который позволит собрать этот слой не по словам, а по фактам.",
+      layer: {
+        layerKey: nextLayer.layerKey,
+        title: nextLayer.title,
+        order: nextLayer.order
+      },
+      artifact: nextArtifact
+        ? {
+            id: nextArtifact.id,
+            title: nextArtifact.title,
+            why: nextArtifact.why,
+            fillPrompt: nextArtifact.fillPrompt
+          }
+        : null,
+      route: "/mini-app/documents"
+    };
+  }
+
+  async getBusinessAssemblyPlan({ bootstrap }) {
+    const run = await this.resolveExpressDiagnosticRun({ bootstrap });
+    const [answers, observations, documents, artifacts] = await Promise.all([
+      this.getExpressAnswers(run.id),
+      this.getCaseObservations({ bootstrap }),
+      this.findMany("document_sources", {
+        case_id: `eq.${bootstrap.activeCase.id}`,
+        order: "updated_at.desc",
+        select: "*"
+      }),
+      this.findMany("artifacts", {
+        case_id: `eq.${bootstrap.activeCase.id}`,
+        order: "created_at.desc",
+        select: "*"
+      })
+    ]);
+    const catalogTools = this.getCatalogTools();
+    const layers = [...BUSINESS_LAYERS_V1]
+      .sort((left, right) => getBusinessAssemblyOrderIndex(left.key) - getBusinessAssemblyOrderIndex(right.key))
+      .map((layer, index) => this.buildAssemblyLayer({
+        layer,
+        index,
+        artifacts,
+        documents,
+        observations,
+        answers,
+        catalogTools,
+        caseId: bootstrap.activeCase.id
+      }));
+    const summary = this.buildAssemblySummary(layers);
+    const nextRequest = this.buildAssemblyNextRequest(layers);
+
+    await this.logMiniAppEvent({
+      bootstrap,
+      eventName: "business_assembly_viewed",
+      metadata: {
+        completedLayers: summary.completedLayers,
+        totalLayers: summary.totalLayers,
+        readyArtifacts: summary.artifactProgress.ready,
+        totalArtifacts: summary.artifactProgress.total,
+        nextLayerKey: nextRequest.layer?.layerKey || ""
+      }
+    });
+
+    return {
+      assembly: {
+        mode: "evidence_first_business_build",
+        title: "Сборка бизнеса",
+        summary: "Это второй путь работы AI-BOSS: не просить оценить бизнес словами, а последовательно собрать факты, документы и решения по 11 слоям.",
+        storage: {
+          title: "Документы и артефакты кейса",
+          route: "/mini-app/documents"
+        },
+        ...summary,
+        nextRequest,
+        layers
+      }
+    };
+  }
+
+  buildAssemblyDraftContent({ bootstrap, layer, definition }) {
+    const companyName = bootstrap.company?.name || "Компания";
+    const currentRequest = bootstrap.companyProfile?.current_request || "";
+
+    return [
+      `# ${definition.title}`,
+      "",
+      `Компания: ${companyName}`,
+      `Слой: ${layer.title}`,
+      "",
+      "## Зачем нужен документ",
+      definition.why,
+      "",
+      "## Что нужно заполнить",
+      definition.fillPrompt,
+      "",
+      "## Текущий запрос",
+      currentRequest || "Пока не указан. Добавьте текущий управленческий запрос, чтобы документ был связан с реальной задачей.",
+      "",
+      "## Факты",
+      "- Что уже известно:",
+      "- Какие данные или документы подтверждают это:",
+      "- Что пока держится только на ощущениях:",
+      "",
+      "## Решения",
+      "- Что AI-BOSS может подготовить сам:",
+      "- Что нужно согласовать с Александром:",
+      "- Какой следующий проверочный шаг:"
+    ].join("\n");
+  }
+
+  async createBusinessAssemblyDraft({ bootstrap, payload = {} }) {
+    const artifactId = trimString(payload.artifactId);
+    const layerKey = trimString(payload.layerKey);
+    const layer = getBusinessLayerByKey(layerKey);
+
+    if (!layer || !artifactId) {
+      throw new Error("Нужно передать слой и документ, который нужно создать.");
+    }
+
+    const definition = getAssemblyArtifactDefinitions(layer.key).find((item) => item.id === artifactId);
+    if (!definition) {
+      throw new Error("Такой документ не найден в карте сборки бизнеса.");
+    }
+
+    const externalId = assemblyArtifactExternalId(bootstrap.activeCase.id, definition.id);
+    const content = this.buildAssemblyDraftContent({ bootstrap, layer, definition });
+    const artifact = await this.upsertOne(
+      "artifacts",
+      {
+        external_id: externalId,
+        workspace_id: bootstrap.workspace.id,
+        case_id: bootstrap.activeCase.id,
+        kind: "snapshot",
+        title: definition.title,
+        summary: `${layer.title}: ${definition.why}`,
+        path: `miniapp://assembly/${definition.id}`,
+        content
+      },
+      {
+        onConflict: "external_id"
+      }
+    );
+
+    await this.logMiniAppEvent({
+      bootstrap,
+      eventName: "business_assembly_draft_created",
+      metadata: {
+        artifactId: artifact.id,
+        assemblyArtifactId: definition.id,
+        layerKey: layer.key
+      }
+    });
+
+    return {
+      artifact,
+      ...(await this.getBusinessAssemblyPlan({ bootstrap }))
+    };
+  }
+
   async updateNextStepStatus({ bootstrap, payload }) {
     const action = trimString(payload.action);
     const id = trimString(payload.id || payload.nextStepId);
@@ -1837,16 +2262,23 @@ export class MiniAppDiagnosticsService {
   }
 
   async getDocuments({ bootstrap }) {
-    const sources = await this.findMany("document_sources", {
-      case_id: `eq.${bootstrap.activeCase.id}`,
-      order: "updated_at.desc",
-      select: "*"
-    });
-    const snapshots = await this.findMany("document_snapshots", {
-      case_id: `eq.${bootstrap.activeCase.id}`,
-      order: "created_at.desc",
-      select: "*"
-    });
+    const [sources, snapshots, artifacts] = await Promise.all([
+      this.findMany("document_sources", {
+        case_id: `eq.${bootstrap.activeCase.id}`,
+        order: "updated_at.desc",
+        select: "*"
+      }),
+      this.findMany("document_snapshots", {
+        case_id: `eq.${bootstrap.activeCase.id}`,
+        order: "created_at.desc",
+        select: "*"
+      }),
+      this.findMany("artifacts", {
+        case_id: `eq.${bootstrap.activeCase.id}`,
+        order: "created_at.desc",
+        select: "*"
+      })
+    ]);
     const latestSnapshotBySource = new Map();
 
     for (const snapshot of snapshots || []) {
@@ -1859,7 +2291,8 @@ export class MiniAppDiagnosticsService {
       documents: (sources || []).map((source) => ({
         ...source,
         latestSnapshot: latestSnapshotBySource.get(source.id) || null
-      }))
+      })),
+      artifacts: artifacts || []
     };
   }
 

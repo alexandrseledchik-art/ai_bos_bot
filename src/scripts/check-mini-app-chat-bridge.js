@@ -49,6 +49,24 @@ function assertInvitePolicy() {
   assert.equal(ceoInvite.route, "/mini-app/ceo");
   assert.equal(ceoInvite.label, "Открыть CEO-контур");
 
+  const assemblyInvite = buildMiniAppInvite({
+    classification: {
+      entryMode: "meta_role",
+      cleanText: "Нужно собрать бизнес по 11 слоям, инструментам и документам"
+    },
+    decision: {
+      decision: {
+        action: "answer",
+        signalSufficiency: "weak"
+      },
+      entryState: {}
+    },
+    runtime: {},
+    entryState: {}
+  });
+  assert.equal(assemblyInvite.route, "/mini-app/assembly");
+  assert.equal(assemblyInvite.label, "Открыть сборку бизнеса");
+
   const diagnosticsInvite = buildMiniAppInvite({
     classification: {
       entryMode: "problem_first",

@@ -757,10 +757,65 @@ a {
   gap: 12px;
 }
 
+.compact-grid {
+  margin-top: 10px;
+}
+
 @media (min-width: 760px) {
   .tool-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+}
+
+.assembly-list,
+.assembly-artifacts,
+.assembly-tools {
+  display: grid;
+  gap: 12px;
+}
+
+.assembly-list {
+  margin-top: 16px;
+}
+
+.assembly-layer,
+.assembly-artifact {
+  display: grid;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.assembly-layer {
+  box-shadow: 0 8px 22px rgba(16, 39, 39, 0.055);
+}
+
+.assembly-artifact {
+  background: rgba(13, 45, 48, 0.035);
+}
+
+.assembly-artifact.ready {
+  border-color: rgba(38, 148, 99, 0.24);
+  background: var(--good-soft);
+}
+
+.assembly-artifact strong,
+.assembly-tools strong {
+  color: var(--ink);
+}
+
+.assembly-artifact span,
+.assembly-artifact small {
+  display: block;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.assembly-artifact small {
+  margin-top: 6px;
+  font-size: 13px;
 }
 
 .tool-card,
@@ -800,6 +855,16 @@ a {
   padding: 12px;
   border-radius: var(--radius-md);
   background: var(--teal-soft);
+}
+
+.snapshot-box pre {
+  max-height: 280px;
+  overflow: auto;
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .inline-analysis {

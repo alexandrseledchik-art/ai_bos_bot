@@ -520,6 +520,25 @@ async function buildPhase8Case() {
   assert.equal(ceo.ceoBrief.agenda.length > 0, true);
   assert.equal(ceo.ceoBrief.controlLoop.openLoops.some((item) => /факт|выполн/i.test(item)), true);
 
+  const assembly = await service.getBusinessAssemblyPlan({ bootstrap });
+  assert.equal(assembly.assembly.layers.length, 11);
+  assert.equal(assembly.assembly.nextRequest.status, "needs_artifact");
+  assert.equal(assembly.assembly.layers[0].layerKey, "owner_context");
+  assert.equal(assembly.assembly.layers.every((layer) => layer.requiredArtifacts.length > 0), true);
+  assert.equal(assembly.assembly.layers.every((layer) => layer.recommendedTools.length > 0), true);
+
+  const draft = await service.createBusinessAssemblyDraft({
+    bootstrap,
+    payload: {
+      layerKey: assembly.assembly.nextRequest.layer.layerKey,
+      artifactId: assembly.assembly.nextRequest.artifact.id
+    }
+  });
+  assert.equal(Boolean(draft.artifact.id), true);
+  assert.match(draft.artifact.content, /Что нужно заполнить/);
+  const documentsAfterDraft = await service.getDocuments({ bootstrap });
+  assert.equal(documentsAfterDraft.artifacts.some((artifact) => artifact.id === draft.artifact.id), true);
+
   return {
     syncClient,
     bootstrap,
@@ -551,7 +570,9 @@ async function assertPhase8Flow() {
     "document_analyzed",
     "consultation_brief_generated",
     "consultation_clicked",
-    "ceo_brief_viewed"
+    "ceo_brief_viewed",
+    "business_assembly_viewed",
+    "business_assembly_draft_created"
   ]) {
     assert.equal(names.includes(expected), true, `Missing event: ${expected}`);
   }
@@ -627,17 +648,25 @@ function assertStaticPhase8Wiring() {
   assert.match(apiClient, /overrideConstraint/);
   assert.match(apiClient, /overrideNextStep/);
   assert.match(apiClient, /getCeoBrief/);
+  assert.match(apiClient, /getBusinessAssembly/);
+  assert.match(apiClient, /createBusinessAssemblyDraft/);
   assert.match(service, /suggestion_shown/);
   assert.match(service, /captureEvalSnapshot/);
   assert.match(service, /manual_constraint_override/);
   assert.match(service, /getCeoOperatingBrief/);
+  assert.match(service, /getBusinessAssemblyPlan/);
+  assert.match(service, /createBusinessAssemblyDraft/);
   assert.match(mainJs, /CEO-контур/);
+  assert.match(mainJs, /Сборка бизнеса/);
+  assert.match(mainJs, /data-assembly-draft/);
   assert.match(mainJs, /Повестка AI-BOSS/);
   assert.match(mainJs, /Решения собственника/);
   assert.match(mainJs, /ceo-metrics/);
   assert.match(miniAppApi, /mini_app_opened/);
   assert.match(miniAppApi, /miniAppAlphaMode/);
   assert.match(miniAppApi, /path === "ceo"/);
+  assert.match(miniAppApi, /path === "assembly"/);
+  assert.match(miniAppApi, /path === "assembly\/draft"/);
   assert.match(miniAppApi, /dev\/constraint-override/);
   assert.match(miniAppApi, /dev\/next-step-override/);
 }

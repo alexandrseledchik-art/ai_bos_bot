@@ -185,6 +185,23 @@ async function dispatchMiniAppRoute(request) {
     });
   }
 
+  if (path === "assembly") {
+    return handleMiniAppRoute(request, ["GET"], async ({ syncClient, bootstrap }) => {
+      const service = createService(syncClient);
+      const result = await service.getBusinessAssemblyPlan({ bootstrap });
+      return jsonResponse({ ok: true, ...result });
+    });
+  }
+
+  if (path === "assembly/draft") {
+    return handleMiniAppRoute(request, ["POST"], async ({ syncClient, bootstrap }) => {
+      const service = createService(syncClient);
+      const payload = await readJsonBody(request);
+      const result = await service.createBusinessAssemblyDraft({ bootstrap, payload });
+      return jsonResponse({ ok: true, ...result });
+    });
+  }
+
   if (path === "tools") {
     return handleMiniAppRoute(request, ["GET"], async ({ syncClient, bootstrap }) => {
       const service = createService(syncClient);

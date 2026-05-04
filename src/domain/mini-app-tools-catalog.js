@@ -19,8 +19,19 @@ const PROBLEM_TYPE_HINTS = [
   }
 ];
 
+const TOOL_LAYER_KEY_ALIASES = {
+  product: "product_value_proposition",
+  operations: "operating_model",
+  team: "people_organization",
+  governance: "governance_risks"
+};
+
 function normalizeText(...parts) {
   return parts.filter(Boolean).join(" ").toLowerCase();
+}
+
+function normalizeLayerKey(layerId) {
+  return TOOL_LAYER_KEY_ALIASES[layerId] || layerId || "";
 }
 
 function inferProblemTypes(tool) {
@@ -47,7 +58,7 @@ function toCatalogTool(tool, index) {
     when_to_use: tool.whenToUse,
     result: tool.result,
     template_url: tool.url || null,
-    layer_keys: tool.layerId ? [tool.layerId] : [],
+    layer_keys: tool.layerId ? [normalizeLayerKey(tool.layerId)] : [],
     layer: tool.layer,
     domain: tool.domain,
     problem_types: inferProblemTypes(tool),

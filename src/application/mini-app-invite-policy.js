@@ -43,6 +43,13 @@ export const MINI_APP_CABINET_SCREENS = {
     title: "CEO-контур",
     purpose: "Показать управленческую повестку кейса: решения собственника, действия AI-BOSS и открытые петли контроля."
   },
+  assembly: {
+    screenId: "assembly",
+    route: "/mini-app/assembly",
+    label: "Открыть сборку бизнеса",
+    title: "Сборка бизнеса",
+    purpose: "Последовательно собрать бизнес по 11 слоям через документы, факты, инструменты и решения."
+  },
   tools: {
     screenId: "tools",
     route: "/mini-app/tools",
@@ -111,6 +118,11 @@ function isCeoLayerQuestion(classification = {}) {
   return /александр|селедчик|консалтинг|ceo|co-ceo|управляющ|контур|11\s+сло|слоям|слоях|упаковк|наш\s+проект|этот\s+проект/.test(text);
 }
 
+function isBusinessAssemblyRequest(classification = {}) {
+  const text = String(classification.cleanText || "").toLowerCase();
+  return /собрать\s+бизнес|сборк[а-яё\s]+бизнес|собира[а-яё\s]+систем|по\s+11\s+сло|слой\s+за\s+сло|инструмент[а-яё\s]+по\s+сло|документ[а-яё\s]+по\s+сло/.test(text);
+}
+
 function selectInviteCandidate({
   classification = {},
   decision = {},
@@ -133,6 +145,14 @@ function selectInviteCandidate({
   const hasDiagnosticCase = runtime.activeCaseKind === "diagnostic_case" || activeCase?.kind === "diagnostic_case";
 
   if (entryMode === "meta_role") {
+    if (isBusinessAssemblyRequest(classification)) {
+      return pickScreen(
+        "assembly",
+        "business_assembly",
+        "Пользователь хочет собрать бизнес как систему по слоям, инструментам и документам; лучше открыть маршрут сборки бизнеса."
+      );
+    }
+
     if (isCeoLayerQuestion(classification)) {
       return pickScreen(
         "ceo",

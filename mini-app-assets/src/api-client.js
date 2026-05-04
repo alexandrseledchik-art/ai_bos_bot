@@ -124,6 +124,17 @@ export class MiniAppApiClient {
     return this.request("/api/mini-app/ceo");
   }
 
+  getBusinessAssembly() {
+    return this.request("/api/mini-app/assembly");
+  }
+
+  createBusinessAssemblyDraft(payload) {
+    return this.request("/api/mini-app/assembly/draft", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  }
+
   getTools() {
     return this.request("/api/mini-app/tools");
   }

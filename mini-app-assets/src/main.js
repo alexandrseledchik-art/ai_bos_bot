@@ -50,6 +50,13 @@ const state = {
     loading: false,
     error: ""
   },
+  assembly: {
+    data: null,
+    loading: false,
+    creatingArtifactId: "",
+    error: "",
+    message: ""
+  },
   tools: {
     catalog: null,
     recommended: null,
@@ -216,6 +223,7 @@ function renderDashboard() {
       <p>${escapeHtml(companyName)}: здесь чат превращается в рабочий кейс. Мы фиксируем контекст, собираем сигналы, проверяем зрелость и выводим одну рабочую гипотезу ограничения.</p>
       <div class="actions">
         <button class="primary-button" data-navigate="/mini-app/onboarding">${profileActionLabel}</button>
+        <button class="secondary-button" data-navigate="/mini-app/assembly">Собрать бизнес</button>
         <button class="secondary-button" data-navigate="/mini-app/diagnostics/express">Пройти диагностику</button>
         <button class="secondary-button" data-navigate="/mini-app/maturity">Открыть матрицу</button>
         <button class="secondary-button" data-navigate="/mini-app/constraint">Найти ограничение</button>
@@ -229,6 +237,8 @@ function renderDashboard() {
       ${renderBootstrapCard()}
       ${renderCeoSummaryCard()}
     </div>
+
+    ${renderAssemblySummaryCard()}
 
     <div class="grid two">
       <section class="card">
@@ -255,18 +265,18 @@ function renderDashboard() {
         </li>
         <li>
           <strong>Кабинет</strong>
-          <span>Здесь фиксируются профиль, диагностика, гипотеза, следующий шаг, инструменты и документы по кейсу.</span>
+          <span>Здесь фиксируются профиль, диагностика, сборка бизнеса, гипотеза, следующий шаг, инструменты и документы по кейсу.</span>
         </li>
         <li>
           <strong>Маршрут</strong>
-          <span>Заполни профиль, пройди диагностику, посмотри срез, проверь гипотезу и зафиксируй следующий шаг.</span>
+          <span>Можно идти двумя путями: быстрый срез через диагностику или сборка бизнеса через документы и факты по слоям.</span>
         </li>
       </ul>
     </section>
 
     ${renderRecommendedToolsPanel()}
 
-    <section class="card">
+    <section class="card next-card">
       <h3>Экраны</h3>
       <ul class="screen-list">
         ${ROUTES.filter((route) => route.path !== "/mini-app").map(routeLink).join("")}
@@ -301,6 +311,38 @@ function renderCeoSummaryCard() {
       </div>
       <div class="actions">
         <button class="secondary-button compact-button" data-navigate="/mini-app/ceo">Открыть контур</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderAssemblySummaryCard() {
+  const assembly = state.assembly.data?.assembly;
+
+  if (!assembly) {
+    return `
+      <section class="card next-card">
+        <h3>Сборка бизнеса</h3>
+        <p>Второй путь AI-BOSS: не оценивать бизнес только по ответам, а собрать документы, факты и решения по 11 слоям.</p>
+        <div class="actions">
+          <button class="secondary-button compact-button" data-navigate="/mini-app/assembly">Открыть сборку</button>
+        </div>
+      </section>
+    `;
+  }
+
+  const progress = assembly.artifactProgress || { ready: 0, total: 0, percent: 0 };
+
+  return `
+    <section class="card next-card">
+      <h3>Сборка бизнеса</h3>
+      <p>${escapeHtml(assembly.nextRequest?.title || assembly.summary)}</p>
+      <div class="status-row">
+        <span class="pill ${Number(progress.percent || 0) >= 100 ? "success" : "neutral"}">документы: ${escapeHtml(progress.ready)}/${escapeHtml(progress.total)}</span>
+        <span class="pill neutral">слои: ${escapeHtml(assembly.completedLayers || 0)}/${escapeHtml(assembly.totalLayers || 11)}</span>
+      </div>
+      <div class="actions">
+        <button class="secondary-button compact-button" data-navigate="/mini-app/assembly">Открыть сборку</button>
       </div>
     </section>
   `;
@@ -1474,6 +1516,175 @@ function renderOpenLoops(openLoops = []) {
   `;
 }
 
+function renderBusinessAssembly() {
+  const block = state.assembly;
+
+  if (block.loading) {
+    return renderLoadingCard("Собираю карту сборки бизнеса...");
+  }
+
+  if (block.error) {
+    return renderErrorCard(block.error, "Повторить", "/mini-app/assembly");
+  }
+
+  if (!block.data?.assembly) {
+    return renderLoadingCard("Готовлю маршрут сборки бизнеса...");
+  }
+
+  const assembly = block.data.assembly;
+  const progress = assembly.artifactProgress || { ready: 0, total: 0, percent: 0 };
+
+  return `
+    <section class="hero compact">
+      <p>Сборка бизнеса</p>
+      <h2>Соберём систему по фактам</h2>
+      <p>${escapeHtml(assembly.summary)} Идём по приоритетам: сначала рамка и рынок, затем фокус, оффер, коммерция, исполнение, деньги и управленческая инфраструктура.</p>
+      ${renderAssemblyProgress(progress)}
+      <div class="actions">
+        <button class="secondary-button" data-navigate="/mini-app/documents">Открыть документы</button>
+        <button class="secondary-button" data-navigate="/mini-app/tools">Инструменты</button>
+      </div>
+    </section>
+
+    ${renderAssemblyNextRequest(assembly.nextRequest, block)}
+
+    <section class="card next-card">
+      <h3>Маршрут по 11 слоям</h3>
+      <p>Каждый слой закрывается не красивой формулировкой, а рабочим документом или фактом. Если документа нет, AI-BOSS может создать черновик, который потом нужно заполнить или заменить реальным файлом.</p>
+      <div class="assembly-list">
+        ${(assembly.layers || []).map((layer) => renderAssemblyLayer(layer, block)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderAssemblyProgress(progress = {}) {
+  const ready = Number(progress.ready || 0);
+  const total = Number(progress.total || 0);
+  const percent = Number(progress.percent || 0);
+
+  return `
+    <div class="progress-block hero-progress">
+      <div class="progress-label">
+        <span>Документы в кейсе</span>
+        <strong>${escapeHtml(ready)}/${escapeHtml(total)}</strong>
+      </div>
+      <div class="progress progress-single" aria-label="Сборка бизнеса: создано или добавлено ${escapeAttribute(ready)}/${escapeAttribute(total)} документов">
+        <div class="progress-bar"><span style="width: ${Math.max(0, Math.min(100, percent))}%"></span></div>
+      </div>
+      <p class="progress-caption">Шкала показывает, сколько нужных документов уже создано или добавлено. Это не оценка качества бизнеса и не оценка глубины заполнения.</p>
+    </div>
+  `;
+}
+
+function renderAssemblyNextRequest(nextRequest, block) {
+  if (!nextRequest) {
+    return "";
+  }
+
+  const layerKey = nextRequest.layer?.layerKey || "";
+  const artifactId = nextRequest.artifact?.id || "";
+
+  return `
+    <section class="card insight-card">
+      <p class="eyebrow">${nextRequest.status === "complete" ? "сборка завершена" : "следующий недостающий документ"}</p>
+      <h3>${escapeHtml(nextRequest.title)}</h3>
+      <p>${escapeHtml(nextRequest.text)}</p>
+      ${nextRequest.artifact?.why ? `<p><strong>Зачем:</strong> ${escapeHtml(nextRequest.artifact.why)}</p>` : ""}
+      <div class="actions">
+        ${artifactId ? `
+          <button
+            class="primary-button"
+            type="button"
+            data-assembly-draft="${escapeAttribute(artifactId)}"
+            data-assembly-layer="${escapeAttribute(layerKey)}"
+            ${block.creatingArtifactId === artifactId ? "disabled" : ""}
+          >
+            ${block.creatingArtifactId === artifactId ? "Создаю..." : "Создать черновик"}
+          </button>
+        ` : ""}
+        <button class="secondary-button" type="button" data-navigate="${escapeAttribute(nextRequest.route || "/mini-app/documents")}">
+          ${nextRequest.status === "complete" ? "Открыть CEO-контур" : "Добавить документ"}
+        </button>
+      </div>
+      ${block.message ? `<p class="hint-text">${escapeHtml(block.message)}</p>` : ""}
+    </section>
+  `;
+}
+
+function renderAssemblyLayer(layer, block) {
+  return `
+    <article class="assembly-layer">
+      <div class="layer-head">
+        <div>
+          <p class="eyebrow">Шаг ${escapeHtml(layer.order)} · класс ${escapeHtml(layer.classKey)}</p>
+          <h4>${escapeHtml(layer.title)}</h4>
+        </div>
+        <span class="score-badge ${layer.status === "ready" ? "filled" : ""}">${escapeHtml(displayAssemblyStatus(layer.status))}</span>
+      </div>
+      <p>${escapeHtml(layer.role || layer.shortDescription)}</p>
+      <div class="status-row">
+        <span class="pill neutral">фактов: ${escapeHtml(layer.observationCount || 0)}</span>
+        <span class="pill neutral">оценка: ${escapeHtml(layer.maturityScore ? `${layer.maturityScore}/5` : "не нужна для старта")}</span>
+      </div>
+      <div class="assembly-artifacts">
+        ${(layer.requiredArtifacts || []).map((artifact) => renderAssemblyArtifact(layer, artifact, block)).join("")}
+      </div>
+      <div class="assembly-tools">
+        <strong>Инструменты для слоя${Number(layer.toolCount || 0) ? `: ${escapeHtml(layer.toolCount)} в каталоге` : ""}</strong>
+        ${layer.recommendedTools?.length ? `
+          <div class="tool-grid compact-grid">
+            ${layer.recommendedTools.map((tool) => renderToolTeaser(tool)).join("")}
+          </div>
+          <p class="hint-text">Показываю первые 3 ориентира. Полный список можно найти в каталоге инструментов.</p>
+        ` : `<p class="hint-text">${escapeHtml(layer.toolGap || "Инструменты для слоя пока не найдены.")}</p>`}
+      </div>
+    </article>
+  `;
+}
+
+function renderAssemblyArtifact(layer, artifact, block) {
+  const match = artifact.match || {};
+  const ready = match.status === "ready";
+
+  return `
+    <article class="assembly-artifact ${ready ? "ready" : ""}">
+      <div>
+        <strong>${escapeHtml(artifact.title)}</strong>
+        <span>${escapeHtml(ready
+          ? `Готово: ${match.title || "документ сохранён"}`
+          : artifact.fillPrompt
+        )}</span>
+        <small>${escapeHtml(artifact.why)}</small>
+      </div>
+      <div class="actions">
+        ${ready ? `
+          <button class="secondary-button compact-button" type="button" data-navigate="/mini-app/documents">Открыть</button>
+        ` : `
+          <button
+            class="secondary-button compact-button"
+            type="button"
+            data-assembly-draft="${escapeAttribute(artifact.id)}"
+            data-assembly-layer="${escapeAttribute(layer.layerKey)}"
+            ${block.creatingArtifactId === artifact.id ? "disabled" : ""}
+          >
+            ${block.creatingArtifactId === artifact.id ? "Создаю..." : "Создать черновик"}
+          </button>
+        `}
+      </div>
+    </article>
+  `;
+}
+
+function displayAssemblyStatus(status) {
+  const map = {
+    ready: "собрано",
+    in_progress: "в работе",
+    missing: "нужно собрать"
+  };
+  return map[status] || status || "нужно собрать";
+}
+
 function renderTools() {
   const block = state.tools;
 
@@ -1659,12 +1870,13 @@ function renderDocuments() {
   }
 
   const documents = block.data?.documents || [];
+  const artifacts = block.data?.artifacts || [];
 
   return `
     <section class="hero compact">
       <p>Документы</p>
-      <h2>Ссылки и снимки документов</h2>
-      <p>Сейчас мы сохраняем ссылку и короткий структурированный снимок. Автоматический доступ к Google-документам и постоянная синхронизация будут позже.</p>
+      <h2>Документы и артефакты кейса</h2>
+      <p>Здесь хранится всё, на что AI-BOSS должен опираться: ссылки, вставленные материалы, снимки анализа и черновики документов для сборки бизнеса.</p>
     </section>
 
     <form class="card form-card" data-document-form>
@@ -1687,8 +1899,13 @@ function renderDocuments() {
     </form>
 
     <section class="card next-card">
-      <h3>Сохранённые документы</h3>
+      <h3>Ссылки и загруженные материалы</h3>
       ${documents.length ? `<div class="document-list">${documents.map(renderDocumentCard).join("")}</div>` : `<p>Пока документов нет.</p>`}
+    </section>
+
+    <section class="card next-card">
+      <h3>Черновики AI-BOSS</h3>
+      ${artifacts.length ? `<div class="document-list">${artifacts.map(renderArtifactCard).join("")}</div>` : `<p>Пока черновиков нет. Их можно создать на экране сборки бизнеса.</p>`}
     </section>
   `;
 }
@@ -1730,6 +1947,37 @@ function renderDocumentCard(document) {
       </div>
     </article>
   `;
+}
+
+function renderArtifactCard(artifact) {
+  return `
+    <article class="document-card">
+      <div>
+        <p class="eyebrow">${escapeHtml(displayArtifactKind(artifact.kind))}</p>
+        <h4>${escapeHtml(artifact.title)}</h4>
+        <p>${escapeHtml(artifact.summary || "Черновик создан AI-BOSS и хранится в кейсе.")}</p>
+        <div class="status-row">
+          <span class="pill success">сохранено</span>
+        </div>
+      </div>
+      ${artifact.content ? `
+        <div class="snapshot-box">
+          <strong>Содержимое</strong>
+          <pre>${escapeHtml(artifact.content)}</pre>
+        </div>
+      ` : ""}
+    </article>
+  `;
+}
+
+function displayArtifactKind(kind) {
+  const map = {
+    screening: "первичный разбор",
+    diagnosis: "диагностика",
+    action_wave: "план действий",
+    snapshot: "черновик"
+  };
+  return map[kind] || kind || "артефакт";
 }
 
 function renderConsultation() {
@@ -1966,6 +2214,10 @@ function renderRouteContent(route) {
     return renderCeoOperating();
   }
 
+  if (route.path === "/mini-app/assembly") {
+    return renderBusinessAssembly();
+  }
+
   if (route.path === "/mini-app/tools") {
     return renderTools();
   }
@@ -2053,6 +2305,10 @@ function bindEvents() {
     button.addEventListener("click", () => updateNextStep(button.dataset.nextStepId, button.dataset.nextStepAction));
   });
 
+  appRoot.querySelectorAll("[data-assembly-draft]").forEach((button) => {
+    button.addEventListener("click", () => createAssemblyDraft(button.dataset.assemblyLayer, button.dataset.assemblyDraft));
+  });
+
   appRoot.querySelector("[data-tools-recommendations-toggle]")?.addEventListener("click", toggleToolRecommendations);
   appRoot.querySelectorAll("[data-open-tool-recommendations]").forEach((button) => {
     button.addEventListener("click", openToolRecommendations);
@@ -2121,6 +2377,7 @@ async function loadRouteData({ force = false } = {}) {
 
   if (path === "/mini-app") {
     await loadCeoBrief({ force });
+    await loadBusinessAssembly({ force });
   }
 
   if (path === "/mini-app/onboarding") {
@@ -2145,6 +2402,10 @@ async function loadRouteData({ force = false } = {}) {
 
   if (path === "/mini-app/ceo") {
     await loadCeoBrief({ force });
+  }
+
+  if (path === "/mini-app/assembly") {
+    await loadBusinessAssembly({ force });
   }
 
   if (path === "/mini-app/tools" || path.startsWith("/mini-app/tools/")) {
@@ -2210,6 +2471,7 @@ async function saveOnboarding(event) {
       onboardingStatus: result.onboardingStatus || state.bootstrap.onboardingStatus
     };
     state.ceo.data = null;
+    state.assembly.data = null;
     state.onboarding.message = "Профиль сохранён.";
     if (intent === "diagnostics") {
       navigate("/mini-app/diagnostics/express");
@@ -2395,6 +2657,7 @@ async function saveExpressAnswer(layerKey, score) {
     };
     state.maturity.data = null;
     state.ceo.data = null;
+    state.assembly.data = null;
   } catch (error) {
     rollbackOptimisticExpressAnswer(layerKey, previousAnswer);
     state.express.error = errorMessage(error, "Не удалось сохранить ответ.");
@@ -2455,6 +2718,7 @@ async function applyPrefillAction(layerKey, action, correctedScore = null) {
     };
     state.maturity.data = null;
     state.ceo.data = null;
+    state.assembly.data = null;
   } catch (error) {
     if (action === "confirm" || action === "correct") {
       rollbackOptimisticExpressAnswer(layerKey, previousAnswer);
@@ -2604,6 +2868,51 @@ async function loadCeoBrief({ force = false } = {}) {
     state.ceo.error = errorMessage(error, "Не удалось собрать CEO-контур.");
   } finally {
     state.ceo.loading = false;
+    render();
+  }
+}
+
+async function loadBusinessAssembly({ force = false } = {}) {
+  if (state.assembly.loading || (state.assembly.data && !force)) {
+    return;
+  }
+
+  state.assembly.loading = true;
+  state.assembly.error = "";
+  render();
+
+  try {
+    state.assembly.data = await api.getBusinessAssembly();
+  } catch (error) {
+    state.assembly.error = errorMessage(error, "Не удалось собрать маршрут сборки бизнеса.");
+  } finally {
+    state.assembly.loading = false;
+    render();
+  }
+}
+
+async function createAssemblyDraft(layerKey, artifactId) {
+  if (!layerKey || !artifactId) {
+    return;
+  }
+
+  state.assembly.creatingArtifactId = artifactId;
+  state.assembly.error = "";
+  state.assembly.message = "";
+  render();
+
+  try {
+    const result = await api.createBusinessAssemblyDraft({ layerKey, artifactId });
+    state.assembly.data = {
+      assembly: result.assembly
+    };
+    state.documents.data = null;
+    state.ceo.data = null;
+    state.assembly.message = "Черновик создан и сохранён в документах кейса.";
+  } catch (error) {
+    state.assembly.error = errorMessage(error, "Не удалось создать черновик документа.");
+  } finally {
+    state.assembly.creatingArtifactId = "";
     render();
   }
 }
@@ -2785,6 +3094,7 @@ async function saveDocument(event) {
     form.reset();
     state.documents.data = null;
     state.ceo.data = null;
+    state.assembly.data = null;
     await loadDocuments({ force: true });
   } catch (error) {
     state.documents.error = errorMessage(error, "Не удалось сохранить документ.");
@@ -2813,6 +3123,7 @@ async function analyzeDocument(documentId) {
     state.documents.message = result.userMessage || "Анализ завершён.";
     state.documents.data = null;
     state.ceo.data = null;
+    state.assembly.data = null;
     await loadDocuments({ force: true });
   } catch (error) {
     state.documents.error = errorMessage(error, "Не удалось проанализировать документ.");
