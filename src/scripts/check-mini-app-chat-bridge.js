@@ -11,6 +11,7 @@ import { TelegramApiClient } from "../infrastructure/telegram/telegram-api.js";
 function assertInvitePolicy() {
   assert.equal(MINI_APP_CABINET_SCREENS.dashboard.route, "/mini-app");
   assert.equal(MINI_APP_CABINET_SCREENS.diagnostics.route, "/mini-app/diagnostics/express");
+  assert.equal(MINI_APP_CABINET_SCREENS.ceo.route, "/mini-app/ceo");
 
   const toolInvite = buildMiniAppInvite({
     classification: {
@@ -29,6 +30,24 @@ function assertInvitePolicy() {
   });
   assert.equal(toolInvite.route, "/mini-app/tools");
   assert.equal(toolInvite.label, "Открыть инструменты");
+
+  const ceoInvite = buildMiniAppInvite({
+    classification: {
+      entryMode: "meta_role",
+      cleanText: "Как ты понимаешь роль AI-BOSS как CEO-слоя в упаковке консалтинга Александра?"
+    },
+    decision: {
+      decision: {
+        action: "answer",
+        signalSufficiency: "weak"
+      },
+      entryState: {}
+    },
+    runtime: {},
+    entryState: {}
+  });
+  assert.equal(ceoInvite.route, "/mini-app/ceo");
+  assert.equal(ceoInvite.label, "Открыть CEO-контур");
 
   const diagnosticsInvite = buildMiniAppInvite({
     classification: {

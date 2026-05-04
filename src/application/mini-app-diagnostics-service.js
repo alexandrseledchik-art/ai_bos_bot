@@ -128,6 +128,10 @@ function isOfficialAnswer(answer) {
   return OFFICIAL_ANSWER_SOURCES.has(answer?.source) && OFFICIAL_ANSWER_STATUSES.has(answer?.status);
 }
 
+function statusRank(value, rankMap) {
+  return rankMap[value] ?? 0;
+}
+
 function normalizeConfidence(value, fallback = 0.75) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) {
@@ -1030,6 +1034,351 @@ export class MiniAppDiagnosticsService {
     return {
       nextStep: persisted,
       constraintHypothesis
+    };
+  }
+
+  async findLatestNextStepAny({ bootstrap, statuses = ["accepted", "suggested", "done", "skipped"] } = {}) {
+    const rows = await this.findMany("next_steps", {
+      case_id: `eq.${bootstrap.activeCase.id}`,
+      order: "updated_at.desc",
+      select: "*"
+    });
+    const rank = {
+      accepted: 4,
+      suggested: 3,
+      done: 2,
+      skipped: 1
+    };
+
+    return (rows || [])
+      .filter((row) => statuses.includes(row.status))
+      .sort((left, right) => statusRank(right.status, rank) - statusRank(left.status, rank))
+      [0] || null;
+  }
+
+  buildOwnerDecisionQueue({ bootstrap, maturity, constraintHypothesis, nextStep, toolRecommendations, documents }) {
+    const decisions = [];
+    const profile = bootstrap.companyProfile || {};
+    const companyName = bootstrap.company?.name || "Компания";
+
+    if (!trimString(profile.current_request)) {
+      decisions.push({
+        id: "current_request",
+        title: "Зафиксировать главный запрос",
+        reason: "Без запроса AI-BOSS будет видеть симптомы, но не сможет понять, какое ограничение важнее именно сейчас.",
+        owner: "Собственник",
+        status: "needs_owner"
+      });
+    }
+
+    if ((maturity?.progressPercent || 0) < 100) {
+      decisions.push({
+        id: "diagnostic_scope",
+        title: "Довести быстрый срез до полной картины",
+        reason: `Сейчас оценено ${maturity?.answeredCount || 0}/${maturity?.totalCount || 11} областей. Этого хватает для движения, но не для уверенного управленческого среза.`,
+        owner: "AI-BOSS готовит, собственник подтверждает",
+        status: "in_progress"
+      });
+    }
+
+    if (!constraintHypothesis) {
+      decisions.push({
+        id: "constraint_choice",
+        title: "Выбрать рабочую гипотезу ограничения",
+        reason: "Пока нет главной версии, сложно понять, какой шаг даст системный эффект, а не просто закроет ближайшую боль.",
+        owner: "AI-BOSS предлагает, собственник подтверждает",
+        status: "needs_decision"
+      });
+    } else if (constraintHypothesis.status !== "confirmed") {
+      decisions.push({
+        id: "constraint_confirmation",
+        title: "Подтвердить или отклонить гипотезу ограничения",
+        reason: `Сейчас гипотеза: ${constraintHypothesis.title}. Её нужно принять как рабочую версию или заменить, чтобы не вести действия в разные стороны.`,
+        owner: "Собственник",
+        status: "needs_owner"
+      });
+    }
+
+    if (!nextStep) {
+      decisions.push({
+        id: "first_action",
+        title: "Выбрать первый проверочный шаг",
+        reason: "CEO-контур должен вести не к общему совету, а к ближайшему действию, которое проверяет ограничение.",
+        owner: "AI-BOSS предлагает",
+        status: "needs_action"
+      });
+    } else if (nextStep.status === "suggested") {
+      decisions.push({
+        id: "accept_first_action",
+        title: "Взять следующий шаг в работу",
+        reason: `Предложен шаг: ${nextStep.title}. Его нужно зафиксировать, чтобы он стал управленческим обязательством, а не рекомендацией в интерфейсе.`,
+        owner: "Собственник",
+        status: "needs_owner"
+      });
+    } else if (nextStep.status === "accepted") {
+      decisions.push({
+        id: "action_result",
+        title: "Вернуться с результатом выполненного шага",
+        reason: "После выполнения AI-BOSS должен обновить гипотезу и следующий шаг, иначе система не учится на фактах.",
+        owner: "Собственник приносит факт, AI-BOSS пересобирает вывод",
+        status: "in_progress"
+      });
+    }
+
+    if (!toolRecommendations?.length && nextStep) {
+      decisions.push({
+        id: "tool_package",
+        title: "Подобрать инструменты под текущий шаг",
+        reason: "Инструменты должны появляться после гипотезы и действия, чтобы помогать работе, а не заменять мышление.",
+        owner: "AI-BOSS",
+        status: "system_action"
+      });
+    }
+
+    if (!documents?.length) {
+      decisions.push({
+        id: "evidence_sources",
+        title: "Добавить первый факт или документ",
+        reason: `${companyName} пока держится в основном на ручном описании. Для управленческого контура нужен хотя бы один источник фактов.`,
+        owner: "Собственник / AI-BOSS",
+        status: "needs_evidence"
+      });
+    }
+
+    return decisions.slice(0, 6);
+  }
+
+  buildCeoAgenda({ bootstrap, maturity, observations, constraintHypothesis, nextStep, toolRecommendations, documents }) {
+    const agenda = [];
+    const progressPercent = Number(maturity?.progressPercent || 0);
+
+    if ((bootstrap.companyProfile?.onboarding_status || "draft") !== "completed") {
+      agenda.push({
+        id: "profile",
+        kind: "system_action",
+        title: "Собрать входной профиль",
+        text: "AI-BOSSу нужен минимальный контекст: компания, роль, масштаб, текущий запрос.",
+        route: "/mini-app/onboarding",
+        cta: "Открыть профиль"
+      });
+    }
+
+    if (progressPercent < 100) {
+      agenda.push({
+        id: "diagnostics",
+        kind: "system_action",
+        title: "Дозаполнить быстрый срез",
+        text: `Оценено ${maturity?.answeredCount || 0}/${maturity?.totalCount || 11} областей. Полный срез помогает не перепутать слабую область с главным ограничением.`,
+        route: "/mini-app/diagnostics/express",
+        cta: "Пройти диагностику"
+      });
+    }
+
+    if (!constraintHypothesis || constraintHypothesis.status !== "confirmed") {
+      agenda.push({
+        id: "constraint",
+        kind: "owner_decision",
+        title: constraintHypothesis ? "Решить судьбу гипотезы" : "Построить гипотезу ограничения",
+        text: constraintHypothesis
+          ? "Гипотеза уже есть, но ещё не стала рабочей управленческой версией."
+          : "Нужно выбрать область, которая лучше всего объясняет текущий запрос и влияет на остальные изменения.",
+        route: "/mini-app/constraint",
+        cta: "Открыть гипотезу"
+      });
+    }
+
+    if (!nextStep || nextStep.status === "suggested") {
+      agenda.push({
+        id: "next_step",
+        kind: "action",
+        title: nextStep ? "Зафиксировать первый шаг" : "Выбрать первый шаг",
+        text: nextStep
+          ? `Предложен шаг: ${nextStep.title}. Его нужно взять в работу или заменить.`
+          : "CEO-контур должен завершаться действием, а не только выводом.",
+        route: "/mini-app/next-step",
+        cta: "Открыть шаг"
+      });
+    }
+
+    if (nextStep?.status === "accepted") {
+      agenda.push({
+        id: "control",
+        kind: "control",
+        title: "Проконтролировать выполнение",
+        text: "Следующий шаг взят в работу. После факта выполнения нужно обновить кейс и проверить, изменилась ли гипотеза.",
+        route: "/mini-app/next-step",
+        cta: "Отметить результат"
+      });
+    }
+
+    if (nextStep && toolRecommendations.length < 1) {
+      agenda.push({
+        id: "tools",
+        kind: "system_action",
+        title: "Подобрать инструменты под действие",
+        text: "Инструменты нужны как опора для текущего шага, а не как отдельный каталог ради каталога.",
+        route: "/mini-app/tools",
+        cta: "Открыть инструменты"
+      });
+    }
+
+    if (!documents.length && observations.length < 2) {
+      agenda.push({
+        id: "facts",
+        kind: "evidence",
+        title: "Добавить факты",
+        text: "Пока мало внешних подтверждений. Документ, таблица или короткий срез цифр сделают решения точнее.",
+        route: "/mini-app/documents",
+        cta: "Добавить документ"
+      });
+    }
+
+    agenda.push({
+      id: "brief",
+      kind: "artifact",
+      title: "Собрать управленческое резюме",
+      text: "Когда профиль, срез, гипотеза и шаг собраны, AI-BOSS должен упаковать кейс для разбора и дальнейших решений.",
+      route: "/mini-app/consultation",
+      cta: "Собрать резюме"
+    });
+
+    return agenda.slice(0, 6);
+  }
+
+  buildCeoControlLoop({ maturity, constraintHypothesis, nextStep, toolRecommendations, documents }) {
+    const openLoops = [];
+
+    if ((maturity?.progressPercent || 0) < 100) {
+      openLoops.push("не завершён быстрый срез");
+    }
+    if (!constraintHypothesis || constraintHypothesis.status !== "confirmed") {
+      openLoops.push("гипотеза ограничения ещё не подтверждена");
+    }
+    if (!nextStep || nextStep.status === "suggested") {
+      openLoops.push("следующий шаг ещё не взят в работу");
+    }
+    if (nextStep?.status === "accepted") {
+      openLoops.push("нужен факт выполнения следующего шага");
+    }
+    if (!toolRecommendations?.length) {
+      openLoops.push("нет привязанных инструментов под текущую ситуацию");
+    }
+    if (!documents?.length) {
+      openLoops.push("нет сохранённых документов или источников фактов");
+    }
+
+    const nextReview = nextStep?.status === "accepted"
+      ? "После выполнения шага: принести факт, обновить гипотезу и выбрать следующий шаг."
+      : "Сначала довести контур до управляемого состояния: профиль, срез, гипотеза, первый шаг.";
+
+    return {
+      cadence: "еженедельный управленческий цикл",
+      nextReview,
+      openLoops,
+      rule: "AI-BOSS сам готовит повестку и варианты решений, но стратегические развилки остаются за собственником."
+    };
+  }
+
+  async getCeoOperatingBrief({ bootstrap }) {
+    const inputs = await this.getConstraintInputs({ bootstrap });
+    const [constraintRow, nextStepRow, toolRecommendations, documents] = await Promise.all([
+      this.findLatestConstraintHypothesis({ bootstrap, statuses: ["confirmed", "suggested"] }),
+      this.findLatestNextStepAny({ bootstrap }),
+      this.findMany("tool_recommendations", {
+        case_id: `eq.${bootstrap.activeCase.id}`,
+        order: "priority.asc",
+        select: "*"
+      }),
+      this.findMany("document_sources", {
+        case_id: `eq.${bootstrap.activeCase.id}`,
+        order: "updated_at.desc",
+        select: "*"
+      })
+    ]);
+    const constraintHypothesis = constraintRow ? this.decorateConstraintHypothesis(constraintRow) : null;
+    const nextStep = nextStepRow ? this.decorateNextStep(nextStepRow, constraintHypothesis) : null;
+    const maturity = inputs.maturity || calculateExpressMaturity(inputs.answers || []);
+    const profileReady = (bootstrap.companyProfile?.onboarding_status || "draft") === "completed";
+    const diagnosticReady = Number(maturity.progressPercent || 0) >= 100;
+    const constraintReady = constraintHypothesis?.status === "confirmed";
+    const actionReady = nextStep?.status === "accepted" || nextStep?.status === "done";
+    const operatingScore = [profileReady, diagnosticReady, constraintReady, actionReady]
+      .filter(Boolean).length;
+    const mode = operatingScore >= 4
+      ? "active_ceo_loop"
+      : operatingScore >= 2
+        ? "building_ceo_loop"
+        : "setup_needed";
+    const summaryByMode = {
+      active_ceo_loop: "CEO-контур уже ведёт кейс: есть контекст, срез, рабочая гипотеза и действие в работе.",
+      building_ceo_loop: "CEO-контур частично собран: AI-BOSS уже может вести повестку, но есть незакрытые управленческие петли.",
+      setup_needed: "Пока это больше рабочее пространство, чем CEO-контур: нужно собрать контекст, срез и первый управленческий шаг."
+    };
+    const agenda = this.buildCeoAgenda({
+      bootstrap,
+      maturity,
+      observations: inputs.observations || [],
+      constraintHypothesis,
+      nextStep,
+      toolRecommendations: toolRecommendations || [],
+      documents: documents || []
+    });
+    const ownerDecisions = this.buildOwnerDecisionQueue({
+      bootstrap,
+      maturity,
+      constraintHypothesis,
+      nextStep,
+      toolRecommendations: toolRecommendations || [],
+      documents: documents || []
+    });
+    const controlLoop = this.buildCeoControlLoop({
+      maturity,
+      constraintHypothesis,
+      nextStep,
+      toolRecommendations: toolRecommendations || [],
+      documents: documents || []
+    });
+
+    await this.logMiniAppEvent({
+      bootstrap,
+      eventName: "ceo_brief_viewed",
+      metadata: {
+        mode,
+        operatingScore,
+        agendaCount: agenda.length,
+        ownerDecisionCount: ownerDecisions.length
+      }
+    });
+
+    return {
+      ceoBrief: {
+        mode,
+        title: "CEO-контур AI-BOSS",
+        summary: summaryByMode[mode],
+        operatingScore,
+        operatingScoreMax: 4,
+        posture: "AI-BOSS действует как управляющий контур: сам держит повестку, предлагает следующий ход и выносит собственнику только ключевые решения.",
+        metrics: {
+          profileReady,
+          diagnosticReady,
+          diagnosticCoverage: {
+            answeredCount: maturity.answeredCount || 0,
+            totalCount: maturity.totalCount || 11,
+            percent: maturity.progressPercent || 0
+          },
+          constraintStatus: constraintHypothesis?.status || "missing",
+          nextStepStatus: nextStep?.status || "missing",
+          toolRecommendationsCount: toolRecommendations?.length || 0,
+          documentsCount: documents?.length || 0,
+          observationsCount: inputs.observations?.length || 0
+        },
+        agenda,
+        ownerDecisions,
+        systemActions: agenda.filter((item) => item.kind === "system_action" || item.kind === "action"),
+        controlLoop
+      },
+      constraintHypothesis,
+      nextStep
     };
   }
 

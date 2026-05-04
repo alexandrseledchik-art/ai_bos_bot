@@ -43,6 +43,11 @@ const state = {
     actionSaving: "",
     error: ""
   },
+  ceo: {
+    data: null,
+    loading: false,
+    error: ""
+  },
   tools: {
     catalog: null,
     recommended: null,
@@ -82,6 +87,7 @@ function displayStatus(value) {
     accepted: "сохранён как следующий шаг",
     done: "выполнено",
     skipped: "пропущено",
+    missing: "пока нет",
     link_added: "ссылка добавлена",
     analyzed: "проанализировано"
   };
@@ -211,6 +217,7 @@ function renderDashboard() {
         <button class="secondary-button" data-navigate="/mini-app/diagnostics/express">Пройти диагностику</button>
         <button class="secondary-button" data-navigate="/mini-app/maturity">Открыть матрицу</button>
         <button class="secondary-button" data-navigate="/mini-app/constraint">Найти ограничение</button>
+        <button class="secondary-button" data-navigate="/mini-app/ceo">CEO-контур</button>
         <button class="secondary-button" data-navigate="/mini-app/tools">Инструменты</button>
         <button class="secondary-button" data-navigate="/mini-app/consultation">Разбор с экспертом</button>
       </div>
@@ -218,6 +225,10 @@ function renderDashboard() {
 
     <div class="grid two">
       ${renderBootstrapCard()}
+      ${renderCeoSummaryCard()}
+    </div>
+
+    <div class="grid two">
       <section class="card">
         <h3>Экспресс-диагностика</h3>
         <p>Это не анкета ради оценки. Экспресс нужен, чтобы быстро увидеть, где бизнес теряет результат, и не перепутать слабую область с главным ограничением.</p>
@@ -259,6 +270,36 @@ function renderDashboard() {
         ${ROUTES.filter((route) => route.path !== "/mini-app").map(routeLink).join("")}
         ${routeLink({ path: "/mini-app/tools/sample-tool", title: "Карточка инструмента" })}
       </ul>
+    </section>
+  `;
+}
+
+function renderCeoSummaryCard() {
+  const ceoBrief = state.ceo.data?.ceoBrief;
+
+  if (!ceoBrief) {
+    return `
+      <section class="card">
+        <h3>CEO-контур</h3>
+        <p>AI-BOSS должен не только отвечать, но и держать управленческую повестку: что собрать, что решить, что взять в работу и где нужен факт.</p>
+        <div class="actions">
+          <button class="secondary-button compact-button" data-navigate="/mini-app/ceo">Открыть контур</button>
+        </div>
+      </section>
+    `;
+  }
+
+  return `
+    <section class="card">
+      <h3>CEO-контур</h3>
+      <p>${escapeHtml(ceoBrief.summary)}</p>
+      <div class="status-row">
+        <span class="pill ${ceoBrief.mode === "active_ceo_loop" ? "success" : "neutral"}">готовность: ${escapeHtml(ceoBrief.operatingScore)}/${escapeHtml(ceoBrief.operatingScoreMax)}</span>
+        <span class="pill neutral">повестка: ${escapeHtml(ceoBrief.agenda?.length || 0)}</span>
+      </div>
+      <div class="actions">
+        <button class="secondary-button compact-button" data-navigate="/mini-app/ceo">Открыть контур</button>
+      </div>
     </section>
   `;
 }
@@ -1227,6 +1268,169 @@ function renderNextStep() {
   `;
 }
 
+function renderCeoOperating() {
+  const block = state.ceo;
+
+  if (block.loading) {
+    return renderLoadingCard("Собираю управленческую повестку...");
+  }
+
+  if (block.error) {
+    return renderErrorCard(block.error, "Повторить", "/mini-app/ceo");
+  }
+
+  if (!block.data?.ceoBrief) {
+    return renderLoadingCard("Готовлю CEO-контур...");
+  }
+
+  const brief = block.data.ceoBrief;
+  const metrics = brief.metrics || {};
+  const coverage = metrics.diagnosticCoverage || { answeredCount: 0, totalCount: 11, percent: 0 };
+
+  return `
+    <section class="hero compact">
+      <p>CEO-контур AI-BOSS</p>
+      <h2>Повестка управления кейсом</h2>
+      <p>${escapeHtml(brief.summary)} ${escapeHtml(brief.posture)}</p>
+      <div class="status-row">
+        <span class="pill ${brief.mode === "active_ceo_loop" ? "success" : "neutral"}">готовность контура: ${escapeHtml(brief.operatingScore)}/${escapeHtml(brief.operatingScoreMax)}</span>
+        <span class="pill neutral">режим: ${escapeHtml(displayCeoMode(brief.mode))}</span>
+      </div>
+    </section>
+
+    <section class="card next-card">
+      <h3>Что сейчас держит AI-BOSS</h3>
+      <div class="ceo-metrics">
+        ${renderCeoMetric("Профиль", metrics.profileReady ? "готов" : "нужно заполнить", metrics.profileReady)}
+        ${renderCeoMetric("Диагностика", `${coverage.answeredCount || 0}/${coverage.totalCount || 11}`, Number(coverage.percent || 0) >= 100)}
+        ${renderCeoMetric("Гипотеза", displayStatus(metrics.constraintStatus), metrics.constraintStatus === "confirmed")}
+        ${renderCeoMetric("Шаг", displayStatus(metrics.nextStepStatus), ["accepted", "done"].includes(metrics.nextStepStatus))}
+        ${renderCeoMetric("Инструменты", String(metrics.toolRecommendationsCount || 0), Number(metrics.toolRecommendationsCount || 0) > 0)}
+        ${renderCeoMetric("Факты", String(metrics.documentsCount || metrics.observationsCount || 0), Number(metrics.documentsCount || metrics.observationsCount || 0) > 0)}
+      </div>
+    </section>
+
+    <section class="card next-card">
+      <h3>Повестка AI-BOSS</h3>
+      <p>Это список того, что система должна вести сама: где подготовить данные, где предложить действие, а где вынести решение собственнику.</p>
+      <div class="agenda-list">
+        ${(brief.agenda || []).map(renderAgendaItem).join("")}
+      </div>
+    </section>
+
+    <div class="grid two">
+      <section class="card list-card">
+        <h3>Решения собственника</h3>
+        <p>Эти пункты нельзя тихо решить за собственника. AI-BOSS готовит варианты, но финальный выбор должен быть явным.</p>
+        ${renderOwnerDecisionList(brief.ownerDecisions || [])}
+      </section>
+      <section class="card list-card">
+        <h3>Контрольный цикл</h3>
+        <p>${escapeHtml(brief.controlLoop?.rule || "")}</p>
+        <div class="divider"></div>
+        <p><strong>${escapeHtml(brief.controlLoop?.cadence || "цикл управления")}</strong></p>
+        <p>${escapeHtml(brief.controlLoop?.nextReview || "")}</p>
+        ${renderOpenLoops(brief.controlLoop?.openLoops || [])}
+      </section>
+    </div>
+
+    <section class="card next-card">
+      <h3>Ближайшее действие</h3>
+      <p>CEO-контур становится реальным, когда у кейса есть одно действие в работе и понятный факт, с которым пользователь вернётся.</p>
+      <div class="actions">
+        <button class="primary-button" data-navigate="/mini-app/next-step">Открыть следующий шаг</button>
+        <button class="secondary-button" data-navigate="/mini-app/constraint">К гипотезе</button>
+        <button class="secondary-button" data-navigate="/mini-app/consultation">Собрать резюме</button>
+      </div>
+    </section>
+  `;
+}
+
+function displayCeoMode(mode) {
+  const map = {
+    active_ceo_loop: "активный контур",
+    building_ceo_loop: "сборка контура",
+    setup_needed: "нужна настройка"
+  };
+  return map[mode] || mode || "не определён";
+}
+
+function renderCeoMetric(label, value, ready) {
+  return `
+    <div class="ceo-metric ${ready ? "ready" : ""}">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value || "нет")}</strong>
+    </div>
+  `;
+}
+
+function renderAgendaItem(item) {
+  return `
+    <article class="agenda-item">
+      <div>
+        <p class="eyebrow">${escapeHtml(displayAgendaKind(item.kind))}</p>
+        <h4>${escapeHtml(item.title)}</h4>
+        <p>${escapeHtml(item.text)}</p>
+      </div>
+      ${item.route ? `<button class="secondary-button compact-button" data-navigate="${escapeAttribute(item.route)}">${escapeHtml(item.cta || "Открыть")}</button>` : ""}
+    </article>
+  `;
+}
+
+function displayAgendaKind(kind) {
+  const map = {
+    owner_decision: "решение собственника",
+    system_action: "действие AI-BOSS",
+    action: "первое действие",
+    control: "контроль",
+    evidence: "факты",
+    artifact: "артефакт"
+  };
+  return map[kind] || kind || "повестка";
+}
+
+function renderOwnerDecisionList(decisions = []) {
+  if (!decisions.length) {
+    return `<p>Ключевые решения пока не выделены. Сначала нужен профиль, диагностика или гипотеза ограничения.</p>`;
+  }
+
+  return `
+    <ul class="plain-list decision-list">
+      ${decisions.map((item) => `
+        <li>
+          <strong>${escapeHtml(item.title)}</strong>
+          <span>${escapeHtml(item.reason)}</span>
+          <em>${escapeHtml(item.owner)} · ${escapeHtml(displayOwnerDecisionStatus(item.status))}</em>
+        </li>
+      `).join("")}
+    </ul>
+  `;
+}
+
+function displayOwnerDecisionStatus(status) {
+  const map = {
+    needs_owner: "нужно решение",
+    in_progress: "в работе",
+    needs_decision: "нужно выбрать",
+    needs_action: "нужно действие",
+    system_action: "готовит AI-BOSS",
+    needs_evidence: "нужен факт"
+  };
+  return map[status] || status || "";
+}
+
+function renderOpenLoops(openLoops = []) {
+  if (!openLoops.length) {
+    return `<p class="hint-text">Открытых петель нет: можно переходить к следующему циклу роста или проверки.</p>`;
+  }
+
+  return `
+    <div class="status-row">
+      ${openLoops.slice(0, 6).map((item) => `<span class="pill neutral">${escapeHtml(item)}</span>`).join("")}
+    </div>
+  `;
+}
+
 function renderTools() {
   const block = state.tools;
 
@@ -1715,6 +1919,10 @@ function renderRouteContent(route) {
     return renderNextStep();
   }
 
+  if (route.path === "/mini-app/ceo") {
+    return renderCeoOperating();
+  }
+
   if (route.path === "/mini-app/tools") {
     return renderTools();
   }
@@ -1864,6 +2072,10 @@ async function loadRouteData({ force = false } = {}) {
 
   const path = normalizePath(state.currentRoute.path);
 
+  if (path === "/mini-app") {
+    await loadCeoBrief({ force });
+  }
+
   if (path === "/mini-app/onboarding") {
     await loadOnboarding({ force });
   }
@@ -1882,6 +2094,10 @@ async function loadRouteData({ force = false } = {}) {
 
   if (path === "/mini-app/next-step") {
     await loadNextStep({ force });
+  }
+
+  if (path === "/mini-app/ceo") {
+    await loadCeoBrief({ force });
   }
 
   if (path === "/mini-app/tools" || path.startsWith("/mini-app/tools/")) {
@@ -1946,6 +2162,7 @@ async function saveOnboarding(event) {
       companyProfile: result.companyProfile || state.bootstrap.companyProfile,
       onboardingStatus: result.onboardingStatus || state.bootstrap.onboardingStatus
     };
+    state.ceo.data = null;
     state.onboarding.message = "Профиль сохранён.";
     if (intent === "diagnostics") {
       navigate("/mini-app/diagnostics/express");
@@ -2130,6 +2347,7 @@ async function saveExpressAnswer(layerKey, score) {
       }
     };
     state.maturity.data = null;
+    state.ceo.data = null;
   } catch (error) {
     rollbackOptimisticExpressAnswer(layerKey, previousAnswer);
     state.express.error = errorMessage(error, "Не удалось сохранить ответ.");
@@ -2189,6 +2407,7 @@ async function applyPrefillAction(layerKey, action, correctedScore = null) {
       prefillByLayer: nextPrefill
     };
     state.maturity.data = null;
+    state.ceo.data = null;
   } catch (error) {
     if (action === "confirm" || action === "correct") {
       rollbackOptimisticExpressAnswer(layerKey, previousAnswer);
@@ -2233,6 +2452,7 @@ async function loadConstraint({ force = false } = {}) {
   try {
     state.constraint.data = await api.reasonConstraint();
     state.nextStep.data = null;
+    state.ceo.data = null;
   } catch (error) {
     state.constraint.error = errorMessage(error, "Не удалось построить гипотезу ограничения.");
   } finally {
@@ -2263,6 +2483,7 @@ async function applyConstraintAction(id, action) {
       }
     };
     state.nextStep.data = null;
+    state.ceo.data = null;
   } catch (error) {
     state.constraint.error = errorMessage(error, "Не удалось обновить гипотезу.");
   } finally {
@@ -2290,6 +2511,25 @@ async function loadNextStep({ force = false } = {}) {
   }
 }
 
+async function loadCeoBrief({ force = false } = {}) {
+  if (state.ceo.loading || (state.ceo.data && !force)) {
+    return;
+  }
+
+  state.ceo.loading = true;
+  state.ceo.error = "";
+  render();
+
+  try {
+    state.ceo.data = await api.getCeoBrief();
+  } catch (error) {
+    state.ceo.error = errorMessage(error, "Не удалось собрать CEO-контур.");
+  } finally {
+    state.ceo.loading = false;
+    render();
+  }
+}
+
 async function updateNextStep(id, action) {
   if (!id || !action) {
     return;
@@ -2311,6 +2551,7 @@ async function updateNextStep(id, action) {
         ...(result.nextStep || {})
       }
     };
+    state.ceo.data = null;
   } catch (error) {
     state.nextStep.error = errorMessage(error, "Не удалось обновить следующий шаг.");
   } finally {
@@ -2391,6 +2632,7 @@ async function recalculateTools() {
     state.tools.recommended = await api.recalculateRecommendedTools();
     state.tools.catalog = null;
     await loadTools({ force: true });
+    state.ceo.data = null;
   } catch (error) {
     state.tools.error = errorMessage(error, "Не удалось пересчитать инструменты.");
   } finally {
@@ -2414,6 +2656,7 @@ async function markToolOpened(toolId) {
     state.tools.recommended = null;
     await loadTools({ force: true });
     await loadRecommendedTools({ force: true });
+    state.ceo.data = null;
   } catch (error) {
     state.tools.error = errorMessage(error, "Не удалось отметить инструмент.");
   } finally {
@@ -2463,6 +2706,7 @@ async function saveDocument(event) {
     }
     form.reset();
     state.documents.data = null;
+    state.ceo.data = null;
     await loadDocuments({ force: true });
   } catch (error) {
     state.documents.error = errorMessage(error, "Не удалось сохранить документ.");
@@ -2490,6 +2734,7 @@ async function analyzeDocument(documentId) {
     const result = await api.analyzeDocument(documentId, { text });
     state.documents.message = result.userMessage || "Анализ завершён.";
     state.documents.data = null;
+    state.ceo.data = null;
     await loadDocuments({ force: true });
   } catch (error) {
     state.documents.error = errorMessage(error, "Не удалось проанализировать документ.");
@@ -2527,6 +2772,7 @@ async function generateConsultationBrief() {
   try {
     state.consultation.data = await api.generateConsultationBrief();
     state.consultation.message = "Резюме сформировано из текущего кейса.";
+    state.ceo.data = null;
   } catch (error) {
     state.consultation.error = errorMessage(error, "Не удалось сформировать резюме.");
   } finally {

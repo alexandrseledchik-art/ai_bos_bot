@@ -388,6 +388,78 @@ a {
   background: linear-gradient(90deg, var(--accent), #ff8a1d);
 }
 
+.ceo-metrics {
+  display: grid;
+  gap: 10px;
+}
+
+@media (min-width: 720px) {
+  .ceo-metrics {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.ceo-metric,
+.agenda-item {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.ceo-metric {
+  display: grid;
+  gap: 6px;
+  padding: 13px;
+}
+
+.ceo-metric span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.ceo-metric strong {
+  color: var(--warning);
+  font-size: 18px;
+}
+
+.ceo-metric.ready strong {
+  color: var(--good);
+}
+
+.agenda-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.agenda-item {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+@media (min-width: 720px) {
+  .agenda-item {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+}
+
+.agenda-item h4 {
+  margin: 0 0 8px;
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.decision-list li em {
+  display: block;
+  margin-top: 6px;
+  color: var(--panel-strong);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 700;
+}
+
 .hero .progress-bar span {
   background: linear-gradient(90deg, var(--panel-strong), #006c73);
 }

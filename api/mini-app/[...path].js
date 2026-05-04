@@ -158,6 +158,14 @@ async function dispatchMiniAppRoute(request) {
     });
   }
 
+  if (path === "ceo") {
+    return handleMiniAppRoute(request, ["GET"], async ({ syncClient, bootstrap }) => {
+      const service = createService(syncClient);
+      const result = await service.getCeoOperatingBrief({ bootstrap });
+      return jsonResponse({ ok: true, ...result });
+    });
+  }
+
   if (path === "tools") {
     return handleMiniAppRoute(request, ["GET"], async ({ syncClient, bootstrap }) => {
       const service = createService(syncClient);

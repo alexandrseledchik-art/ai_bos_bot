@@ -113,6 +113,10 @@ export class MiniAppApiClient {
     });
   }
 
+  getCeoBrief() {
+    return this.request("/api/mini-app/ceo");
+  }
+
   getTools() {
     return this.request("/api/mini-app/tools");
   }

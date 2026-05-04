@@ -36,6 +36,13 @@ export const MINI_APP_CABINET_SCREENS = {
     title: "Следующий шаг",
     purpose: "Зафиксировать ближайшее действие, которое проверяет гипотезу или начинает снимать ограничение."
   },
+  ceo: {
+    screenId: "ceo",
+    route: "/mini-app/ceo",
+    label: "Открыть CEO-контур",
+    title: "CEO-контур",
+    purpose: "Показать управленческую повестку кейса: решения собственника, действия AI-BOSS и открытые петли контроля."
+  },
   tools: {
     screenId: "tools",
     route: "/mini-app/tools",
@@ -99,6 +106,11 @@ function pickScreen(screenId, stage, reason) {
   };
 }
 
+function isCeoLayerQuestion(classification = {}) {
+  const text = String(classification.cleanText || "").toLowerCase();
+  return /александр|селедчик|консалтинг|ceo|co-ceo|управляющ|контур|11\s+сло|слоям|слоях|упаковк|наш\s+проект|этот\s+проект/.test(text);
+}
+
 function selectInviteCandidate({
   classification = {},
   decision = {},
@@ -121,6 +133,14 @@ function selectInviteCandidate({
   const hasDiagnosticCase = runtime.activeCaseKind === "diagnostic_case" || activeCase?.kind === "diagnostic_case";
 
   if (entryMode === "meta_role") {
+    if (isCeoLayerQuestion(classification)) {
+      return pickScreen(
+        "ceo",
+        "ceo_orientation",
+        "Пользователь спрашивает о роли AI-BOSS как управляющего контура; лучше открыть экран с повесткой, решениями и действиями."
+      );
+    }
+
     return pickScreen(
       "dashboard",
       "orientation",

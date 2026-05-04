@@ -513,6 +513,13 @@ async function buildPhase8Case() {
   });
   assert.equal(nextOverride.nextStep.status, "accepted");
 
+  const ceo = await service.getCeoOperatingBrief({ bootstrap });
+  assert.equal(Boolean(ceo.ceoBrief), true);
+  assert.match(ceo.ceoBrief.posture, /управляющий контур/);
+  assert.equal(ceo.ceoBrief.ownerDecisions.length > 0, true);
+  assert.equal(ceo.ceoBrief.agenda.length > 0, true);
+  assert.equal(ceo.ceoBrief.controlLoop.openLoops.some((item) => /факт|выполн/i.test(item)), true);
+
   return {
     syncClient,
     bootstrap,
@@ -543,7 +550,8 @@ async function assertPhase8Flow() {
     "document_added",
     "document_analyzed",
     "consultation_brief_generated",
-    "consultation_clicked"
+    "consultation_clicked",
+    "ceo_brief_viewed"
   ]) {
     assert.equal(names.includes(expected), true, `Missing event: ${expected}`);
   }
@@ -618,11 +626,18 @@ function assertStaticPhase8Wiring() {
   assert.match(mainJs, /Данных пока мало/);
   assert.match(apiClient, /overrideConstraint/);
   assert.match(apiClient, /overrideNextStep/);
+  assert.match(apiClient, /getCeoBrief/);
   assert.match(service, /suggestion_shown/);
   assert.match(service, /captureEvalSnapshot/);
   assert.match(service, /manual_constraint_override/);
+  assert.match(service, /getCeoOperatingBrief/);
+  assert.match(mainJs, /CEO-контур/);
+  assert.match(mainJs, /Повестка AI-BOSS/);
+  assert.match(mainJs, /Решения собственника/);
+  assert.match(mainJs, /ceo-metrics/);
   assert.match(miniAppApi, /mini_app_opened/);
   assert.match(miniAppApi, /miniAppAlphaMode/);
+  assert.match(miniAppApi, /path === "ceo"/);
   assert.match(miniAppApi, /dev\/constraint-override/);
   assert.match(miniAppApi, /dev\/next-step-override/);
 }
