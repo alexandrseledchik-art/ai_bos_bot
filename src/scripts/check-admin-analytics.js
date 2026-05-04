@@ -229,7 +229,7 @@ function createSeed() {
         thread_id: "thread-1",
         role: "assistant",
         text: "Похоже, главное ограничение в финансах.",
-        created_at: "2026-05-01T10:01:00.000Z"
+        created_at: "2026-05-01T10:00:00.000Z"
       },
       {
         id: "message-3",
@@ -283,6 +283,7 @@ async function run() {
 
   const detail = await service.getConversation({ threadId: "thread-1" });
   assert(detail.messages.length === 3, "expected conversation messages");
+  assert(detail.messages[0].role === "user" && detail.messages[1].role === "assistant", "expected stable user-before-assistant ordering for equal timestamps");
 
   const placeholderDetail = await service.getConversation({ threadId: "app_user:456" });
   assert(placeholderDetail.isPlaceholder, "expected placeholder detail");

@@ -67,10 +67,36 @@ function latestByGroup(rows = [], key) {
   const groups = groupBy(rows, key);
   const result = new Map();
   for (const [groupKey, items] of groups.entries()) {
-    const sorted = [...items].sort((left, right) => String(right.created_at || "").localeCompare(String(left.created_at || "")));
-    result.set(groupKey, sorted[0]);
+    const sorted = sortMessagesAsc(items);
+    result.set(groupKey, sorted[sorted.length - 1]);
   }
   return result;
+}
+
+function messageRoleOrder(role) {
+  if (role === "user") {
+    return 1;
+  }
+  if (role === "assistant") {
+    return 2;
+  }
+  return 0;
+}
+
+function sortMessagesAsc(messages = []) {
+  return [...messages].sort((left, right) => {
+    const createdAtDelta = String(left.created_at || "").localeCompare(String(right.created_at || ""));
+    if (createdAtDelta !== 0) {
+      return createdAtDelta;
+    }
+
+    const roleDelta = messageRoleOrder(left.role) - messageRoleOrder(right.role);
+    if (roleDelta !== 0) {
+      return roleDelta;
+    }
+
+    return String(left.id || "").localeCompare(String(right.id || ""));
+  });
 }
 
 function matchesSearch(conversation, query) {
@@ -297,7 +323,12 @@ export class AdminAnalyticsService {
     const messages = messagesByVisibleThread.flat();
     const companyById = indexById(companies);
     const caseById = indexById(cases);
-    const messagesByThread = groupBy(messages, "thread_id");
+    const messagesByThread = new Map(
+      [...groupBy(messages, "thread_id").entries()].map(([threadId, threadMessages]) => [
+        threadId,
+        sortMessagesAsc(threadMessages)
+      ])
+    );
     const latestMessageByThread = latestByGroup(messages, "thread_id");
     const latestEvaluationByThread = latestByGroup(evaluations, "thread_id");
 
@@ -349,7 +380,7 @@ export class AdminAnalyticsService {
         thread_id: `eq.${thread.id}`,
         select: "*",
         order: "created_at.asc"
-      }),
+      }).then(sortMessagesAsc),
       this.findOne("admin_conversation_evaluations", {
         thread_id: `eq.${thread.id}`,
         select: "*",
