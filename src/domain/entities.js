@@ -118,6 +118,11 @@ export function createEntryState(seed = {}) {
 export function emptyState() {
   return {
     companies: [],
+    companySources: [],
+    layerAnalyses: [],
+    toolResults: [],
+    companyAnalyses: [],
+    telegramContexts: [],
     cases: [],
     observations: [],
     goals: [],
@@ -134,14 +139,153 @@ export function emptyState() {
   };
 }
 
-export function createCompany({ name, telegramChatId }) {
+export function createCompany({
+  name,
+  telegramChatId,
+  industry = "",
+  description = "",
+  ownerGoal = "",
+  currentRequest = "",
+  workspaceType = "consultant",
+  userRole = "consultant",
+  status = "active",
+  companySource = ""
+}) {
   const createdAt = nowIso();
   return {
     id: createId("company"),
     name,
     telegramChatId: String(telegramChatId),
+    industry,
+    description,
+    ownerGoal,
+    currentRequest,
+    workspaceType,
+    userRole,
+    status,
+    analysisStatus: "not_analyzed",
+    lastAnalysisId: "",
+    companySource,
     createdAt,
     updatedAt: createdAt
+  };
+}
+
+export function createCompanySource({
+  companyId,
+  type = "text",
+  title = "",
+  contentText = "",
+  fileUrl = "",
+  sourceOrigin = "manual",
+  aiSummary = "",
+  relatedLayers = [],
+  processingStatus = "processed"
+}) {
+  const createdAt = nowIso();
+  return {
+    id: createId("source"),
+    companyId,
+    type,
+    title,
+    contentText,
+    fileUrl,
+    sourceOrigin,
+    createdAt,
+    processedAt: processingStatus === "processed" ? createdAt : "",
+    processingStatus,
+    aiSummary,
+    relatedLayers,
+    updatedAt: createdAt
+  };
+}
+
+export function createLayerAnalysis({
+  companyId,
+  layerCode,
+  facts = [],
+  referenceModel = {},
+  filledFields = {},
+  missingFields = [],
+  gaps = [],
+  confidence = "LOW",
+  conclusions = [],
+  sourceIds = []
+}) {
+  return {
+    id: createId("layer_analysis"),
+    companyId,
+    layerCode,
+    facts,
+    referenceModel,
+    filledFields,
+    missingFields,
+    gaps,
+    confidence,
+    conclusions,
+    sourceIds,
+    updatedAt: nowIso()
+  };
+}
+
+export function createToolResult({
+  companyId,
+  toolTemplateId,
+  layerCode,
+  filledData = {},
+  missingData = [],
+  confidence = "LOW",
+  sourceIds = []
+}) {
+  return {
+    id: createId("tool_result"),
+    companyId,
+    toolTemplateId,
+    layerCode,
+    filledData,
+    missingData,
+    confidence,
+    sourceIds,
+    updatedAt: nowIso()
+  };
+}
+
+export function createCompanyAnalysis({
+  companyId,
+  summary = "",
+  layerSummary = [],
+  filledToolsSummary = [],
+  missingData = [],
+  keyProblemAreas = [],
+  probableConstraint = null,
+  reasoning = "",
+  nextStep = null,
+  confidence = "LOW",
+  sourceIds = []
+}) {
+  return {
+    id: createId("company_analysis"),
+    companyId,
+    summary,
+    layerSummary,
+    filledToolsSummary,
+    missingData,
+    keyProblemAreas,
+    probableConstraint,
+    reasoning,
+    nextStep,
+    confidence,
+    sourceIds,
+    createdAt: nowIso()
+  };
+}
+
+export function createTelegramContext({ telegramUserId, telegramChatId, activeCompanyId = "" }) {
+  return {
+    telegramUserId: String(telegramUserId || telegramChatId || ""),
+    telegramChatId: String(telegramChatId || telegramUserId || ""),
+    activeCompanyId,
+    lastMessageAt: nowIso()
   };
 }
 

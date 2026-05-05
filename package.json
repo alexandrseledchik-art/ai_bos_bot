@@ -20,6 +20,7 @@
     "reference:check": "node src/scripts/check-reference-model-gate.js",
     "data:check": "node src/scripts/check-data-sufficiency.js",
     "ceo:check": "node src/scripts/run-ceo-kernel-checks.js",
+    "consultant:mvp:check": "node src/scripts/check-consultant-mvp.js",
     "miniapp:phase1": "node src/scripts/check-mini-app-phase1.js",
     "miniapp:phase2": "node src/scripts/check-mini-app-phase2.js",
     "miniapp:phase3": "node src/scripts/check-mini-app-phase3.js",

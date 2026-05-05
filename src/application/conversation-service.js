@@ -24,6 +24,7 @@ import { analyzeWithGraph } from "./graph-reasoner.js";
 import { applyGuardrails } from "./guardrails.js";
 import { buildMiniAppInvite, createMiniAppInviteSnapshot } from "./mini-app-invite-policy.js";
 import { AutonomousDataCollector } from "./autonomous-data-collector.js";
+import { ConsultantTelegramMode } from "./consultant-telegram-mode.js";
 import { DataSufficiencyChecker } from "./data-sufficiency-checker.js";
 import { ReferenceModelService } from "./reference-model-service.js";
 
@@ -648,6 +649,7 @@ export class ConversationService {
     this.reasoner = reasoner;
     this.screener = screener;
     this.maxHistoryMessages = maxHistoryMessages;
+    this.consultantTelegramMode = new ConsultantTelegramMode();
   }
 
   async recordTelegramExchange({ telegramChatId, userText = "", assistantText = "", userMeta = {} }) {
@@ -687,6 +689,45 @@ export class ConversationService {
     return this.store.update(async (state) => {
       const thread = ensureThread(state, telegramChatId);
       const company = ensureCompany(state, thread, userMeta);
+      const consultantResult = this.consultantTelegramMode.handle({
+        state,
+        thread,
+        telegramChatId: String(telegramChatId),
+        text,
+        userMeta
+      });
+
+      if (consultantResult.handled) {
+        const userMessage = createMessage({
+          threadId: thread.id,
+          role: "user",
+          text
+        });
+        const assistantMessage = createMessage({
+          threadId: thread.id,
+          role: "assistant",
+          text: consultantResult.reply
+        });
+
+        state.messages.push(userMessage);
+        state.messages.push(assistantMessage);
+        thread.updatedAt = nowIso();
+
+        return {
+          reply: consultantResult.reply,
+          consultantMode: true,
+          company: consultantResult.company || company,
+          source: consultantResult.source || null,
+          analysis: consultantResult.analysis || null,
+          miniAppInvite: null,
+          runtime: {
+            threadId: thread.id,
+            activeCompanyId: consultantResult.company?.id || thread.companyId,
+            chatFirst: true
+          }
+        };
+      }
+
       const history = recentHistory(state, thread.id, this.maxHistoryMessages);
       const classification = contextualizeClassification(classifyInput(text), thread, history);
       const intentIntegrity = checkIntentIntegrity({
