@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI-BOSS Companies</title>
+    <link rel="stylesheet" href="/companies-assets/styles.css?v=20260505-1">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">AI-BOSS</p>
+          <h1>Компании</h1>
+        </div>
+        <div class="top-actions">
+          <button class="ghost" id="refreshButton" type="button">Обновить</button>
+          <button class="ghost" id="logoutButton" type="button">Сбросить токен</button>
+        </div>
+      </header>
+
+      <section class="token-panel" id="tokenPanel">
+        <h2>Вход</h2>
+        <form id="tokenForm" class="token-form">
+          <input
+            id="tokenInput"
+            name="token"
+            type="password"
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+            placeholder="ADMIN_DASHBOARD_TOKEN"
+          >
+          <button type="submit">Открыть</button>
+        </form>
+        <p class="hint" id="tokenHint"></p>
+      </section>
+
+      <section class="workspace" id="workspace" hidden>
+        <aside class="sidebar">
+          <div class="sidebar-head">
+            <h2>Кейсы</h2>
+            <button id="newCompanyButton" type="button">Создать</button>
+          </div>
+          <div class="company-list" id="companyList"></div>
+        </aside>
+
+        <section class="content" id="content"></section>
+      </section>
+    </main>
+
+    <script type="module" src="/companies-assets/src/main.js?v=20260505-1"></script>
+  </body>
+</html>

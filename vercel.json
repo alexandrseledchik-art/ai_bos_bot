@@ -17,6 +17,18 @@
       "destination": "/api/admin/rpc?path=:first/:rest*"
     },
     {
+      "source": "/api/companies/:first/:rest*",
+      "destination": "/api/companies/rpc?path=:first/:rest*"
+    },
+    {
+      "source": "/companies",
+      "destination": "/companies/index.html"
+    },
+    {
+      "source": "/companies/:path*",
+      "destination": "/companies/index.html"
+    },
+    {
       "source": "/admin",
       "destination": "/admin/index.html"
     },
