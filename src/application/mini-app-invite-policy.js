@@ -1,4 +1,5 @@
 const INVITE_SUPPRESSION_WINDOW_MS = 10 * 60 * 1000;
+const CHAT_FIRST_MODE = true;
 
 export const MINI_APP_CABINET_SCREENS = {
   dashboard: {
@@ -115,7 +116,12 @@ function pickScreen(screenId, stage, reason) {
 
 function isCeoLayerQuestion(classification = {}) {
   const text = String(classification.cleanText || "").toLowerCase();
-  return /кто\s+ты|чем\s+ты\s+полез|твоя\s+роль|роль|александр|селедчик|консалтинг|ceo|co-ceo|управляющ|контур|11\s+сло|слоям|слоях|упаковк|наш\s+проект|этот\s+проект/.test(text);
+  return /александр|селедчик|консалтинг|ceo|co-ceo|управляющ|контур|11\s+сло|слоям|слоях|упаковк|наш\s+проект|этот\s+проект/.test(text);
+}
+
+function isCabinetOrientationRequest(classification = {}) {
+  const text = String(classification.cleanText || "").toLowerCase();
+  return /кабинет|mini\s?app|мини-?апп|приложени|как\s+пользоваться|как\s+работать\s+с\s+кабинет|открой|покажи/.test(text);
 }
 
 function isBusinessAssemblyRequest(classification = {}) {
@@ -161,11 +167,15 @@ function selectInviteCandidate({
       );
     }
 
-    return pickScreen(
-      "dashboard",
-      "orientation",
-      "Пользователь спрашивает, как с системой работать; лучше показать рабочее пространство, а не только объяснять текстом."
-    );
+    if (isCabinetOrientationRequest(classification)) {
+      return pickScreen(
+        "dashboard",
+        "orientation",
+        "Пользователь спрашивает, как работать с кабинетом; лучше показать рабочее пространство."
+      );
+    }
+
+    return null;
   }
 
   if (hasDocumentUrl(classification.urls || [])) {
@@ -228,6 +238,10 @@ function selectInviteCandidate({
 }
 
 export function buildMiniAppInvite(context = {}) {
+  if (CHAT_FIRST_MODE && !context.forceMiniAppInvite) {
+    return null;
+  }
+
   const candidate = selectInviteCandidate(context);
   if (!candidate) {
     return null;

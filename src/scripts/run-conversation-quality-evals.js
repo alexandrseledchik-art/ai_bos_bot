@@ -175,6 +175,22 @@ function checkTurn(run, check = {}, index) {
     );
   }
 
+  if (check.expectMiniAppInvite != null) {
+    addIssue(
+      issues,
+      Boolean(run.miniAppInvite) === Boolean(check.expectMiniAppInvite),
+      `turn ${index}: miniAppInvite expected=${Boolean(check.expectMiniAppInvite)} actual=${Boolean(run.miniAppInvite)}`
+    );
+  }
+
+  if (check.expectedMiniAppScreenId) {
+    addIssue(
+      issues,
+      run.miniAppInvite?.screenId === check.expectedMiniAppScreenId,
+      `turn ${index}: miniAppInvite.screenId expected=${check.expectedMiniAppScreenId} actual=${run.miniAppInvite?.screenId || ""}`
+    );
+  }
+
   return issues;
 }
 

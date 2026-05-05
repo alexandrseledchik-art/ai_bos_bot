@@ -14,6 +14,7 @@ function assertInvitePolicy() {
   assert.equal(MINI_APP_CABINET_SCREENS.ceo.route, "/mini-app/ceo");
 
   const toolInvite = buildMiniAppInvite({
+    forceMiniAppInvite: true,
     classification: {
       entryMode: "specific_tool_request",
       hasSpecificToolIntent: true
@@ -31,7 +32,25 @@ function assertInvitePolicy() {
   assert.equal(toolInvite.route, "/mini-app/tools");
   assert.equal(toolInvite.label, "Открыть инструменты");
 
+  const chatFirstInvite = buildMiniAppInvite({
+    classification: {
+      entryMode: "specific_tool_request",
+      hasSpecificToolIntent: true
+    },
+    decision: {
+      decision: {
+        action: "clarify",
+        signalSufficiency: "weak"
+      },
+      entryState: {}
+    },
+    runtime: {},
+    entryState: {}
+  });
+  assert.equal(chatFirstInvite, null);
+
   const ceoInvite = buildMiniAppInvite({
+    forceMiniAppInvite: true,
     classification: {
       entryMode: "meta_role",
       cleanText: "Как ты понимаешь роль AI-BOSS как CEO-слоя в упаковке консалтинга Александра?"
@@ -50,6 +69,7 @@ function assertInvitePolicy() {
   assert.equal(ceoInvite.label, "Открыть CEO-контур");
 
   const assemblyInvite = buildMiniAppInvite({
+    forceMiniAppInvite: true,
     classification: {
       entryMode: "meta_role",
       cleanText: "Нужно собрать бизнес по 11 слоям, инструментам и документам"
@@ -68,6 +88,7 @@ function assertInvitePolicy() {
   assert.equal(assemblyInvite.label, "Открыть сборку бизнеса");
 
   const diagnosticsInvite = buildMiniAppInvite({
+    forceMiniAppInvite: true,
     classification: {
       entryMode: "problem_first",
       urls: []
@@ -87,6 +108,7 @@ function assertInvitePolicy() {
   assert.equal(diagnosticsInvite.route, "/mini-app/diagnostics/express");
 
   const suppressed = buildMiniAppInvite({
+    forceMiniAppInvite: true,
     classification: {
       entryMode: "problem_first",
       urls: []
@@ -109,6 +131,7 @@ function assertInvitePolicy() {
   assert.equal(suppressed, null);
 
   const documentInvite = buildMiniAppInvite({
+    forceMiniAppInvite: true,
     classification: {
       entryMode: "url_only",
       urls: ["https://docs.google.com/spreadsheets/d/example"]
