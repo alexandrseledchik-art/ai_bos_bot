@@ -644,12 +644,12 @@ function buildArtifactBody({ company, activeCase, decision, classification, user
 }
 
 export class ConversationService {
-  constructor({ store, reasoner, screener, maxHistoryMessages = 12 }) {
+  constructor({ store, reasoner, screener, googleDrive = null, maxHistoryMessages = 12 }) {
     this.store = store;
     this.reasoner = reasoner;
     this.screener = screener;
     this.maxHistoryMessages = maxHistoryMessages;
-    this.consultantTelegramMode = new ConsultantTelegramMode();
+    this.consultantTelegramMode = new ConsultantTelegramMode({ googleDrive });
   }
 
   async recordTelegramExchange({ telegramChatId, userText = "", assistantText = "", userMeta = {} }) {
@@ -689,7 +689,7 @@ export class ConversationService {
     return this.store.update(async (state) => {
       const thread = ensureThread(state, telegramChatId);
       const company = ensureCompany(state, thread, userMeta);
-      const consultantResult = this.consultantTelegramMode.handle({
+      const consultantResult = await this.consultantTelegramMode.handle({
         state,
         thread,
         telegramChatId: String(telegramChatId),

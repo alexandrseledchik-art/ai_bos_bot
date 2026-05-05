@@ -173,6 +173,7 @@ export function createCompany({
 
 export function createCompanySource({
   companyId,
+  externalId = "",
   type = "text",
   title = "",
   contentText = "",
@@ -180,12 +181,14 @@ export function createCompanySource({
   sourceOrigin = "manual",
   aiSummary = "",
   relatedLayers = [],
+  sourceMeta = {},
   processingStatus = "processed"
 }) {
   const createdAt = nowIso();
   return {
     id: createId("source"),
     companyId,
+    externalId,
     type,
     title,
     contentText,
@@ -196,6 +199,7 @@ export function createCompanySource({
     processingStatus,
     aiSummary,
     relatedLayers,
+    sourceMeta,
     updatedAt: createdAt
   };
 }

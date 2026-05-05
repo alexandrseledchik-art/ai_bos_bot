@@ -206,6 +206,15 @@ function parseLayerQuestion(text) {
   return null;
 }
 
+function parseDriveSyncCommand(text) {
+  const value = cleanText(text);
+  if (/^\/drive(?:\s+sync)?$/i.test(value) || /^\/sync-drive$/i.test(value)) {
+    return true;
+  }
+
+  return /^(?:синхронизируй|подтяни|обнови)\s+(?:google\s+drive|гугл\s+диск|диск|документы)$/i.test(value);
+}
+
 function latestCompanyAnalysis(state, companyId) {
   return [...(state.companyAnalyses || [])].reverse().find((item) => item.companyId === companyId) || null;
 }
@@ -268,12 +277,107 @@ function formatLayerAnswer(company, layerAnalysis, wantsGaps) {
   ].filter(Boolean).join("\n");
 }
 
-export class ConsultantTelegramMode {
-  constructor({ analyzer = new CompanyAnalysisCore() } = {}) {
-    this.analyzer = analyzer;
+function findExistingDriveSource(state, companyId, file) {
+  const externalId = `google_drive:${file.id}`;
+  return (state.companySources || []).find((source) =>
+    source.companyId === companyId &&
+    (source.externalId === externalId || (file.webViewLink && source.fileUrl === file.webViewLink))
+  ) || null;
+}
+
+function buildDriveSourceSummary({ file, readable, reason }) {
+  if (readable) {
+    return `Google Drive: ${file.name}`;
   }
 
-  handle({ state, thread, telegramChatId, text, userMeta = {} }) {
+  return reason || `Google Drive: ${file.name}. Файл сохранён как ссылка, текст пока не извлечён.`;
+}
+
+export class ConsultantTelegramMode {
+  constructor({ analyzer = new CompanyAnalysisCore(), googleDrive = null } = {}) {
+    this.analyzer = analyzer;
+    this.googleDrive = googleDrive;
+  }
+
+  async syncGoogleDriveForCompany({ state, company }) {
+    if (!this.googleDrive?.enabled) {
+      return {
+        ok: false,
+        reason: "not_configured",
+        syncedCount: 0,
+        readableCount: 0,
+        skippedCount: 0,
+        unsupported: []
+      };
+    }
+
+    const { companyFolder, files } = await this.googleDrive.listCompanyFiles(company.name);
+    const unsupported = [];
+    let syncedCount = 0;
+    let readableCount = 0;
+
+    state.companySources = state.companySources || [];
+
+    for (const file of files) {
+      const extracted = await this.googleDrive.readFileText(file);
+      const contentText = extracted.text || "";
+      const relatedLayers = detectConsultantLayersForText(`${file.name}\n${contentText}`);
+      const existing = findExistingDriveSource(state, company.id, file);
+      const common = {
+        externalId: `google_drive:${file.id}`,
+        type: "document",
+        title: file.name,
+        contentText,
+        fileUrl: file.webViewLink || "",
+        sourceOrigin: "google_drive",
+        aiSummary: buildDriveSourceSummary({ file, readable: extracted.readable, reason: extracted.reason }),
+        relatedLayers,
+        sourceMeta: {
+          googleDriveFileId: file.id,
+          googleDriveFolderId: companyFolder?.id || this.googleDrive.rootFolderId,
+          googleDriveFolderName: companyFolder?.name || "",
+          mimeType: file.mimeType || "",
+          modifiedTime: file.modifiedTime || "",
+          readable: extracted.readable,
+          readReason: extracted.reason || ""
+        },
+        processingStatus: extracted.readable ? "processed" : "link_added"
+      };
+
+      if (existing) {
+        Object.assign(existing, common, {
+          processedAt: extracted.readable ? nowIso() : existing.processedAt || "",
+          updatedAt: nowIso()
+        });
+      } else {
+        state.companySources.push(createCompanySource({
+          companyId: company.id,
+          ...common
+        }));
+      }
+
+      syncedCount += 1;
+      if (extracted.readable) {
+        readableCount += 1;
+      } else {
+        unsupported.push(file.name);
+      }
+    }
+
+    company.updatedAt = nowIso();
+
+    return {
+      ok: true,
+      folderName: companyFolder?.name || "",
+      usedRootFolder: !companyFolder,
+      syncedCount,
+      readableCount,
+      skippedCount: Math.max(0, files.length - syncedCount),
+      unsupported
+    };
+  }
+
+  async handle({ state, thread, telegramChatId, text, userMeta = {} }) {
     const telegramUserId = userMeta.telegramUserId || userMeta.id || telegramChatId;
     const useCompanyName = parseUseCommand(text);
     if (useCompanyName) {
@@ -297,6 +401,57 @@ export class ConsultantTelegramMode {
         ].join("\n\n"),
         company
       };
+    }
+
+    if (parseDriveSyncCommand(text)) {
+      const company = getActiveCompany(state, { telegramChatId, telegramUserId });
+      if (!company) {
+        return {
+          handled: true,
+          reply: "Сначала выбери компанию: `/use Название компании`. Потом я подтяну документы из Google Drive именно в её контекст."
+        };
+      }
+
+      if (!this.googleDrive?.enabled) {
+        return {
+          handled: true,
+          reply: [
+            "Google Drive пока не подключён.",
+            "",
+            "Для MVP нужно:",
+            "1. Создать service account в Google Cloud.",
+            "2. Расшарить с ним одну папку на Google Drive.",
+            "3. Добавить в Vercel env: `GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_DRIVE_PRIVATE_KEY`, `GOOGLE_DRIVE_FOLDER_ID`.",
+            "",
+            "После этого команда `/drive` будет подтягивать документы в активную компанию."
+          ].join("\n")
+        };
+      }
+
+      try {
+        const result = await this.syncGoogleDriveForCompany({ state, company });
+        const unsupportedLine = result.unsupported.length
+          ? `Не смог прочитать текст напрямую у файлов: ${result.unsupported.slice(0, 5).join(", ")}. Их ссылки всё равно сохранены.`
+          : "";
+        return {
+          handled: true,
+          reply: [
+            `Подтянул Google Drive по компании "${company.name}".`,
+            result.folderName
+              ? `Папка: ${result.folderName}.`
+              : "Не нашёл отдельную подпапку компании в корневой папке Drive. Создай подпапку с таким же названием, чтобы я не смешивал документы разных компаний.",
+            `Сохранено источников: ${result.syncedCount}. Прочитано текстом: ${result.readableCount}.`,
+            unsupportedLine,
+            "Теперь можно написать `/analyze` — AI-BOSS учтёт эти документы в разборе по 11 слоям."
+          ].filter(Boolean).join("\n\n"),
+          company
+        };
+      } catch (error) {
+        return {
+          handled: true,
+          reply: `Не смог подтянуть Google Drive: ${error.message}`
+        };
+      }
     }
 
     const factRequest = parseAddFact(text);

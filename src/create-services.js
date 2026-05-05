@@ -2,6 +2,7 @@ import { AccessControlService } from "./application/access-control-service.js";
 import { ConversationService } from "./application/conversation-service.js";
 import { loadConfig } from "./config.js";
 import { AudioTranscriber } from "./infrastructure/openai/audio-transcriber.js";
+import { GoogleDriveClient } from "./infrastructure/google/google-drive-client.js";
 import { ReasoningClient } from "./infrastructure/openai/reasoning-client.js";
 import { WebsiteScreener } from "./infrastructure/screening/website-screener.js";
 import { createMemoryStore } from "./infrastructure/storage/create-store.js";
@@ -36,6 +37,12 @@ export function getServices() {
   const screener = new WebsiteScreener({
     timeoutMs: config.screenTimeoutMs
   });
+  const googleDrive = new GoogleDriveClient({
+    serviceAccountEmail: config.googleDriveServiceAccountEmail,
+    privateKey: config.googleDrivePrivateKey,
+    rootFolderId: config.googleDriveFolderId,
+    maxTextChars: config.googleDriveMaxTextChars
+  });
 
   services = {
     config,
@@ -53,6 +60,7 @@ export function getServices() {
       store,
       reasoner,
       screener,
+      googleDrive,
       maxHistoryMessages: config.maxHistoryMessages
     })
   };
