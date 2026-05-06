@@ -1,7 +1,23 @@
 import assert from "node:assert/strict";
 import zlib from "node:zlib";
 
+import { ConsultantWebService } from "../application/consultant-web-service.js";
 import { importDeepDiagnosticXlsx } from "../application/deep-diagnostic-importer.js";
+import { emptyState } from "../domain/entities.js";
+
+class InMemoryStore {
+  constructor() {
+    this.state = emptyState();
+  }
+
+  async readState() {
+    return this.state;
+  }
+
+  async update(mutator) {
+    return mutator(this.state);
+  }
+}
 
 const CRC32_TABLE = new Uint32Array(256).map((_, index) => {
   let value = index;
@@ -172,7 +188,8 @@ function buildWorkbook() {
 }
 
 async function main() {
-  const imported = importDeepDiagnosticXlsx(buildWorkbook());
+  const workbook = buildWorkbook();
+  const imported = importDeepDiagnosticXlsx(workbook);
 
   assert.equal(imported.profile["Название компании"], "ООО РОКС ЛОГИСТИК");
   assert.equal(imported.layerScores.length, 5);
@@ -181,6 +198,28 @@ async function main() {
   assert.ok(imported.contentText.includes("Верхняя рамка требует проверки"));
   assert.ok(imported.weakestSubdomains.some((item) => item.layerCode === "finance" && item.name === "Cash Flow"));
 
+  const service = new ConsultantWebService({ store: new InMemoryStore() });
+  const created = await service.createCompany({
+    name: "ООО РОКС ЛОГИСТИК",
+    currentRequest: "Понять, почему прибыль и управляемость не растут."
+  });
+
+  await service.importDeepDiagnostic(created.company.id, {
+    fileName: "Рокс Логистик Диагностика архитектуры бизнеса.xlsx",
+    fileBase64: workbook.toString("base64")
+  });
+  const analyzed = await service.analyzeCompany(created.company.id);
+  const deepDiagnostic = analyzed.analysis.deepDiagnostic;
+
+  assert.ok(deepDiagnostic);
+  assert.equal(deepDiagnostic.classSummary.length, 4);
+  assert.equal(deepDiagnostic.rootHypothesis.title, "Условия игры: собственник, рынок и стратегия");
+  assert.match(deepDiagnostic.rootHypothesis.why, /финансы, операции, команда/i);
+  assert.ok(deepDiagnostic.parallelActions.some((item) => item.layer === "finance"));
+  assert.ok(deepDiagnostic.parallelActions.some((item) => item.layer === "team"));
+  assert.match(deepDiagnostic.nextStep.title, /собственник-рынок/i);
+  assert.ok(analyzed.analysis.probableConstraint.title);
+
   console.log("Deep diagnostic importer checks passed.");
 }
 
@@ -188,4 +227,3 @@ main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
-

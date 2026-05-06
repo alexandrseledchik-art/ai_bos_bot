@@ -353,6 +353,37 @@ label {
   gap: 12px;
 }
 
+.compact-stack {
+  gap: 10px;
+}
+
+.mini-row {
+  display: grid;
+  gap: 5px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.mini-row:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.mini-row strong {
+  font-size: 15px;
+}
+
+.mini-row span {
+  color: var(--teal-dark);
+  font-weight: 850;
+}
+
+.mini-row p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .layer-row {
   display: grid;
   grid-template-columns: minmax(180px, 260px) minmax(0, 1fr) auto;

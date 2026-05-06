@@ -267,6 +267,7 @@ export function createCompanyAnalysis({
   parallelActions = [],
   rejectedHypotheses = [],
   diagnosticChain = [],
+  deepDiagnostic = null,
   confidence = "LOW",
   sourceIds = []
 }) {
@@ -284,6 +285,7 @@ export function createCompanyAnalysis({
     parallelActions,
     rejectedHypotheses,
     diagnosticChain,
+    deepDiagnostic,
     confidence,
     sourceIds,
     createdAt: nowIso()

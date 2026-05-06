@@ -8,6 +8,7 @@ import {
   CONSULTANT_MVP_LAYERS,
   CONSULTANT_TOOL_TEMPLATES
 } from "../domain/consultant-mvp-schema.js";
+import { analyzeDeepDiagnosticSources } from "./deep-diagnostic-analyzer.js";
 
 const CONFIDENCE_ORDER = {
   LOW: 1,
@@ -625,6 +626,7 @@ export class CompanyAnalysisCore {
     const keyProblemAreas = buildKeyProblemAreas(layerAnalyses);
     const probableConstraint = selectConstraint({ company, sources: storedSources, layerAnalyses });
     const nextStep = buildNextStep(probableConstraint);
+    const deepDiagnostic = analyzeDeepDiagnosticSources(storedSources);
     const parallelActions = probableConstraint.parallelActions || [];
     const rejectedHypotheses = probableConstraint.rejectedAlternatives || [];
     const diagnosticChain = probableConstraint.relatedLayers || [];
@@ -672,6 +674,7 @@ export class CompanyAnalysisCore {
       parallelActions,
       rejectedHypotheses,
       diagnosticChain,
+      deepDiagnostic,
       sourceIds: storedSources.map((source) => source.id)
     });
 

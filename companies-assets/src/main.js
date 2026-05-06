@@ -59,6 +59,14 @@ function filledPercent(item) {
   return total ? Math.round((filled / total) * 100) : 0;
 }
 
+function formatScore(value) {
+  const score = Number(value);
+  if (!Number.isFinite(score)) {
+    return "нет";
+  }
+  return score.toFixed(2).replace(/\.00$/, "");
+}
+
 function setAuthenticated(isAuthenticated) {
   tokenPanel.hidden = isAuthenticated;
   workspace.hidden = !isAuthenticated;
@@ -259,6 +267,102 @@ function renderSources(detail) {
   `;
 }
 
+function renderDeepDiagnostic(detail) {
+  const diagnostic = detail.analysis?.deepDiagnostic;
+  if (!diagnostic) {
+    return "";
+  }
+
+  const overall = diagnostic.overall || {};
+  const root = diagnostic.rootHypothesis || {};
+  const nextStep = diagnostic.nextStep || {};
+  const classes = diagnostic.classSummary || [];
+  const weakZones = diagnostic.weakZones || [];
+  const strengths = diagnostic.strengths || [];
+  const parallel = diagnostic.parallelActions || [];
+  const missingForConfidence = diagnostic.missingForConfidence || [];
+
+  return `
+    <section class="content-section">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Глубокая диагностика</p>
+          <h3>Срез по диагностической матрице</h3>
+        </div>
+        <div class="pill-row">
+          <span class="pill">слоёв: ${escapeHtml(overall.layerCount || 0)}</span>
+          <span class="pill">поддоменов: ${escapeHtml(overall.scoredSubdomainCount || 0)}</span>
+          <span class="pill orange">средняя: ${escapeHtml(formatScore(overall.averageScore))}</span>
+        </div>
+      </div>
+
+      <article class="card">
+        <h3>Что показывает диагностика</h3>
+        <p>${escapeHtml(overall.conclusion || "")}</p>
+      </article>
+
+      <div class="grid-two">
+        <article class="card">
+          <h3>Главная рабочая версия</h3>
+          <p><strong>${escapeHtml(root.title || "Пока не выбрана")}</strong></p>
+          <p>${escapeHtml(root.why || "")}</p>
+          ${root.notRootYet?.length ? `<p><strong>Не считаю корнем прямо сейчас:</strong> ${escapeHtml(root.notRootYet.join(", "))}.</p>` : ""}
+        </article>
+        <article class="card">
+          <h3>Следующий шаг</h3>
+          <p><strong>${escapeHtml(nextStep.title || "Не выбран")}</strong></p>
+          <p>${escapeHtml(nextStep.why || "")}</p>
+          ${nextStep.result ? `<p><strong>Результат:</strong> ${escapeHtml(nextStep.result)}</p>` : ""}
+          ${missingForConfidence.length ? `
+            <p><strong>Для большей уверенности нужны:</strong></p>
+            <ul class="split-list">
+              ${missingForConfidence.slice(0, 5).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+            </ul>
+          ` : ""}
+        </article>
+      </div>
+
+      <div class="grid-two">
+        <article class="card">
+          <h3>Классы системы</h3>
+          <div class="stack compact-stack">
+            ${classes.map((item) => `
+              <div class="mini-row">
+                <strong>${escapeHtml(item.classKey)} · ${escapeHtml(item.title || "")}</strong>
+                <span>${escapeHtml(formatScore(item.averageScore))} · ${escapeHtml(item.status || "")}</span>
+                <p>${escapeHtml(item.conclusion || "")}</p>
+              </div>
+            `).join("")}
+          </div>
+        </article>
+        <article class="card">
+          <h3>Что можно запускать параллельно</h3>
+          ${parallel.length ? `
+            <ul class="split-list">
+              ${parallel.slice(0, 4).map((item) => `<li><strong>${escapeHtml(item.title)}</strong> — ${escapeHtml(item.why || "")}</li>`).join("")}
+            </ul>
+          ` : `<p>Параллельные действия пока не выделены.</p>`}
+        </article>
+      </div>
+
+      <div class="grid-two">
+        <article class="card">
+          <h3>Слабые зоны</h3>
+          <ul class="split-list">
+            ${weakZones.slice(0, 8).map((item) => `<li>${escapeHtml(item.layerName)} / ${escapeHtml(item.title)}: ${escapeHtml(formatScore(item.score))}</li>`).join("")}
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Возможные опоры</h3>
+          <ul class="split-list">
+            ${strengths.slice(0, 6).map((item) => `<li>${escapeHtml(item.layerName)} / ${escapeHtml(item.title)}: ${escapeHtml(formatScore(item.score))}</li>`).join("") || "<li>Явные опоры пока не выделены.</li>"}
+          </ul>
+        </article>
+      </div>
+    </section>
+  `;
+}
+
 function renderLayers(detail) {
   const rows = detail.layerAnalyses || [];
   return `
@@ -383,6 +487,7 @@ function renderDetail() {
 
   content.innerHTML = [
     renderOverview(detail),
+    renderDeepDiagnostic(detail),
     renderSources(detail),
     renderLayers(detail),
     renderProblems(detail)
