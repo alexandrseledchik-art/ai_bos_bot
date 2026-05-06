@@ -264,6 +264,9 @@ export function createCompanyAnalysis({
   probableConstraint = null,
   reasoning = "",
   nextStep = null,
+  parallelActions = [],
+  rejectedHypotheses = [],
+  diagnosticChain = [],
   confidence = "LOW",
   sourceIds = []
 }) {
@@ -278,6 +281,9 @@ export function createCompanyAnalysis({
     probableConstraint,
     reasoning,
     nextStep,
+    parallelActions,
+    rejectedHypotheses,
+    diagnosticChain,
     confidence,
     sourceIds,
     createdAt: nowIso()

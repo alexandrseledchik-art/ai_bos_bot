@@ -15,6 +15,51 @@ const CONFIDENCE_ORDER = {
   HIGH: 3
 };
 
+const UPPER_FRAME_LAYER_CODES = ["owner_context", "external_environment", "strategy"];
+const SAFE_STABILIZATION_LAYER_CODES = ["finance", "team", "operations", "governance", "data_analytics"];
+
+const OWNER_GOAL_SIGNALS = [
+  "цель собственника",
+  "личный доход",
+  "на себя",
+  "дивиден",
+  "прибыл",
+  "1 млн",
+  "миллион",
+  "выруч",
+  "рост",
+  "масштаб",
+  "горизонт",
+  "роль собственника"
+];
+
+const MARKET_STRATEGY_SIGNALS = [
+  "рынок",
+  "спрос",
+  "конкурент",
+  "сегмент",
+  "позиционир",
+  "ценностное предложение",
+  "стратег",
+  "где деньги",
+  "где маржа",
+  "клиентский поток",
+  "модель роста",
+  "за счёт чего выигры"
+];
+
+const EXPLICIT_UPPER_FRAME_SIGNALS = [
+  "внешняя среда не проясн",
+  "рынок и спрос",
+  "стратегия не постро",
+  "условия игры",
+  "a-класс",
+  "контур собственника",
+  "не выбрала точную модель роста",
+  "не выбран фокус",
+  "прибыльный и управляемый поток"
+];
+
 function cleanText(value) {
   return String(value || "").trim();
 }
@@ -37,6 +82,31 @@ function splitSentences(value) {
 function compactSnippet(value, maxLength = 220) {
   const text = cleanText(value).replace(/\s+/g, " ");
   return text.length > maxLength ? `${text.slice(0, maxLength - 1).trim()}…` : text;
+}
+
+function hasAnyTextSignal(text, signals) {
+  const normalized = normalizeText(text);
+  return signals.some((signal) => normalized.includes(normalizeText(signal)));
+}
+
+function layerByCode(layerAnalyses, layerCode) {
+  return layerAnalyses.find((item) => item.layerCode === layerCode) || null;
+}
+
+function layersByCode(layerAnalyses, layerCodes) {
+  return layerCodes
+    .map((layerCode) => layerByCode(layerAnalyses, layerCode))
+    .filter(Boolean);
+}
+
+function totalFacts(layerAnalyses, layerCodes) {
+  return layersByCode(layerAnalyses, layerCodes)
+    .reduce((sum, item) => sum + (item.facts || []).length, 0);
+}
+
+function totalMissingFields(layerAnalyses, layerCodes) {
+  return layersByCode(layerAnalyses, layerCodes)
+    .reduce((sum, item) => sum + (item.missingFields || []).length, 0);
 }
 
 function sourceToText(source) {
@@ -207,6 +277,165 @@ function layerPriorityBoost(layerCode, companyText) {
   return (boosts[layerCode] || []).reduce((score, keyword) => score + Number(text.includes(keyword)), 0);
 }
 
+function detectUpperFramePriority({ companyText, layerAnalyses }) {
+  const ownerGoalVisible = hasAnyTextSignal(companyText, OWNER_GOAL_SIGNALS);
+  const marketOrStrategyVisible = hasAnyTextSignal(companyText, MARKET_STRATEGY_SIGNALS);
+  const explicitlyUpper = hasAnyTextSignal(companyText, EXPLICIT_UPPER_FRAME_SIGNALS);
+  const upperFacts = totalFacts(layerAnalyses, UPPER_FRAME_LAYER_CODES);
+  const upperMissing = totalMissingFields(layerAnalyses, UPPER_FRAME_LAYER_CODES);
+
+  return Boolean(
+    (ownerGoalVisible && marketOrStrategyVisible && upperFacts >= 2) ||
+    (explicitlyUpper && upperFacts >= 1) ||
+    (ownerGoalVisible && explicitlyUpper && upperMissing >= 4)
+  );
+}
+
+function buildParallelActions({ layerAnalyses, companyText }) {
+  const text = normalizeText(companyText);
+  const actions = [];
+  const addAction = (action) => {
+    if (!actions.some((item) => item.layer === action.layer)) {
+      actions.push(action);
+    }
+  };
+
+  const finance = layerByCode(layerAnalyses, "finance");
+  if (finance?.facts.length || hasAnyTextSignal(text, ["финанс", "марж", "cash flow", "кэш", "дебитор", "выруч", "прибыл", "деньг"])) {
+    addAction({
+      layer: "finance",
+      layerName: "Финансы",
+      title: "Запустить управленческую финансовую отчётность",
+      description: "Назначить ответственного за короткий срез: выручка, маржа, расходы, cash flow, дебиторка и кассовые риски.",
+      why: "Это не подменяет выбор стратегии, а даёт факты, без которых нельзя понять, какой рост реально выгоден и безопасен.",
+      resultFormat: "Таблица или отчёт по деньгам и марже в разрезе клиентов, услуг или заявок."
+    });
+  }
+
+  const team = layerByCode(layerAnalyses, "team");
+  if (team?.facts.length || hasAnyTextSignal(text, ["роль", "должност", "команд", "кто что делает", "нагруз", "ответствен"])) {
+    addAction({
+      layer: "team",
+      layerName: "Команда",
+      title: "Описать фактические роли и профили должностей",
+      description: "Зафиксировать, кто что реально делает сейчас, где пересечения, перегруз и размытая ответственность.",
+      why: "Это можно делать параллельно: карта ролей не закрепляет стратегию, а показывает, на чём фактически держится система.",
+      resultFormat: "Карта текущих ролей: роль, задачи, зона ответственности, перегруз, зависимость от конкретного человека."
+    });
+  }
+
+  const operations = layerByCode(layerAnalyses, "operations");
+  if (operations?.facts.length || hasAnyTextSignal(text, ["заявк", "заказ", "процесс", "перевоз", "исполн", "операцион", "передач", "сбой"])) {
+    addAction({
+      layer: "operations",
+      layerName: "Операции",
+      title: "Описать текущий путь заявки или заказа",
+      description: "Разобрать несколько последних заявок от входа до результата: кто принял, кто передал, где задержка, чем закончилось.",
+      why: "Это даст факты о прохождении потока и не требует заранее выбирать финальную операционную модель.",
+      resultFormat: "Карта 5-10 заявок с этапами, ответственными, задержками, потерями и итогом."
+    });
+  }
+
+  const data = layerByCode(layerAnalyses, "data_analytics");
+  if (data?.facts.length || hasAnyTextSignal(text, ["данн", "отчёт", "отчет", "аналит", "метрик", "дашборд", "единая картина"])) {
+    addAction({
+      layer: "data_analytics",
+      layerName: "Данные и аналитика",
+      title: "Определить одну версию правды по ключевым цифрам",
+      description: "Понять, где лежат основные цифры, кто их обновляет и каким источникам можно доверять.",
+      why: "Это снижает риск спорить об ощущениях вместо фактов и помогает проверять любые гипотезы быстрее.",
+      resultFormat: "Список ключевых метрик, источников, ответственных и частоты обновления."
+    });
+  }
+
+  const governance = layerByCode(layerAnalyses, "governance");
+  if (governance?.facts.length || hasAnyTextSignal(text, ["управлен", "контроль", "решени", "plan", "review", "kpi", "ответствен"])) {
+    addAction({
+      layer: "governance",
+      layerName: "Управление",
+      title: "Собрать минимальный управленческий ритм",
+      description: "Определить, какие цифры, решения, риски и ответственные смотрим каждую неделю.",
+      why: "Это удерживает текущую работу в управлении, пока верхняя рамка роста уточняется.",
+      resultFormat: "Еженедельный список вопросов: деньги, продажи, заявки, сбои, решения, ответственные, риски."
+    });
+  }
+
+  return actions
+    .sort((left, right) => {
+      const leftIndex = SAFE_STABILIZATION_LAYER_CODES.indexOf(left.layer);
+      const rightIndex = SAFE_STABILIZATION_LAYER_CODES.indexOf(right.layer);
+      return (leftIndex === -1 ? 99 : leftIndex) - (rightIndex === -1 ? 99 : rightIndex);
+    })
+    .slice(0, 3);
+}
+
+function buildRejectedAlternatives(layerAnalyses) {
+  const labels = {
+    finance: "Финансы",
+    operations: "Операции",
+    team: "Команда",
+    governance: "Управление",
+    data_analytics: "Данные и аналитика",
+    technology: "Технологии",
+    commercial: "Коммерция"
+  };
+
+  return ["finance", "operations", "team", "governance", "data_analytics", "technology", "commercial"]
+    .map((layerCode) => layerByCode(layerAnalyses, layerCode))
+    .filter((item) => item && ((item.facts || []).length || (item.missingFields || []).length >= 4))
+    .map((item) => ({
+      layer: item.layerCode,
+      layerName: labels[item.layerCode] || item.layerName,
+      reason: `Слой "${labels[item.layerCode] || item.layerName}" важен, но сейчас больше похож на симптом или источник фактов: без верхней рамки нельзя уверенно понять, что именно в нём нужно строить.`
+    }))
+    .slice(0, 4);
+}
+
+function buildUpperFrameConstraint({ companyText, layerAnalyses }) {
+  const upperLayers = layersByCode(layerAnalyses, UPPER_FRAME_LAYER_CODES);
+  const parallelActions = buildParallelActions({ layerAnalyses, companyText });
+  const rejectedAlternatives = buildRejectedAlternatives(layerAnalyses);
+  const evidence = upperLayers.flatMap((item) => item.facts || []).slice(0, 4);
+  const relatedLayers = upperLayers.map((item) => ({
+    layer: item.layerCode,
+    layerName: item.layerName,
+    confidence: item.confidence,
+    missingFields: item.missingFields || []
+  }));
+
+  const confidence = evidence.length >= 3 ? "MEDIUM" : "LOW";
+
+  return {
+    layer: "owner_context",
+    layerName: "Условия игры",
+    title: "Условия игры: собственник, рынок и стратегия",
+    explanation: [
+      "Сейчас слабее всего выглядит не отдельная функция, а верхняя рамка: что именно считается успехом для собственника, в какой рыночной реальности компания играет и за счёт чего будет выигрывать.",
+      "Пока это не прояснено, финансы, операции, команда и данные нельзя уверенно объявлять корневой причиной: они могут быть следствиями того, что игра сверху не выбрана.",
+      parallelActions.length
+        ? "При этом нижние слои не откладываем: по ним можно запускать безопасные параллельные действия, которые дадут факты и снизят хаос."
+        : ""
+    ].filter(Boolean).join(" "),
+    cause: "Не зафиксирована минимальная рамка собственник-рынок: цель, горизонт, роль и ограничения собственника плюс рыночные сегменты, спрос, маржа, конкуренция и отличие.",
+    effects: [
+      "Стратегия, ICP, продуктовая упаковка и модель роста остаются размытыми.",
+      "Финансы показывают не только денежную проблему, но и нехватку фактов о том, какой поток действительно выгоден.",
+      "Операции, команда и данные могут проседать как следствие невыбранного клиентского потока и правил управления."
+    ],
+    confidence,
+    missingForHigh: [
+      "зафиксировать цель собственника, горизонт, роль, допустимый риск и ограничения",
+      "выделить 5-7 рыночных или клиентских сегментов",
+      "оценить сегменты по спросу, марже, повторяемости, конкуренции, кассовому риску и операционной сложности"
+    ],
+    mode: "upper_frame",
+    relatedLayers,
+    evidence,
+    rejectedAlternatives,
+    parallelActions
+  };
+}
+
 function buildKeyProblemAreas(layerAnalyses) {
   return layerAnalyses
     .filter((item) => item.facts.length || item.missingFields.length >= 4)
@@ -232,6 +461,10 @@ function selectConstraint({ company, sources, layerAnalyses }) {
     company.currentRequest,
     ...sources.map((source) => sourceToText(source))
   ].join("\n");
+
+  if (detectUpperFramePriority({ companyText, layerAnalyses })) {
+    return buildUpperFrameConstraint({ companyText, layerAnalyses });
+  }
 
   const ranked = layerAnalyses
     .map((item) => {
@@ -290,6 +523,16 @@ function selectConstraint({ company, sources, layerAnalyses }) {
 }
 
 function buildNextStep(constraint) {
+  if (constraint.mode === "upper_frame") {
+    return {
+      title: "Собрать рамку собственник-рынок: цель собственника и карту 5-7 сегментов рынка.",
+      description: "Зафиксировать цель, горизонт, роль, риск и ограничения собственника; затем оценить 5-7 сегментов по спросу, марже, повторяемости, конкуренции, cash flow и операционной сложности.",
+      why: "Это самый короткий способ понять, какую игру компания выбирает, и не начать чинить финансы, команду или процессы под невыбранную модель.",
+      expectedResult: "Появится рабочая рамка: какие клиентские потоки стоит усиливать, какие отсекать и какие факты нужны для стратегии.",
+      successCriteria: "Есть рамка собственника и сегментная таблица, по которым можно выбрать 1-2 приоритетных клиентских потока для проверки."
+    };
+  }
+
   if (!constraint.layer) {
     return {
       title: "Добавить один конкретный факт по текущей компании",
@@ -382,6 +625,9 @@ export class CompanyAnalysisCore {
     const keyProblemAreas = buildKeyProblemAreas(layerAnalyses);
     const probableConstraint = selectConstraint({ company, sources: storedSources, layerAnalyses });
     const nextStep = buildNextStep(probableConstraint);
+    const parallelActions = probableConstraint.parallelActions || [];
+    const rejectedHypotheses = probableConstraint.rejectedAlternatives || [];
+    const diagnosticChain = probableConstraint.relatedLayers || [];
     const missingData = layerAnalyses
       .filter((item) => item.missingFields.length)
       .map((item) => ({
@@ -391,7 +637,9 @@ export class CompanyAnalysisCore {
         whyNeeded: `Эти данные нужны, чтобы сравнить реальность со слоем "${item.layerName}" и не перепутать причину со следствием.`
       }));
 
-    const summary = probableConstraint.layer
+    const summary = probableConstraint.mode === "upper_frame"
+      ? "Вероятное ограничение сейчас похоже на незафиксированные условия игры: собственник, рынок и стратегия."
+      : probableConstraint.layer
       ? `Вероятное ограничение сейчас похоже на слой "${probableConstraint.layerName}".`
       : "Пока данных недостаточно, чтобы выбрать главное ограничение.";
 
@@ -421,6 +669,9 @@ export class CompanyAnalysisCore {
       reasoning: probableConstraint.explanation,
       nextStep,
       confidence,
+      parallelActions,
+      rejectedHypotheses,
+      diagnosticChain,
       sourceIds: storedSources.map((source) => source.id)
     });
 

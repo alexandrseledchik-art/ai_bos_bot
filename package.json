@@ -22,6 +22,7 @@
     "ceo:check": "node src/scripts/run-ceo-kernel-checks.js",
     "consultant:mvp:check": "node src/scripts/check-consultant-mvp.js",
     "consultant:web:check": "node src/scripts/check-consultant-web.js",
+    "consultant:roks:check": "node src/scripts/check-roks-deep-diagnostic-logic.js",
     "miniapp:phase1": "node src/scripts/check-mini-app-phase1.js",
     "miniapp:phase2": "node src/scripts/check-mini-app-phase2.js",
     "miniapp:phase3": "node src/scripts/check-mini-app-phase3.js",

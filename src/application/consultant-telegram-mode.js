@@ -236,12 +236,20 @@ function formatLayerList(layerCodes) {
 function formatAnalysisShort(company, analysis) {
   const constraint = analysis.probableConstraint || {};
   const nextStep = analysis.nextStep || {};
+  const parallelActions = analysis.parallelActions || constraint.parallelActions || [];
+  const rejected = analysis.rejectedHypotheses || constraint.rejectedAlternatives || [];
 
   return [
     `По компании "${company.name}" сейчас главное ограничение выглядит как: ${constraint.title || "пока не выбрано"}.`,
     "",
     constraint.explanation ? `Почему: ${constraint.explanation}` : "",
+    rejected.length
+      ? `Что не считаю корнем прямо сейчас: ${rejected.slice(0, 2).map((item) => item.layerName || item.layer).join(", ")}. Это важно, но может быть следствием или источником фактов.`
+      : "",
     constraint.confidence ? `Уверенность: ${constraint.confidence}.` : "",
+    parallelActions.length
+      ? `Параллельно можно начать: ${parallelActions.slice(0, 3).map((item) => item.title).join("; ")}.`
+      : "",
     "",
     nextStep.title ? `Следующий шаг: ${nextStep.title}` : "",
     nextStep.why ? `Зачем: ${nextStep.why}` : ""

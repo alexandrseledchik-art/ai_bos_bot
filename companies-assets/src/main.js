@@ -151,6 +151,7 @@ function renderOverview(detail) {
   const { company, analysis } = detail;
   const constraint = analysis?.probableConstraint || company.probableConstraint || {};
   const nextStep = analysis?.nextStep || company.nextStep || {};
+  const parallelActions = analysis?.parallelActions || constraint.parallelActions || [];
   const layerSummary = analysis?.layerSummary || [];
   const avgFilled = layerSummary.length
     ? Math.round(layerSummary.reduce((sum, item) => sum + filledPercent(item), 0) / layerSummary.length)
@@ -217,6 +218,15 @@ function renderOverview(detail) {
           ${nextStep.why ? `<p><strong>Зачем:</strong> ${escapeHtml(nextStep.why)}</p>` : ""}
         </article>
       </div>
+      ${parallelActions.length ? `
+        <article class="card">
+          <h3>Что можно делать параллельно</h3>
+          <p>Это не заменяет главный фокус, а собирает факты и снижает хаос без преждевременной фиксации модели.</p>
+          <ul class="split-list">
+            ${parallelActions.slice(0, 3).map((action) => `<li><strong>${escapeHtml(action.title)}</strong>${action.why ? ` — ${escapeHtml(action.why)}` : ""}</li>`).join("")}
+          </ul>
+        </article>
+      ` : ""}
     </section>
   `;
 }
@@ -285,6 +295,8 @@ function renderProblems(detail) {
   const problems = analysis.keyProblemAreas || [];
   const missing = analysis.missingData || [];
   const constraint = analysis.probableConstraint || {};
+  const rejected = analysis.rejectedHypotheses || constraint.rejectedAlternatives || [];
+  const parallelActions = analysis.parallelActions || constraint.parallelActions || [];
 
   return `
     <section class="content-section">
@@ -314,8 +326,31 @@ function renderProblems(detail) {
         <h3>${escapeHtml(constraint.title || "Пока не выбрано")}</h3>
         <p>${escapeHtml(constraint.explanation || "Запусти анализ после добавления данных.")}</p>
         ${constraint.cause ? `<p><strong>Причина:</strong> ${escapeHtml(constraint.cause)}</p>` : ""}
+        ${rejected.length ? `
+          <p><strong>Почему не нижние слои:</strong> ${escapeHtml(rejected.slice(0, 3).map((item) => item.layerName || item.layer).join(", "))} важны, но сейчас могут быть следствием или источником фактов.</p>
+        ` : ""}
       </article>
     </section>
+
+    ${parallelActions.length ? `
+      <section class="content-section">
+        <div class="section-head">
+          <h3>Параллельные действия</h3>
+        </div>
+        <div class="stack">
+          ${parallelActions.slice(0, 3).map((action) => `
+            <article class="problem-row">
+              <h4>${escapeHtml(action.title)}</h4>
+              <p>${escapeHtml(action.description || "")}</p>
+              ${action.why ? `<p><strong>Зачем:</strong> ${escapeHtml(action.why)}</p>` : ""}
+              <div class="pill-row">
+                <span class="pill orange">${escapeHtml(action.layerName || action.layer)}</span>
+              </div>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+    ` : ""}
 
     <section class="content-section">
       <div class="section-head">
