@@ -237,7 +237,10 @@ function renderSources(detail) {
     <section class="content-section">
       <div class="section-head">
         <h3>Данные</h3>
-        <button id="addSourceButton" type="button">Добавить источник</button>
+        <div class="actions">
+          <button class="secondary" id="importDeepDiagnosticButton" type="button">Импорт диагностики Excel</button>
+          <button id="addSourceButton" type="button">Добавить источник</button>
+        </div>
       </div>
       <div class="stack">
         ${rows.length ? rows.map((source) => `
@@ -388,6 +391,7 @@ function renderDetail() {
   document.querySelector("#analyzeButton")?.addEventListener("click", analyzeSelectedCompany);
   document.querySelector("#editCompanyButton")?.addEventListener("click", () => openCompanyModal(detail.company));
   document.querySelector("#addSourceButton")?.addEventListener("click", openSourceModal);
+  document.querySelector("#importDeepDiagnosticButton")?.addEventListener("click", importSelectedDeepDiagnostic);
 }
 
 function openModal(markup) {
@@ -532,6 +536,57 @@ async function analyzeSelectedCompany() {
   await api(`/${encodeURIComponent(state.selectedCompanyId)}/analyze`, { method: "POST" });
   await loadCompanies();
   await openCompany(state.selectedCompanyId, { replaceRoute: true });
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("error", () => reject(reader.error || new Error("Не удалось прочитать файл.")));
+    reader.addEventListener("load", () => {
+      const bytes = new Uint8Array(reader.result);
+      let binary = "";
+      const chunkSize = 0x8000;
+      for (let index = 0; index < bytes.length; index += chunkSize) {
+        binary += String.fromCharCode(...bytes.slice(index, index + chunkSize));
+      }
+      resolve(btoa(binary));
+    });
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function importSelectedDeepDiagnostic() {
+  if (!state.selectedCompanyId) {
+    return;
+  }
+
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  input.addEventListener("change", async () => {
+    const file = input.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      renderLoading("Импортирую глубокую диагностику");
+      const fileBase64 = await fileToBase64(file);
+      await api(`/${encodeURIComponent(state.selectedCompanyId)}/import/deep-diagnostic`, {
+        method: "POST",
+        body: {
+          fileName: file.name,
+          fileBase64
+        }
+      });
+      await api(`/${encodeURIComponent(state.selectedCompanyId)}/analyze`, { method: "POST" });
+      await loadCompanies();
+      await openCompany(state.selectedCompanyId, { replaceRoute: true });
+    } catch (error) {
+      renderError(error);
+    }
+  });
+  input.click();
 }
 
 async function bootstrap() {

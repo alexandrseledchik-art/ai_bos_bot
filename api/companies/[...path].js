@@ -81,6 +81,12 @@ async function dispatch(request) {
     return json({ ok: true, ...(await service.addSource(decodeURIComponent(sourceMatch[1]), payload)) });
   }
 
+  const importDeepDiagnosticMatch = path.match(/^([^/]+)\/import\/deep-diagnostic$/);
+  if (importDeepDiagnosticMatch && request.method === "POST") {
+    const payload = await readAdminJsonBody(request);
+    return json({ ok: true, ...(await service.importDeepDiagnostic(decodeURIComponent(importDeepDiagnosticMatch[1]), payload)) });
+  }
+
   const analyzeMatch = path.match(/^([^/]+)\/analyze$/);
   if (analyzeMatch && request.method === "POST") {
     return json({ ok: true, ...(await service.analyzeCompany(decodeURIComponent(analyzeMatch[1]))) });

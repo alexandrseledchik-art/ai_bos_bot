@@ -4,6 +4,7 @@ import {
   nowIso
 } from "../domain/entities.js";
 import { CompanyAnalysisCore, detectConsultantLayersForText } from "./company-analysis-core.js";
+import { importDeepDiagnosticXlsx } from "./deep-diagnostic-importer.js";
 
 function cleanText(value) {
   return String(value || "").trim();
@@ -63,6 +64,34 @@ function assertCompany(state, companyId) {
   }
 
   return company;
+}
+
+function decodeBase64(value) {
+  const raw = cleanText(value).replace(/^data:[^;]+;base64,/, "");
+  if (!raw) {
+    const error = new Error("Файл диагностики не передан.");
+    error.status = 400;
+    throw error;
+  }
+
+  return Buffer.from(raw, "base64");
+}
+
+function profileAnswer(profile, names) {
+  const normalizedNames = names.map(normalizeText);
+  const found = Object.entries(profile || {}).find(([question]) => normalizedNames.includes(normalizeText(question)));
+  return cleanText(found?.[1] || "");
+}
+
+function buildProfileDescription(profile) {
+  const parts = [
+    profileAnswer(profile, ["Основной продукт / услуга"]),
+    profileAnswer(profile, ["География"]),
+    profileAnswer(profile, ["Количество сотрудников"]) ? `Сотрудников: ${profileAnswer(profile, ["Количество сотрудников"])}` : "",
+    profileAnswer(profile, ["Выручка (за прошлый год / текущий прогноз)"]) ? `Выручка: ${profileAnswer(profile, ["Выручка (за прошлый год / текущий прогноз)"])}` : ""
+  ].filter(Boolean);
+
+  return parts.join(". ");
 }
 
 export class ConsultantWebService {
@@ -193,6 +222,62 @@ export class ConsultantWebService {
       company.updatedAt = nowIso();
 
       return { source, company: companySummary(state, company) };
+    });
+  }
+
+  async importDeepDiagnostic(companyId, payload) {
+    return this.store.update(async (state) => {
+      const company = assertCompany(state, companyId);
+      const fileName = cleanText(payload.fileName) || "Глубокая диагностика.xlsx";
+      const fileBuffer = decodeBase64(payload.fileBase64 || payload.base64 || payload.file);
+      const imported = importDeepDiagnosticXlsx(fileBuffer);
+      const relatedLayers = imported.layerScores.map((item) => item.layerCode).filter(Boolean);
+      const source = createCompanySource({
+        companyId,
+        type: "deep_diagnostic",
+        title: `Глубокая диагностика: ${fileName}`,
+        contentText: imported.contentText,
+        sourceOrigin: "web_upload",
+        aiSummary: `Импортирована глубокая диагностика: ${imported.layerScores.length} слоёв, ${imported.summary.scoredSubdomainCount} оценённых поддоменов.`,
+        relatedLayers,
+        sourceMeta: {
+          fileName,
+          deepDiagnostic: {
+            profile: imported.profile,
+            layerScores: imported.layerScores,
+            weakestSubdomains: imported.weakestSubdomains,
+            strongestSubdomains: imported.strongestSubdomains,
+            summary: imported.summary
+          }
+        },
+        processingStatus: "processed"
+      });
+
+      state.companySources = state.companySources || [];
+      state.companySources.push(source);
+
+      const industry = profileAnswer(imported.profile, ["Сфера / рынок"]);
+      const ownerGoal = profileAnswer(imported.profile, ["Прибыль (если готов раскрыть)"]);
+      const description = buildProfileDescription(imported.profile);
+
+      if (industry && !company.industry) {
+        company.industry = industry;
+      }
+      if (ownerGoal && !company.ownerGoal) {
+        company.ownerGoal = ownerGoal;
+      }
+      if (description && !company.description) {
+        company.description = description;
+      }
+
+      company.analysisStatus = "source_imported";
+      company.updatedAt = nowIso();
+
+      return {
+        source,
+        importSummary: imported.summary,
+        company: companySummary(state, company)
+      };
     });
   }
 
