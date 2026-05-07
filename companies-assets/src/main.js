@@ -68,23 +68,23 @@ function confidenceClass(value) {
 
 function confidenceLabel(value) {
   if (value === "HIGH") {
-    return "достаточно фактов";
+    return "данных достаточно";
   }
   if (value === "MEDIUM") {
-    return "есть сигналы";
+    return "часть данных есть";
   }
-  return "мало фактов";
+  return "данных мало";
 }
 
 function conclusionConfidenceLabel(value) {
   if (value === "HIGH") {
-    return "уверенность вывода: высокая";
+    return "вывод хорошо подтверждён";
   }
   if (value === "MEDIUM") {
-    return "уверенность вывода: рабочая";
+    return "вывод рабочий, нужны факты";
   }
   if (value === "LOW") {
-    return "уверенность вывода: низкая";
+    return "вывод предварительный";
   }
   return "без анализа";
 }
@@ -94,15 +94,101 @@ function diagnosticQualityLabel(score) {
     return "";
   }
 
-  return `диагностическая логика: ${score}/10`;
+  return `качество разбора: ${score}/10`;
 }
 
 function asArray(value) {
   return Array.isArray(value) ? value.filter(Boolean) : [];
 }
 
-function renderSmallList(items, emptyText = "Пока нет данных.") {
-  const rows = asArray(items).filter((item) => String(item || "").trim());
+function cleanHumanText(value) {
+  return String(value ?? "")
+    .replace(/[“”]/g, "\"")
+    .replace(/[‘’]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function csvParts(value) {
+  return cleanHumanText(value)
+    .replace(/^["']|["']$/g, "")
+    .split(",")
+    .map((part) => part.trim().replace(/^["']|["']$/g, ""))
+    .filter(Boolean);
+}
+
+function humanizeEvidenceItem(item) {
+  const original = cleanHumanText(item);
+  if (!original) {
+    return "";
+  }
+
+  const withoutNoise = original
+    .replace(/"{2,}/g, "\"")
+    .replace(/,{2,}/g, ",")
+    .replace(/,+$/g, "")
+    .replace(/\s+,/g, ",")
+    .trim();
+
+  const parts = csvParts(withoutNoise);
+  const lower = withoutNoise.toLowerCase();
+
+  if (
+    parts.length >= 4 &&
+    /сегмент|профиль|выруч|роль|запрос|продукт|марж|канал|клиент/i.test(withoutNoise) &&
+    parts.every((part) => part.length <= 48)
+  ) {
+    return `В источнике есть таблица с полями: ${parts.slice(0, 8).join(", ")}.`;
+  }
+
+  if (/^сегмент\s+[a-zа-я]/i.test(withoutNoise.replace(/^["']/, ""))) {
+    return `Описан клиентский сегмент: ${withoutNoise.replace(/^["']|["']$/g, "")}.`;
+  }
+
+  if (lower.includes("ikigai") || lower.includes("икигай")) {
+    return `Есть артефакт про смысл, фокус и сильную сторону бизнеса: ${withoutNoise.replace(/\.$/, "")}.`;
+  }
+
+  if (lower.includes("customer & jobs") || lower.includes("customer jobs")) {
+    return `Есть карта клиентов и задач, которые они решают: ${withoutNoise}.`;
+  }
+
+  if (lower.includes("customer journey")) {
+    return `Есть карта пути клиента: ${withoutNoise}.`;
+  }
+
+  if (parts.length >= 5) {
+    return `В источнике перечислены: ${parts.slice(0, 8).join(", ")}.`;
+  }
+
+  return withoutNoise;
+}
+
+function humanizeMissingField(value) {
+  const text = cleanHumanText(value);
+  if (!text) {
+    return "";
+  }
+
+  const dictionary = {
+    "owner goal": "цель собственника",
+    "goal": "цель",
+    "horizon": "горизонт",
+    "role": "роль",
+    "strategy": "стратегия",
+    "icp": "портрет целевого клиента",
+    "unit economics": "экономика сделки",
+    "cash flow": "движение денег",
+    "decision rights": "кто принимает какие решения"
+  };
+
+  return dictionary[text.toLowerCase()] || text;
+}
+
+function renderSmallList(items, emptyText = "Пока нет данных.", formatter = (item) => item) {
+  const rows = asArray(items)
+    .map((item) => formatter(item))
+    .filter((item) => String(item || "").trim());
   if (!rows.length) {
     return `<p class="hint-text">${escapeHtml(emptyText)}</p>`;
   }
@@ -117,7 +203,7 @@ function renderSmallList(items, emptyText = "Пока нет данных.") {
 function renderLayerEvidenceRows(layers = []) {
   const rows = asArray(layers).slice(0, 5);
   if (!rows.length) {
-    return `<p class="hint-text">Цепочка слоёв пока не собрана.</p>`;
+    return `<p class="hint-text">Пока не видно, какие области реально объясняют ситуацию.</p>`;
   }
 
   return `
@@ -126,8 +212,8 @@ function renderLayerEvidenceRows(layers = []) {
         <div class="mini-row evidence-row">
           <strong>${escapeHtml(layer.layerName || layer.layer || "Слой")}</strong>
           <span>${escapeHtml(confidenceLabel(layer.confidence))}</span>
-          ${asArray(layer.facts).length ? `<p><b>Факты:</b> ${escapeHtml(asArray(layer.facts).slice(0, 2).join("; "))}</p>` : ""}
-          ${asArray(layer.missingFields).length ? `<p><b>Не хватает:</b> ${escapeHtml(asArray(layer.missingFields).slice(0, 3).join(", "))}</p>` : ""}
+          ${asArray(layer.facts).length ? `<p><b>Что уже видно:</b> ${escapeHtml(asArray(layer.facts).slice(0, 2).map(humanizeEvidenceItem).filter(Boolean).join(" "))}</p>` : ""}
+          ${asArray(layer.missingFields).length ? `<p><b>Чего не хватает:</b> ${escapeHtml(asArray(layer.missingFields).slice(0, 3).map(humanizeMissingField).filter(Boolean).join(", "))}</p>` : ""}
         </div>
       `).join("")}
     </div>
@@ -137,7 +223,7 @@ function renderLayerEvidenceRows(layers = []) {
 function renderRejectedRows(rejected = []) {
   const rows = asArray(rejected).slice(0, 4);
   if (!rows.length) {
-    return `<p class="hint-text">Альтернативы пока не выделены.</p>`;
+    return `<p class="hint-text">Пока нет сильных альтернатив основной версии.</p>`;
   }
 
   return `
@@ -458,7 +544,7 @@ function renderOverview(detail) {
         </div>
       </div>
       ${analysis ? `
-        <p class="section-note">Уверенность показывает, насколько вывод подтверждён данными. Оценка диагностической логики показывает, насколько корректно AI-BOSS рассуждал по методологии.</p>
+        <p class="section-note">Уверенность показывает, насколько вывод подтверждён данными. Качество разбора показывает, аккуратно ли AI-BOSS отделил факты, версии и следующий шаг.</p>
       ` : ""}
       <div class="grid-two">
         <article class="card">
@@ -474,20 +560,20 @@ function renderOverview(detail) {
       ${analysis ? `
         <div class="grid-two evidence-grid">
           <article class="card">
-            <h3>Почему такой вывод</h3>
+            <h3>Как AI-BOSS пришёл к выводу</h3>
             ${selectionBasis.length ? `
-              <p><strong>Логика выбора:</strong></p>
+              <p><strong>Почему выбрана эта версия:</strong></p>
               ${renderSmallList(selectionBasis)}
             ` : ""}
-            <p><strong>Факты и сигналы:</strong></p>
-            ${renderSmallList(evidence, "Пока нет явных фактов в выводе. Нужно открыть слои и источники.")}
-            <p><strong>Слои, которые участвовали в версии:</strong></p>
+            <p><strong>На что опираюсь:</strong></p>
+            ${renderSmallList(evidence, "Пока нет понятных опор в данных. Нужно открыть области и источники.", humanizeEvidenceItem)}
+            <p><strong>Какие области проверил:</strong></p>
             ${renderLayerEvidenceRows(diagnosticChain)}
-            <p><strong>Что пока не считаю главным ограничением:</strong></p>
+            <p><strong>Что важно, но пока не похоже на главную причину:</strong></p>
             ${renderRejectedRows(rejectedHypotheses)}
           </article>
           <article class="card">
-            <h3>Почему именно этот следующий шаг</h3>
+            <h3>Почему следующий шаг такой</h3>
             ${nextStepBasis.length ? renderSmallList(nextStepBasis) : renderSmallList([
               nextStep.why || "Шаг выбран как минимальная проверка текущей версии.",
               "Он должен снизить неопределённость, а не сразу запустить большой проект изменений."
@@ -495,8 +581,8 @@ function renderOverview(detail) {
             ${nextStep.expectedResult ? `<p><strong>Что должно получиться:</strong> ${escapeHtml(nextStep.expectedResult)}</p>` : ""}
             ${nextStep.successCriteria ? `<p><strong>Критерий результата:</strong> ${escapeHtml(nextStep.successCriteria)}</p>` : ""}
             ${missingForHigh.length ? `
-              <p><strong>Что нужно для высокой уверенности:</strong></p>
-              ${renderSmallList(missingForHigh.slice(0, 4))}
+              <p><strong>Чего не хватает, чтобы говорить увереннее:</strong></p>
+              ${renderSmallList(missingForHigh.slice(0, 4), "Пока дополнительных уточнений не нужно.", humanizeMissingField)}
             ` : ""}
           </article>
         </div>
@@ -512,7 +598,7 @@ function renderOverview(detail) {
       ${parallelActions.length ? `
         <article class="card">
           <h3>Что можно делать параллельно</h3>
-          <p>Это не заменяет главный фокус, а собирает факты и снижает хаос без преждевременной фиксации модели.</p>
+          <p>Это не заменяет главный фокус. Такие шаги можно делать уже сейчас: они дают факты и не заставляют преждевременно перестраивать весь бизнес.</p>
           <ul class="split-list">
             ${parallelActions.slice(0, 3).map((action) => `<li><strong>${escapeHtml(action.title)}</strong>${action.why ? ` — ${escapeHtml(action.why)}` : ""}</li>`).join("")}
           </ul>
@@ -821,8 +907,8 @@ function renderLayers(detail) {
               <div class="layer-expand">
                 <div class="layer-expand-grid">
                   <div class="layer-panel">
-                    <h5>Эталон слоя</h5>
-                    <p>Это минимальные параметры, с которыми AI-BOSS сравнивает реальность перед выводом по слою.</p>
+                    <h5>С чем сравниваем реальность</h5>
+                    <p>Это минимальные параметры, без которых нельзя честно сказать, хорошо или плохо работает эта область.</p>
                     <div class="parameter-list">
                       ${filledEntries.length ? filledEntries.map(([field, value]) => `
                         <div class="parameter-row is-covered">
@@ -924,7 +1010,7 @@ function renderLayers(detail) {
                     <ul class="split-list">
                       ${visibleFacts.map((fact) => `<li>${escapeHtml(fact)}</li>`).join("")}
                     </ul>
-                  ` : `<p class="hint-text">Факты по слою пока не подтверждены содержанием источников.</p>`}
+                  ` : `<p class="hint-text">Факты по этой области пока не подтверждены содержанием источников.</p>`}
                   ${layerSources.length ? `
                     <div class="source-link-list">
                       <strong>Источники слоя:</strong>
@@ -981,7 +1067,7 @@ function renderProblems(detail) {
         <p>${escapeHtml(constraint.explanation || "Запусти анализ после добавления данных.")}</p>
         ${constraint.cause ? `<p><strong>Причина:</strong> ${escapeHtml(constraint.cause)}</p>` : ""}
         ${rejected.length ? `
-          <p><strong>Почему не нижние слои:</strong> ${escapeHtml(rejected.slice(0, 3).map((item) => item.layerName || item.layer).join(", "))} важны, но сейчас могут быть следствием или источником фактов.</p>
+          <p><strong>Почему не они:</strong> ${escapeHtml(rejected.slice(0, 3).map((item) => item.layerName || item.layer).join(", "))} важны, но сейчас больше похожи на следствие или источник фактов, а не на главную причину.</p>
         ` : ""}
       </article>
     </section>
