@@ -150,6 +150,14 @@ function layerEvidenceText(layer, layerSources) {
   ].join(" "));
 }
 
+function sourceEvidenceText(source) {
+  return normalizeLookup([
+    source.contentText,
+    source.aiSummary,
+    source.title
+  ].join(" "));
+}
+
 function architectureItemHasSignal(item, evidenceText) {
   const domainTokens = lookupTokens(item.domain);
   if (domainTokens.some((token) => evidenceText.includes(token))) {
@@ -158,6 +166,18 @@ function architectureItemHasSignal(item, evidenceText) {
 
   const hintTokens = lookupTokens(item.toolHints).slice(0, 8);
   return hintTokens.some((token) => evidenceText.includes(token));
+}
+
+function sourceHasLayerSignal(source, layer, architectureItems) {
+  const evidenceText = sourceEvidenceText(source);
+  const referenceTokens = lookupTokens([
+    layer.layerName,
+    ...Object.keys(layer.filledFields || {}),
+    ...(layer.missingFields || [])
+  ].join(" "));
+
+  return referenceTokens.some((token) => evidenceText.includes(token)) ||
+    architectureItems.some((item) => architectureItemHasSignal(item, evidenceText));
 }
 
 function filledPercent(item) {
@@ -588,14 +608,15 @@ function renderLayers(detail) {
       <div class="stack">
         ${rows.length ? rows.map((layer, index) => {
           const percent = filledPercent(layer);
+          const architectureItems = architectureItemsByLayer.get(layer.layerCode) || [];
           const layerSources = [
             ...(layer.sourceIds || []).map((sourceId) => sourceById.get(sourceId)),
             ...(detail.sources || []).filter((source) => (source.relatedLayers || []).includes(layer.layerCode))
           ]
             .filter(Boolean)
             .filter((source, sourceIndex, sources) => sources.findIndex((item) => item.id === source.id) === sourceIndex)
+            .filter((source) => sourceHasLayerSignal(source, layer, architectureItems))
             .slice(0, 5);
-          const architectureItems = architectureItemsByLayer.get(layer.layerCode) || [];
           const evidenceText = layerEvidenceText(layer, layerSources);
           const filledEntries = Object.entries(layer.filledFields || {});
           const missingFields = layer.missingFields || [];

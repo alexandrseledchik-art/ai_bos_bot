@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import { ConsultantWebService } from "../application/consultant-web-service.js";
+import { detectConsultantLayersForText } from "../application/company-analysis-core.js";
 import { emptyState } from "../domain/entities.js";
 import { GoogleDriveClient } from "../infrastructure/google/google-drive-client.js";
 import { PublicGoogleLinkReader } from "../infrastructure/google/public-google-link-reader.js";
@@ -176,6 +177,8 @@ class FakeRootFolderGoogleDriveClient extends GoogleDriveClient {
 }
 
 async function main() {
+  assert.equal(detectConsultantLayersForText("Отрасль: Управленческий консалтинг").includes("governance"), false);
+
   const store = new InMemoryStore();
   const service = new ConsultantWebService({
     store,

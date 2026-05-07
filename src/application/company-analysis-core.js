@@ -156,6 +156,10 @@ function sourceToText(source) {
   ].filter(Boolean).join("\n");
 }
 
+function shouldPreserveRelatedLayers(source) {
+  return source.type === "deep_diagnostic" || Boolean(source.sourceMeta?.deepDiagnostic);
+}
+
 function buildCompanyContextSource(company) {
   const parts = [
     company.description ? `Описание: ${company.description}` : "",
@@ -711,8 +715,8 @@ export class CompanyAnalysisCore {
     const sources = companyContextSource ? [companyContextSource, ...storedSources] : storedSources;
 
     for (const source of storedSources) {
-      source.relatedLayers = source.relatedLayers?.length
-        ? source.relatedLayers
+      source.relatedLayers = shouldPreserveRelatedLayers(source)
+        ? (source.relatedLayers || [])
         : detectLayersForText(sourceToText(source));
       source.aiSummary = source.aiSummary || compactSnippet(source.contentText, 260);
       source.processingStatus = source.processingStatus || "processed";
