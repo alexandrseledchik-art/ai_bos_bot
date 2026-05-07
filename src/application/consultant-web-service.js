@@ -406,7 +406,7 @@ export class ConsultantWebService {
         };
       }
 
-      const { companyFolder, files } = await this.googleDrive.listCompanyFiles(company.name);
+      const { companyFolder, files, usedRootFolder = false } = await this.googleDrive.listCompanyFiles(company.name);
       if (!companyFolder) {
         return {
           company: companySummary(state, company),
@@ -418,7 +418,8 @@ export class ConsultantWebService {
             expectedFolderName: company.name,
             syncedCount: 0,
             readableCount: 0,
-            unsupported: []
+            unsupported: [],
+            usedRootFolder: false
           }
         };
       }
@@ -483,6 +484,7 @@ export class ConsultantWebService {
         googleDrive: {
           ok: true,
           folderName: companyFolder.name || "",
+          usedRootFolder,
           syncedCount,
           readableCount,
           unsupported

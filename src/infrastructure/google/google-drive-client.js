@@ -38,6 +38,21 @@ function normalizeName(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function namesMatch(left, right) {
+  const normalizedLeft = normalizeName(left);
+  const normalizedRight = normalizeName(right);
+
+  return Boolean(
+    normalizedLeft &&
+    normalizedRight &&
+    (
+      normalizedLeft === normalizedRight ||
+      normalizedLeft.includes(normalizedRight) ||
+      normalizedRight.includes(normalizedLeft)
+    )
+  );
+}
+
 function compactText(value, maxChars) {
   const text = String(value || "").trim();
   if (!maxChars || text.length <= maxChars) {
@@ -185,25 +200,42 @@ export class GoogleDriveClient {
     return files;
   }
 
+  async getFileMetadata(fileId = this.rootFolderId) {
+    this.assertEnabled();
+    const response = await this.request(`/files/${encodeURIComponent(fileId)}`, {
+      query: {
+        fields: "id,name,mimeType,webViewLink,modifiedTime"
+      }
+    });
+
+    return response.json();
+  }
+
   async findCompanyFolder(companyName) {
     const files = await this.listFilesInFolder(this.rootFolderId);
     const folders = files.filter(isFolder);
-    const normalizedCompanyName = normalizeName(companyName);
 
-    return folders.find((folder) => normalizeName(folder.name) === normalizedCompanyName) ||
-      folders.find((folder) => {
-        const folderName = normalizeName(folder.name);
-        return folderName.includes(normalizedCompanyName) || normalizedCompanyName.includes(folderName);
-      }) ||
+    return folders.find((folder) => namesMatch(folder.name, companyName)) ||
       null;
   }
 
   async listCompanyFiles(companyName) {
     const companyFolder = await this.findCompanyFolder(companyName);
     if (!companyFolder) {
+      const rootFolder = await this.getFileMetadata(this.rootFolderId);
+      if (isFolder(rootFolder) && namesMatch(rootFolder.name, companyName)) {
+        const files = (await this.listFilesInFolder(rootFolder.id)).filter((file) => !isFolder(file));
+        return {
+          companyFolder: rootFolder,
+          files,
+          usedRootFolder: true
+        };
+      }
+
       return {
         companyFolder: null,
-        files: []
+        files: [],
+        usedRootFolder: false
       };
     }
 
@@ -211,7 +243,8 @@ export class GoogleDriveClient {
 
     return {
       companyFolder,
-      files
+      files,
+      usedRootFolder: false
     };
   }
 

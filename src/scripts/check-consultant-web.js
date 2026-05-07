@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import { ConsultantWebService } from "../application/consultant-web-service.js";
 import { emptyState } from "../domain/entities.js";
+import { GoogleDriveClient } from "../infrastructure/google/google-drive-client.js";
 
 class InMemoryStore {
   constructor() {
@@ -88,6 +89,43 @@ class MockPublicGoogleLinkReader {
   }
 }
 
+class FakeRootFolderGoogleDriveClient extends GoogleDriveClient {
+  constructor() {
+    super({
+      serviceAccountEmail: "service@example.iam.gserviceaccount.com",
+      privateKey: "unused",
+      rootFolderId: "root_folder"
+    });
+  }
+
+  async request(pathname, { query = {} } = {}) {
+    if (pathname === "/files/root_folder") {
+      return Response.json({
+        id: "root_folder",
+        name: "Селедчик консалтинг",
+        mimeType: "application/vnd.google-apps.folder",
+        webViewLink: "https://drive.example/root_folder"
+      });
+    }
+
+    if (pathname === "/files" && String(query.q || "").includes("'root_folder' in parents")) {
+      return Response.json({
+        files: [
+          {
+            id: "vision_doc",
+            name: "Видение и икигай",
+            mimeType: "application/vnd.google-apps.document",
+            webViewLink: "https://drive.example/vision_doc",
+            modifiedTime: "2026-05-02T10:00:00.000Z"
+          }
+        ]
+      });
+    }
+
+    throw new Error(`Unexpected fake Drive request: ${pathname}`);
+  }
+}
+
 async function main() {
   const store = new InMemoryStore();
   const service = new ConsultantWebService({
@@ -123,14 +161,28 @@ async function main() {
   assert.equal(publicGoogleSource.source.processingStatus, "processed");
   assert.match(publicGoogleSource.source.contentText, /Публичная заметка/);
 
+  const visionSource = await service.addSource(created.company.id, {
+    type: "document",
+    title: "Видение и икигай",
+    contentText: "Видение собственника: построить консультационный продукт, где икигай соединяет ценность для рынка, сильные стороны и устойчивую стратегию роста."
+  });
+  assert.ok(visionSource.source.relatedLayers.includes("owner_context"));
+  assert.ok(visionSource.source.relatedLayers.includes("strategy"));
+
   const analyzed = await service.analyzeCompany(created.company.id);
   assert.equal(analyzed.layerAnalyses.length, 11);
   assert.equal(analyzed.toolResults.length, 11);
   assert.ok(analyzed.analysis.nextStep.title);
   assert.ok(analyzed.analysis.diagnosticQuality?.score10 >= 8);
+  assert.ok(
+    analyzed.layerAnalyses.some((layer) =>
+      layer.layerCode === "owner_context" &&
+      layer.sourceIds.includes(visionSource.source.id)
+    )
+  );
 
   const detail = await service.getCompany(created.company.id);
-  assert.equal(detail.sources.length, 3);
+  assert.equal(detail.sources.length, 4);
   assert.ok(detail.analysis.probableConstraint.title);
 
   const list = await service.listCompanies();
@@ -146,6 +198,12 @@ async function main() {
   assert.equal(driveSync.googleDrive.syncedCount, 2);
   assert.equal(driveSync.googleDrive.readableCount, 1);
   assert.equal(store.state.companySources.filter((item) => item.sourceOrigin === "google_drive").length, 2);
+
+  const rootDrive = new FakeRootFolderGoogleDriveClient();
+  const rootFiles = await rootDrive.listCompanyFiles("Селедчик консалтинг");
+  assert.equal(rootFiles.usedRootFolder, true);
+  assert.equal(rootFiles.companyFolder.name, "Селедчик консалтинг");
+  assert.equal(rootFiles.files[0].name, "Видение и икигай");
 
   const deleted = await service.deleteCompany(created.company.id);
   assert.equal(deleted.deletedCompany.id, created.company.id);

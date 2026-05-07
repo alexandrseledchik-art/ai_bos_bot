@@ -297,7 +297,7 @@ function renderIntegrations(detail) {
           <div class="section-head compact-head">
             <div>
               <h3>Google Drive</h3>
-              <p>Документы компании подтягиваются из папки с таким же названием, как компания.</p>
+              <p>Массовая синхронизация читает папку компании через service account. Быстрый вариант без интеграции — вставить публичную ссылку на отдельный Google Doc или Sheet в источники.</p>
             </div>
             <span class="pill ${driveReady ? "green" : "orange"}">${driveReady ? "подключён" : "не настроен"}</span>
           </div>
@@ -310,7 +310,8 @@ function renderIntegrations(detail) {
                 <button id="syncGoogleDriveButton" type="button">Синхронизировать Drive</button>
               </div>
             ` : `
-              <p>Чтобы включить, расшарь корневую папку с service account и добавь в Vercel env:</p>
+              <p><strong>Важно:</strong> доступ по ссылке или расшаривание папки само по себе не подключает интеграцию. Приложению нужен service account: его email, private key и id корневой папки в Vercel env.</p>
+              <p>Если нужно быстро добавить 1-2 файла, используй кнопку «Добавить источник» и вставь публичную ссылку на Google Doc / Sheet.</p>
               <div class="code-list">
                 ${(drive.setupRequired || []).map((item) => `<code>${escapeHtml(item)}</code>`).join("")}
               </div>
@@ -439,6 +440,7 @@ function renderDeepDiagnostic(detail) {
 
 function renderLayers(detail) {
   const rows = detail.layerAnalyses || [];
+  const sourceById = new Map((detail.sources || []).map((source) => [source.id, source]));
   return `
     <section class="content-section">
       <div class="section-head">
@@ -447,10 +449,15 @@ function renderLayers(detail) {
       <div class="stack">
         ${rows.length ? rows.map((layer) => {
           const percent = filledPercent(layer);
+          const layerSources = (layer.sourceIds || [])
+            .map((sourceId) => sourceById.get(sourceId))
+            .filter(Boolean)
+            .slice(0, 5);
           return `
             <article class="layer-row">
               <div>
-                <h4>${escapeHtml(layer.layerCode)}</h4>
+                <h4>${escapeHtml(layer.layerName || layer.layerCode)}</h4>
+                <span class="meta">${escapeHtml(layer.layerCode)}</span>
                 <span class="pill ${confidenceClass(layer.confidence)}">${escapeHtml(layer.confidence)}</span>
               </div>
               <div>
@@ -458,6 +465,15 @@ function renderLayers(detail) {
                 <ul class="split-list">
                   ${(layer.facts || []).slice(0, 2).map((fact) => `<li>${escapeHtml(fact)}</li>`).join("")}
                 </ul>
+                ${layerSources.length ? `
+                  <div class="source-link-list">
+                    <strong>Артефакты слоя:</strong>
+                    ${layerSources.map((source) => source.fileUrl
+                      ? `<a href="${escapeHtml(source.fileUrl)}" target="_blank" rel="noreferrer">${escapeHtml(source.title || source.fileUrl)}</a>`
+                      : `<span>${escapeHtml(source.title || "Источник")}</span>`
+                    ).join("")}
+                  </div>
+                ` : ""}
               </div>
               <div>
                 <span class="meta">${percent}%</span>
