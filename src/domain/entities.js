@@ -207,6 +207,7 @@ export function createCompanySource({
 export function createLayerAnalysis({
   companyId,
   layerCode,
+  layerName = "",
   facts = [],
   referenceModel = {},
   filledFields = {},
@@ -220,6 +221,7 @@ export function createLayerAnalysis({
     id: createId("layer_analysis"),
     companyId,
     layerCode,
+    layerName,
     facts,
     referenceModel,
     filledFields,

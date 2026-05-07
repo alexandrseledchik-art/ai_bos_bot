@@ -177,6 +177,7 @@ async function main() {
   assert.ok(
     analyzed.layerAnalyses.some((layer) =>
       layer.layerCode === "owner_context" &&
+      layer.layerName === "Контур собственника" &&
       layer.sourceIds.includes(visionSource.source.id)
     )
   );

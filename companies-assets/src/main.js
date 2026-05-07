@@ -19,6 +19,20 @@ const logoutButton = document.querySelector("#logoutButton");
 const refreshButton = document.querySelector("#refreshButton");
 const newCompanyButton = document.querySelector("#newCompanyButton");
 
+const LAYER_LABELS = {
+  owner_context: "Контур собственника",
+  external_environment: "Внешняя среда",
+  strategy: "Стратегия",
+  product: "Продукт",
+  commercial: "Коммерция",
+  operations: "Операции",
+  finance: "Финансы",
+  team: "Команда",
+  governance: "Управление",
+  technology: "Технологии",
+  data_analytics: "Данные и аналитика"
+};
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -50,6 +64,20 @@ function confidenceClass(value) {
     return "orange";
   }
   return "";
+}
+
+function confidenceLabel(value) {
+  if (value === "HIGH") {
+    return "достаточно фактов";
+  }
+  if (value === "MEDIUM") {
+    return "есть сигналы";
+  }
+  return "мало фактов";
+}
+
+function layerLabel(layer) {
+  return layer?.layerName || LAYER_LABELS[layer?.layerCode] || layer?.layerCode || "Слой";
 }
 
 function filledPercent(item) {
@@ -447,7 +475,7 @@ function renderLayers(detail) {
         <h3>11 слоёв</h3>
       </div>
       <div class="stack">
-        ${rows.length ? rows.map((layer) => {
+        ${rows.length ? rows.map((layer, index) => {
           const percent = filledPercent(layer);
           const layerSources = (layer.sourceIds || [])
             .map((sourceId) => sourceById.get(sourceId))
@@ -456,9 +484,9 @@ function renderLayers(detail) {
           return `
             <article class="layer-row">
               <div>
-                <h4>${escapeHtml(layer.layerName || layer.layerCode)}</h4>
-                <span class="meta">${escapeHtml(layer.layerCode)}</span>
-                <span class="pill ${confidenceClass(layer.confidence)}">${escapeHtml(layer.confidence)}</span>
+                <h4>${escapeHtml(layerLabel(layer))}</h4>
+                <span class="meta">Слой ${index + 1} из 11</span>
+                <span class="pill ${confidenceClass(layer.confidence)}">${escapeHtml(confidenceLabel(layer.confidence))}</span>
               </div>
               <div>
                 <p>${escapeHtml((layer.conclusions || [])[0] || "")}</p>
