@@ -9,6 +9,7 @@ import {
   CONSULTANT_TOOL_TEMPLATES
 } from "../domain/consultant-mvp-schema.js";
 import { analyzeDeepDiagnosticSources } from "./deep-diagnostic-analyzer.js";
+import { assessDiagnosticExcellence } from "./diagnostic-excellence-assessor.js";
 
 const CONFIDENCE_ORDER = {
   LOW: 1,
@@ -59,6 +60,43 @@ const EXPLICIT_UPPER_FRAME_SIGNALS = [
   "не выбрала точную модель роста",
   "не выбран фокус",
   "прибыльный и управляемый поток"
+];
+
+const SOLUTION_FIRST_SIGNALS = [
+  "нужна crm",
+  "нужен crm",
+  "внедрить crm",
+  "настроить crm",
+  "купить crm",
+  "нужен raci",
+  "нужна матрица ответственности",
+  "нужно нанять",
+  "нужен продавец",
+  "нужен маркетолог",
+  "нужен операционный директор",
+  "нужен регламент",
+  "нужен дашборд"
+];
+
+const PROBLEM_CONTEXT_SIGNALS = [
+  "падает",
+  "не успе",
+  "теря",
+  "нет продаж",
+  "мало продаж",
+  "прибыл",
+  "кассов",
+  "разрыв",
+  "марж",
+  "застр",
+  "хаос",
+  "конфликт",
+  "не хватает",
+  "не понятно",
+  "непонятно",
+  "сбой",
+  "ручн",
+  "перегруз"
 ];
 
 function cleanText(value) {
@@ -292,6 +330,54 @@ function detectUpperFramePriority({ companyText, layerAnalyses }) {
   );
 }
 
+function detectSolutionFirstPriority(companyText) {
+  const hasSolution = hasAnyTextSignal(companyText, SOLUTION_FIRST_SIGNALS);
+  const hasProblemContext = hasAnyTextSignal(companyText, PROBLEM_CONTEXT_SIGNALS);
+
+  return hasSolution && !hasProblemContext;
+}
+
+function buildSolutionFirstConstraint(companyText) {
+  const mentionsCrm = hasAnyTextSignal(companyText, ["crm"]);
+  const toolName = mentionsCrm ? "CRM" : "инструмент";
+
+  return {
+    layer: "",
+    layerName: "Проблема за предложенным решением",
+    title: `Сначала нужно определить проблему за запросом на ${toolName}`,
+    explanation: `Запрос звучит как готовое решение, а не как диагностированная причина. Этот инструмент может быть полезен, но сначала нужно понять, какой разрыв он должен закрыть: качество лидов, обработку заявок, передачу ответственности, контроль, данные или управленческий ритм.`,
+    cause: "Пока не доказано, какой управленческий или процессный разрыв стоит за предложенным решением.",
+    effects: [
+      "можно автоматизировать хаос вместо процесса",
+      "можно потратить ресурс на инструмент, который не меняет ограничение",
+      "можно закрепить неправильную логику продаж, операций или контроля"
+    ],
+    confidence: "LOW",
+    mode: "solution_first",
+    missingForHigh: [
+      "какую проблему должен решить инструмент",
+      "где сейчас теряется результат",
+      "какой процесс или решение должен поддержать инструмент",
+      "какой факт покажет, что проблема действительно в инструменте"
+    ],
+    relatedLayers: [
+      { layer: "commercial", layerName: "Коммерция", confidence: "LOW", missingFields: ["критерии качественного лида", "путь клиента до покупки"] },
+      { layer: "operations", layerName: "Операции", confidence: "LOW", missingFields: ["целевой процесс", "этапы"] },
+      { layer: "governance", layerName: "Управление", confidence: "LOW", missingFields: ["кто принимает решения", "кто отвечает за результат"] },
+      { layer: "technology", layerName: "Технологии", confidence: "LOW", missingFields: ["целевая архитектура инструментов"] },
+      { layer: "data_analytics", layerName: "Данные и аналитика", confidence: "LOW", missingFields: ["ключевые метрики", "источники данных"] }
+    ],
+    rejectedAlternatives: [
+      {
+        layer: "technology",
+        layerName: "Технологии",
+        reason: `Пока рано считать корнем сами технологии: сначала нужно доказать, что ${toolName} закрывает реальный разрыв, а не просто переносит хаос в систему.`
+      }
+    ],
+    parallelActions: []
+  };
+}
+
 function buildParallelActions({ layerAnalyses, companyText }) {
   const text = normalizeText(companyText);
   const actions = [];
@@ -392,6 +478,27 @@ function buildRejectedAlternatives(layerAnalyses) {
     .slice(0, 4);
 }
 
+function buildGeneralRejectedAlternatives(primary, alternatives = []) {
+  return alternatives
+    .filter((item) => item.layerCode !== primary.layerCode)
+    .map((item) => ({
+      layer: item.layerCode,
+      layerName: item.layerName,
+      score: item.score,
+      reason: `Слой "${item.layerName}" остаётся альтернативной версией, но сейчас объясняет запрос слабее: меньше прямых сигналов, ниже уверенность или меньше связи с текущей целью.`
+    }));
+}
+
+function buildGeneralRelatedLayers(primary, alternatives = []) {
+  return [primary, ...alternatives].map((item) => ({
+    layer: item.layerCode,
+    layerName: item.layerName,
+    confidence: item.confidence,
+    factsCount: (item.facts || []).length,
+    missingFields: item.missingFields || []
+  }));
+}
+
 function buildUpperFrameConstraint({ companyText, layerAnalyses }) {
   const upperLayers = layersByCode(layerAnalyses, UPPER_FRAME_LAYER_CODES);
   const parallelActions = buildParallelActions({ layerAnalyses, companyText });
@@ -463,6 +570,10 @@ function selectConstraint({ company, sources, layerAnalyses }) {
     ...sources.map((source) => sourceToText(source))
   ].join("\n");
 
+  if (detectSolutionFirstPriority(companyText)) {
+    return buildSolutionFirstConstraint(companyText);
+  }
+
   if (detectUpperFramePriority({ companyText, layerAnalyses })) {
     return buildUpperFrameConstraint({ companyText, layerAnalyses });
   }
@@ -495,6 +606,11 @@ function selectConstraint({ company, sources, layerAnalyses }) {
   }
 
   const alternatives = ranked.slice(1, 3).filter((item) => item.score > 1);
+  const rejectedAlternatives = buildGeneralRejectedAlternatives(primary, alternatives);
+  const relatedLayers = buildGeneralRelatedLayers(primary, alternatives);
+  const safeParallelActions = buildParallelActions({ layerAnalyses, companyText })
+    .filter((action) => action.layer !== primary.layerCode)
+    .slice(0, 3);
   const explanation = [
     `Сильнее всего с текущим запросом связан слой "${primary.layerName}".`,
     primary.facts.length ? `В данных есть прямые сигналы: ${primary.facts.slice(0, 2).join("; ")}.` : "",
@@ -513,6 +629,10 @@ function selectConstraint({ company, sources, layerAnalyses }) {
       : `Факты указывают, что разрыв может находиться в самом прохождении потока через этот слой.`,
     effects: primary.gaps.slice(0, 3),
     confidence: primary.confidence,
+    mode: "layer_hypothesis",
+    relatedLayers,
+    rejectedAlternatives,
+    parallelActions: safeParallelActions,
     missingForHigh: primary.confidence === "HIGH"
       ? []
       : [
@@ -524,6 +644,16 @@ function selectConstraint({ company, sources, layerAnalyses }) {
 }
 
 function buildNextStep(constraint) {
+  if (constraint.mode === "solution_first") {
+    return {
+      title: "Разобрать 5 последних ситуаций, где инструмент должен был бы помочь.",
+      description: "Выписать для каждой ситуации: что произошло, где потерялся результат, кто участвовал, какая информация была нужна и какое решение не было принято вовремя.",
+      why: "Это покажет, проблема действительно в инструменте или выше: в процессе, ответственности, данных, критериях качества потока или управлении.",
+      expectedResult: "Станет понятно, какой разрыв нужно закрыть и нужен ли для этого именно инструмент.",
+      successCriteria: "Есть 5 примеров с понятным местом потери результата и предварительным выводом: технология, процесс, ответственность, данные или коммерция."
+    };
+  }
+
   if (constraint.mode === "upper_frame") {
     return {
       title: "Собрать рамку собственник-рынок: цель собственника и карту 5-7 сегментов рынка.",
@@ -676,6 +806,12 @@ export class CompanyAnalysisCore {
       diagnosticChain,
       deepDiagnostic,
       sourceIds: storedSources.map((source) => source.id)
+    });
+    analysis.diagnosticQuality = assessDiagnosticExcellence({
+      company,
+      sources,
+      layerAnalyses,
+      analysis
     });
 
     state.layerAnalyses = [

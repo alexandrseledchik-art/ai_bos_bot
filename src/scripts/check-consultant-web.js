@@ -43,6 +43,7 @@ async function main() {
   assert.equal(analyzed.layerAnalyses.length, 11);
   assert.equal(analyzed.toolResults.length, 11);
   assert.ok(analyzed.analysis.nextStep.title);
+  assert.ok(analyzed.analysis.diagnosticQuality?.score10 >= 8);
 
   const detail = await service.getCompany(created.company.id);
   assert.equal(detail.sources.length, 2);

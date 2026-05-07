@@ -160,6 +160,7 @@ function renderOverview(detail) {
   const constraint = analysis?.probableConstraint || company.probableConstraint || {};
   const nextStep = analysis?.nextStep || company.nextStep || {};
   const parallelActions = analysis?.parallelActions || constraint.parallelActions || [];
+  const diagnosticQuality = analysis?.diagnosticQuality || {};
   const layerSummary = analysis?.layerSummary || [];
   const avgFilled = layerSummary.length
     ? Math.round(layerSummary.reduce((sum, item) => sum + filledPercent(item), 0) / layerSummary.length)
@@ -212,6 +213,7 @@ function renderOverview(detail) {
         <h3>Вывод AI-BOSS</h3>
         <div class="pill-row">
           <span class="pill ${confidenceClass(analysis?.confidence)}">${escapeHtml(analysis?.confidence || "без анализа")}</span>
+          ${diagnosticQuality.score10 != null ? `<span class="pill green">логика диагностики: ${escapeHtml(diagnosticQuality.score10)}/10</span>` : ""}
           <span class="pill">${escapeHtml(formatDate(analysis?.createdAt || company.lastAnalysisAt))}</span>
         </div>
       </div>
@@ -226,6 +228,14 @@ function renderOverview(detail) {
           ${nextStep.why ? `<p><strong>Зачем:</strong> ${escapeHtml(nextStep.why)}</p>` : ""}
         </article>
       </div>
+      ${diagnosticQuality.missing?.length ? `
+        <article class="card">
+          <h3>Что мешает диагностике быть 10/10</h3>
+          <ul class="split-list">
+            ${diagnosticQuality.missing.slice(0, 4).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+          </ul>
+        </article>
+      ` : ""}
       ${parallelActions.length ? `
         <article class="card">
           <h3>Что можно делать параллельно</h3>

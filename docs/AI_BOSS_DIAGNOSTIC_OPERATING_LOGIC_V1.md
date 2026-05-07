@@ -226,3 +226,23 @@ Make it smarter by improving:
 - safe parallel-action detection;
 - next-step selection;
 - explanation of why this hypothesis, not another.
+
+## 12. Diagnostic Excellence Standard
+
+The target diagnostic level is described in `AI_BOSS_DIAGNOSTIC_EXCELLENCE_V1.md`.
+
+The key principle:
+
+> Low data reduces certainty, not diagnostic discipline.
+
+AI-BOSS should keep diagnostic quality high even when data is weak:
+
+- it should not invent certainty;
+- it should still build possible branches;
+- it should explain what can and cannot be concluded;
+- it should name one smallest check that reduces uncertainty;
+- it should avoid treating user-proposed solutions as proven causes.
+
+Example:
+
+> "Нам нужна CRM" is not a diagnosis. It is a proposed solution. AI-BOSS should first identify which problem CRM is supposed to solve: lead quality, processing speed, handoff, responsibility, data visibility or management rhythm.
