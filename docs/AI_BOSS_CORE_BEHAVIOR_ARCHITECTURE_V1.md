@@ -343,7 +343,7 @@ Important:
 
 - `schemaVersion` protects old snapshots from future field changes;
 - `createdAt` makes the decision object usable for history, sorting and review;
-- `reviewStatus` powers admin workflow: `not_reviewed`, `reviewed`, `needs_improvement`, `accepted`, `rejected`;
+- `reviewStatus` powers admin workflow: `not_reviewed`, `auto_reviewed`, `reviewed`, `needs_improvement`, `accepted`, `rejected`;
 - `improvementProposalIds` links the answer to future improvement proposals;
 - `reasonCodes` explain why the orchestrator selected a mode without exposing chain-of-thought;
 - `userFacingSummary` is safe to show in admin review;
@@ -455,7 +455,13 @@ Command:
 
 The next product layer should not be another prompt rewrite.
 
-It should be an admin review loop over decision objects:
+It should be a separate admin review loop over decision objects.
+
+Specification:
+
+- `AI_BOSS_ADMIN_REVIEW_LOOP_V1.md`
+
+Core flow:
 
 ```
 decision objects
