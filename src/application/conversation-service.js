@@ -17,6 +17,7 @@ import {
   emptyEntryState,
   nowIso
 } from "../domain/entities.js";
+import { AIBossModeOrchestrator } from "./ai-boss-mode-orchestrator.js";
 import { classifyInput } from "./classify-input.js";
 import { checkIntentIntegrity } from "./intent-integrity-checker.js";
 import { extractObservations } from "./observation-extractor.js";
@@ -650,6 +651,7 @@ export class ConversationService {
     this.reasoner = reasoner;
     this.screener = screener;
     this.maxHistoryMessages = maxHistoryMessages;
+    this.modeOrchestrator = new AIBossModeOrchestrator();
     this.consultantTelegramMode = new ConsultantTelegramMode({ googleDrive });
   }
 
@@ -810,10 +812,16 @@ export class ConversationService {
       context.referenceGate = referenceGate;
       context.autonomousData = autonomousData;
       context.dataSufficiency = dataSufficiency;
+      context.orchestration = this.modeOrchestrator.orchestrate({ context });
 
       let decision = await this.reasoner.decide(context);
       decision = applyGuardrails(decision, context);
       decision.diagnosticQuality = assessChatDiagnosticExcellence({ decision, context });
+      decision.orchestration = this.modeOrchestrator.orchestrate({
+        context,
+        decision,
+        diagnosticQuality: decision.diagnosticQuality
+      });
 
       const userMessage = createMessage({
         threadId: thread.id,
@@ -868,6 +876,12 @@ export class ConversationService {
       if (activeCase) {
         persistExtractedObservations({ state, activeCase, userMessage, extracted });
         persistedMemory = buildPersistedMemory(decision);
+        decision.decisionObject = this.modeOrchestrator.buildDecisionObject({
+          context,
+          decision,
+          activeCase,
+          company
+        });
 
         activeCase.mode = decision.selectedMode;
         activeCase.summary = decision.response.whatIUnderstood;
@@ -996,7 +1010,8 @@ export class ConversationService {
             knownFacts: decision.guardrails.knownFacts,
             observations: decision.guardrails.observations,
             workingHypotheses: decision.guardrails.workingHypotheses,
-            graphSnapshot: decision.graphAnalysis || graphPacket
+            graphSnapshot: decision.graphAnalysis || graphPacket,
+            decisionObject: decision.decisionObject
           })
         );
 
@@ -1039,7 +1054,8 @@ export class ConversationService {
         artifactSaved: Boolean(artifactPath),
         entryStateAfterMerge: thread.entryState,
         graphPacket,
-        persistedMemory
+        persistedMemory,
+        decisionObject: decision.decisionObject || null
       };
       const miniAppInvite = buildMiniAppInvite({
         classification,

@@ -1,0 +1,548 @@
+function normalizeText(value) {
+  return String(value || "").trim();
+}
+
+function lowerText(value) {
+  return normalizeText(value).toLowerCase();
+}
+
+function includesAny(text, patterns = []) {
+  return patterns.some((pattern) => pattern.test(text));
+}
+
+function confidenceToDataLevel(value) {
+  const normalized = normalizeText(value).toUpperCase();
+  if (normalized === "HIGH") {
+    return "high";
+  }
+  if (normalized === "MEDIUM") {
+    return "medium";
+  }
+  return "low";
+}
+
+function collectContextText(context = {}, decision = {}) {
+  const entryState = decision.entryState || context.entryState || {};
+  return lowerText([
+    context.userText,
+    context.classification?.cleanText,
+    context.intentIntegrity?.proposedSolution,
+    context.intentIntegrity?.reason,
+    context.dataSufficiency?.reason,
+    context.referenceGate?.userFacingNote,
+    decision.response?.whatIUnderstood,
+    decision.response?.whyItMatters,
+    decision.response?.nextStep,
+    decision.response?.responseText,
+    entryState.claimedProblem,
+    entryState.claimedCause,
+    entryState.selectedConstraint,
+    entryState.nextBestStep,
+    entryState.nextBestQuestion,
+    ...(entryState.symptoms || []),
+    ...((entryState.candidateConstraints || []).map((item) => item?.label))
+  ].join(" "));
+}
+
+function inferBusinessStateMode(context = {}, decision = {}) {
+  const text = collectContextText(context, decision);
+  const integrityType = context.intentIntegrity?.integrityType || "";
+
+  if (
+    integrityType === "urgent_problem" ||
+    includesAny(text, [
+      /кассов[а-яё]+\s+разрыв/,
+      /ден[её]г\s+хватит\s+на/,
+      /деньги\s+заканч/,
+      /не\s+чем\s+платить/,
+      /зарплат[ау]\s+не\s+можем/,
+      /кризис|паник|срочн|выжить/
+    ])
+  ) {
+    return {
+      mode: "crisis",
+      confidence: "HIGH",
+      reason: "Есть срочный риск денег, обязательств или управляемости; приоритет — сохранить время и варианты решений."
+    };
+  }
+
+  if (
+    includesAny(text, [
+      /продать\s+бизнес/,
+      /подготов.*к\s+продаж[еуы]/,
+      /выход\s+из\s+бизнес/,
+      /выйти\s+из\s+операцион/,
+      /оценк[аи]\s+бизнес/,
+      /покупател|инвестор|exit/
+    ])
+  ) {
+    return {
+      mode: "exit_preparation",
+      confidence: "HIGH",
+      reason: "Запрос связан с продажей, выходом собственника или повышением переносимости бизнеса."
+    };
+  }
+
+  if (
+    integrityType === "strategic_intent" ||
+    includesAny(text, [
+      /нов[а-яё]+\s+ниш/,
+      /нов[а-яё]+\s+рынок/,
+      /нов[а-яё]+\s+сегмент/,
+      /сменить\s+направлен/,
+      /pivot|пивот/,
+      /пересобрать\s+модель/,
+      /нов[а-яё]+\s+стратег/
+    ])
+  ) {
+    return {
+      mode: "rebuild",
+      confidence: "MEDIUM",
+      reason: "Запрос похож на выбор или пересборку игры: сначала проверяется верхняя рамка, рынок и стратегический выбор."
+    };
+  }
+
+  if (
+    includesAny(text, [
+      /рост|масштаб/,
+      /выручк[а-яё]+\s+раст/,
+      /лидов\s+много/,
+      /заяв[а-яё]+\s+много/,
+      /больше\s+клиент/,
+      /не\s+выдерживает\s+рост/,
+      /команд[а-яё]+\s+не\s+тян/
+    ])
+  ) {
+    return {
+      mode: "growth",
+      confidence: "MEDIUM",
+      reason: "Есть сигнал роста или потока, который начинает упираться в качество, мощность, экономику или управляемость."
+    };
+  }
+
+  if (
+    includesAny(text, [
+      /хаос|пожар|ручн/,
+      /роль|ответствен/,
+      /процесс|регламент|операц/,
+      /управляем|контрол|ритм/,
+      /прибыл|марж|выручк|деньг/,
+      /crm|дашборд|отч[её]т|данн/,
+      /теря[ею]тся|завис|не\s+успева/
+    ])
+  ) {
+    return {
+      mode: "stabilization",
+      confidence: "MEDIUM",
+      reason: "Сигнал похож на восстановление контроля: роли, процесс, данные, управленческий ритм или передача ответственности."
+    };
+  }
+
+  return {
+    mode: "unknown",
+    confidence: "LOW",
+    reason: "Бизнес-состояние пока не различено; нужен один факт о цели, срочности или текущем режиме компании."
+  };
+}
+
+function inferOperatingMode(context = {}, decision = {}) {
+  const text = collectContextText(context, decision);
+  const userText = lowerText([
+    context.userText,
+    context.classification?.cleanText
+  ].join(" "));
+  const entryMode = context.classification?.entryMode || "";
+  const routeType = context.classification?.type || "";
+  const integrityType = context.intentIntegrity?.integrityType || "";
+  const action = decision.decision?.action || "";
+
+  if (
+    entryMode === "meta_role" ||
+    includesAny(text, [
+      /как\s+работа[её]т\s+метод/,
+      /объясни\s+метод/,
+      /что\s+такое/,
+      /кто\s+ты/,
+      /как\s+ты\s+анализиру/
+    ])
+  ) {
+    return {
+      mode: "methodology_expert",
+      reason: "Пользователь спрашивает о смысле, роли, методологии или понятии."
+    };
+  }
+
+  if (
+    includesAny(userText, [
+      /кто\s+делает/,
+      /кто\s+ответствен/,
+      /статус/,
+      /дедлайн|срок/,
+      /уже\s+сделал/,
+      /беру\s+в\s+работу/,
+      /назначить|исполнител/
+    ])
+  ) {
+    return {
+      mode: "execution_coordinator",
+      reason: "Запрос относится к исполнению, владельцу действия, статусу или контролю результата."
+    };
+  }
+
+  if (
+    includesAny(text, [
+      /стратегическ[а-яё]+\s+ревиз/,
+      /правильн[а-яё]+\s+игр/,
+      /куда\s+движ/,
+      /выбор\s+направлен/,
+      /продать\s+бизнес/,
+      /продаж[аеуы]\s+бизнес/,
+      /бизнес.*продаж[аеуы]/,
+      /выход\s+из\s+операц/,
+      /переносим/
+    ])
+  ) {
+    return {
+      mode: "strategic_reviewer",
+      reason: "Запрос требует проверки верхней рамки, направления, игры или переносимости бизнеса."
+    };
+  }
+
+  if (
+    integrityType === "urgent_problem" ||
+    integrityType === "strategic_intent" ||
+    includesAny(text, [
+      /какой\s+путь\s+выбрать/,
+      /что\s+приоритет/,
+      /риск/,
+      /решени[ея]\s+собственник/,
+      /цена\s+ошибк/,
+      /необратим/
+    ])
+  ) {
+    return {
+      mode: "ceo_mode",
+      reason: "Нужна управленческая развилка, оценка риска, приоритет или собственническое решение."
+    };
+  }
+
+  if (routeType === "free_text_problem" || action === "diagnose" || action === "clarify") {
+    return {
+      mode: "diagnostician",
+      reason: "Пользователь принёс бизнес-сигнал; нужно отделить симптом от причины и выбрать следующий диагностический ход."
+    };
+  }
+
+  if (
+    entryMode === "tool_discovery" ||
+    entryMode === "specific_tool_request" ||
+    integrityType === "light_task" ||
+    action === "answer"
+  ) {
+    return {
+      mode: "advisor",
+      reason: "Можно дать практичную рекомендацию, объяснение инструмента или один следующий ход без тяжёлого цикла."
+    };
+  }
+
+  return {
+    mode: "methodology_expert",
+    reason: "По умолчанию безопаснее объяснить рамку и не запускать тяжёлый цикл без сигнала."
+  };
+}
+
+function inferTimeHorizon({ businessStateMode = "unknown", text = "", action = "" }) {
+  if (
+    businessStateMode === "crisis" ||
+    includesAny(text, [/сегодня|завтра|недел|кассов|срочн|быстро|немедлен/])
+  ) {
+    return "immediate";
+  }
+  if (includesAny(text, [/нанять|внедрить|перестроить|структур|crm|автоматиз|регламент/])) {
+    return "structural";
+  }
+  if (businessStateMode === "exit_preparation" || businessStateMode === "rebuild") {
+    return "strategic";
+  }
+  if (action === "clarify") {
+    return "immediate";
+  }
+  if (businessStateMode === "growth" || businessStateMode === "stabilization") {
+    return "tactical";
+  }
+  return "immediate";
+}
+
+function inferConstraintOwner({ text = "", entryState = {} }) {
+  const layerText = lowerText([
+    entryState.selectedConstraint,
+    ...((entryState.candidateConstraints || []).map((item) => item?.layer)),
+    ...(entryState.businessLayers || []),
+    text
+  ].join(" "));
+
+  if (/finance|финанс|прибыл|марж|касс|деньг/.test(layerText)) {
+    return {
+      owner: "собственник / финансы",
+      executor: "тот, кто может собрать сделки, расходы, маржу и кассовые данные"
+    };
+  }
+  if (/commercial|коммерц|продаж|лид|заяв|воронк|icp|клиент/.test(layerText)) {
+    return {
+      owner: "собственник / коммерческий владелец",
+      executor: "тот, кто видит источники, квалификацию, статусы и исходы заявок"
+    };
+  }
+  if (/operations|operating|операц|процесс|исполн|передач|срыв/.test(layerText)) {
+    return {
+      owner: "операционный владелец",
+      executor: "тот, кто может восстановить путь задачи, заказа или заявки по этапам"
+    };
+  }
+  if (/team|people|команд|роль|ответствен|нагруз/.test(layerText)) {
+    return {
+      owner: "собственник / руководитель функции",
+      executor: "тот, кто может разложить реальные задачи по ролям и владельцам результата"
+    };
+  }
+  if (/technology|data|аналит|данн|crm|отч[её]т/.test(layerText)) {
+    return {
+      owner: "владелец данных / операционный владелец",
+      executor: "тот, кто может показать источник данных, отчёт или текущий инструмент"
+    };
+  }
+  if (/owner_context|external_environment|strategy|стратег|рынок|собственник|сегмент/.test(layerText)) {
+    return {
+      owner: "собственник",
+      executor: "AI-BOSS может подготовить варианты, но выбор остаётся за собственником"
+    };
+  }
+
+  return {
+    owner: "собственник / владелец зоны",
+    executor: "тот, кто ближе всего к фактам по текущему потоку"
+  };
+}
+
+function inferMetric({ text = "", entryState = {} }) {
+  const haystack = lowerText([text, entryState.primaryFlow, entryState.constraintType].join(" "));
+
+  if (/касс|прибыл|марж|деньг|finance|cash/.test(haystack)) {
+    return "маржа, денежный эффект и причина потери денег по последним сделкам";
+  }
+  if (/лид|заяв|commercial|leads/.test(haystack)) {
+    return "доля целевых заявок, скорость первого ответа, статус и исход по последним входящим";
+  }
+  if (/операц|процесс|delivery|operations/.test(haystack)) {
+    return "место задержки, владелец этапа, срок и результат по последним случаям";
+  }
+  if (/роль|команд|team|people/.test(haystack)) {
+    return "понятность владельца результата, нагрузка и место пересечения ролей";
+  }
+  if (/стратег|рынок|сегмент|strategy|demand/.test(haystack)) {
+    return "ясность выбранного сегмента, ценности, отказов и критерия успеха";
+  }
+  return "факт, который подтверждает или ломает текущую рабочую гипотезу";
+}
+
+function horizonToDeadline(horizon) {
+  const mapping = {
+    immediate: "0-7 дней",
+    tactical: "1-6 недель",
+    structural: "1-6 месяцев",
+    strategic: "6-24 месяца"
+  };
+  return mapping[horizon] || "0-7 дней";
+}
+
+function horizonToReviewMoment(horizon) {
+  const mapping = {
+    immediate: "после сбора первого среза фактов",
+    tactical: "на ближайшем недельном управленческом разборе",
+    structural: "на контрольной точке пилота или внедрения",
+    strategic: "после проверки ключевой стратегической гипотезы"
+  };
+  return mapping[horizon] || "после первого проверочного шага";
+}
+
+function inferDecisionRights({ context = {}, businessStateMode = "unknown", operatingMode = "diagnostician", text = "" }) {
+  const integrityType = context.intentIntegrity?.integrityType || "";
+  const highRisk = businessStateMode === "crisis" ||
+    integrityType === "strategic_intent" ||
+    includesAny(text, [
+      /нанять|уволить/,
+      /изменить\s+процесс/,
+      /финансов[а-яё]+\s+обязательств/,
+      /публичн|репутац/,
+      /необратим/,
+      /автоматизировать|интеграц/,
+      /продать\s+бизнес|инвестор/
+    ]);
+
+  if (highRisk) {
+    return {
+      autonomyLevel: "HIGH_CONFIRMATION_REQUIRED",
+      requiresOwnerConfirmation: true,
+      reason: "Решение может затронуть риск, деньги, людей, публичность, стратегический выбор или необратимое действие."
+    };
+  }
+
+  if (operatingMode === "execution_coordinator" || operatingMode === "advisor") {
+    return {
+      autonomyLevel: "MEDIUM",
+      requiresOwnerConfirmation: false,
+      reason: "Можно рекомендовать следующий шаг, инструмент или безопасную параллельную работу без необратимого действия."
+    };
+  }
+
+  return {
+    autonomyLevel: "LOW",
+    requiresOwnerConfirmation: false,
+    reason: "Бот может строить гипотезы, отделять сигналы и предлагать проверку, но не должен сам менять систему."
+  };
+}
+
+export class AIBossModeOrchestrator {
+  orchestrate({ context = {}, decision = null, diagnosticQuality = null } = {}) {
+    const businessState = inferBusinessStateMode(context, decision || {});
+    const operating = inferOperatingMode(context, decision || {});
+    const dataConfidence = confidenceToDataLevel(context.dataSufficiency?.confidenceLevel);
+    const text = collectContextText(context, decision || {});
+    const action = decision?.decision?.action || "";
+    const timeHorizon = inferTimeHorizon({
+      businessStateMode: businessState.mode,
+      text,
+      action
+    });
+    const decisionRights = inferDecisionRights({
+      context,
+      businessStateMode: businessState.mode,
+      operatingMode: operating.mode,
+      text
+    });
+    const shouldAskOneQuestion = Boolean(
+      context.dataSufficiency?.shouldAskUser ||
+      context.referenceGate?.shouldBlockDiagnosis ||
+      context.intentIntegrity?.integrityType === "proposed_solution"
+    );
+    const canAnswerImmediately = Boolean(
+      context.intentIntegrity?.integrityType === "light_task" ||
+      context.dataSufficiency?.canMakeDecision ||
+      action === "answer" ||
+      action === "screen"
+    );
+    const needsDiagnosis = ["diagnostician", "ceo_mode", "strategic_reviewer"].includes(operating.mode) &&
+      !context.dataSufficiency?.canMakeDecision;
+    const needsExecutionContainer = Boolean(
+      decision &&
+      ["answer", "diagnose"].includes(action) &&
+      !shouldAskOneQuestion &&
+      operating.mode !== "methodology_expert"
+    );
+
+    return {
+      businessStateMode: businessState.mode,
+      businessStateConfidence: businessState.confidence,
+      businessStateReason: businessState.reason,
+      operatingMode: operating.mode,
+      operatingModeReason: operating.reason,
+      dataConfidence,
+      diagnosticQuality: diagnosticQuality?.score10 ?? decision?.diagnosticQuality?.score10 ?? null,
+      timeHorizon,
+      shouldAskOneQuestion,
+      canAnswerImmediately,
+      needsDiagnosis,
+      needsExecutionContainer,
+      decisionRights,
+      transition: needsExecutionContainer
+        ? "diagnosis_to_execution"
+        : shouldAskOneQuestion
+          ? "ask_one_question"
+          : canAnswerImmediately
+            ? "answer_now"
+            : "continue_diagnosis"
+    };
+  }
+
+  buildExecutionContainer({ context = {}, decision = {}, orchestration = {} } = {}) {
+    const entryState = decision.entryState || {};
+    const text = collectContextText(context, decision);
+    const ownership = inferConstraintOwner({ text, entryState });
+    const timeHorizon = orchestration.timeHorizon || inferTimeHorizon({
+      businessStateMode: orchestration.businessStateMode,
+      text,
+      action: decision.decision?.action
+    });
+
+    return {
+      owner: ownership.owner,
+      executor: ownership.executor,
+      timeHorizon,
+      deadline: horizonToDeadline(timeHorizon),
+      inputData: normalizeText(decision.response?.nextStep || entryState.nextBestStep || entryState.nextBestQuestion),
+      metric: inferMetric({ text, entryState }),
+      successCriteria: "получен факт, который подтверждает, ослабляет или меняет рабочую гипотезу",
+      failureCriteria: "факт не получен, данные противоречат версии или найдено более сильное объяснение",
+      reviewMoment: horizonToReviewMoment(timeHorizon)
+    };
+  }
+
+  buildDecisionObject({ context = {}, decision = {}, activeCase = null, company = null } = {}) {
+    const orchestration = decision.orchestration || this.orchestrate({
+      context,
+      decision,
+      diagnosticQuality: decision.diagnosticQuality
+    });
+    const entryState = decision.entryState || {};
+    const nextMove = normalizeText(decision.response?.nextStep || entryState.nextBestStep || entryState.nextBestQuestion);
+    const executionContainer = orchestration.needsExecutionContainer
+      ? this.buildExecutionContainer({ context, decision, orchestration })
+      : {
+          owner: "",
+          executor: "",
+          timeHorizon: orchestration.timeHorizon || "immediate",
+          deadline: "",
+          inputData: "",
+          metric: "",
+          successCriteria: "",
+          failureCriteria: "",
+          reviewMoment: ""
+        };
+
+    return {
+      companyId: company?.id || context.company?.id || "",
+      caseId: activeCase?.id || context.activeCase?.id || "",
+      businessStateMode: orchestration.businessStateMode,
+      businessStateConfidence: orchestration.businessStateConfidence,
+      operatingMode: orchestration.operatingMode,
+      dataConfidence: orchestration.dataConfidence,
+      diagnosticQuality: decision.diagnosticQuality?.score10 ?? orchestration.diagnosticQuality ?? null,
+      decisionRights: orchestration.decisionRights,
+      transition: orchestration.transition,
+      shouldAskOneQuestion: orchestration.shouldAskOneQuestion,
+      needsExecutionContainer: orchestration.needsExecutionContainer,
+      workingHypothesis: normalizeText(
+        entryState.selectedConstraint ||
+        decision.memory?.constraint ||
+        entryState.candidateConstraints?.[0]?.label ||
+        decision.response?.hypotheses?.[0] ||
+        ""
+      ),
+      nextMove,
+      executionContainer,
+      evidence: {
+        knownFacts: decision.guardrails?.knownFacts || [],
+        observations: decision.guardrails?.observations || [],
+        canNotAssert: decision.guardrails?.canNotAssert || []
+      },
+      reviewPolicy: {
+        reopenIf: [
+          "новые факты противоречат рабочей гипотезе",
+          "результат проверки не подтверждает версию",
+          "появилась более сильная гипотеза",
+          "данные оказались ненадёжными"
+        ]
+      }
+    };
+  }
+}

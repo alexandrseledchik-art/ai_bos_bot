@@ -451,7 +451,8 @@ export function createSnapshot({
   knownFacts,
   observations,
   workingHypotheses,
-  graphSnapshot = null
+  graphSnapshot = null,
+  decisionObject = null
 }) {
   return {
     id: createId("snapshot"),
@@ -464,6 +465,7 @@ export function createSnapshot({
     observations,
     workingHypotheses,
     graphSnapshot,
+    decisionObject,
     createdAt: nowIso()
   };
 }
