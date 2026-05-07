@@ -171,3 +171,35 @@ Every diagnostic improvement must be checked against benchmark cases:
 - "РОКС ЛОГИСТИК deep diagnostic"
 
 The benchmark should evaluate not whether AI-BOSS guessed the final answer, but whether it behaved like a 10/10 diagnostician.
+
+## 8. Chat Diagnostic Gate
+
+The same diagnostic bar applies to Telegram chat, not only to Web / company analysis.
+
+Every non-light diagnostic reply should be checked for:
+
+- input integrity;
+- evidence discipline;
+- layer orientation;
+- reference gate;
+- upper-frame protection;
+- alternative hypotheses;
+- cause/effect separation;
+- confidence calibration;
+- one next move;
+- parallel safety;
+- human surface quality.
+
+The chat score is stored on the decision as `diagnosticQuality`.
+
+The target behavior:
+
+> AI-BOSS may have LOW data confidence, but it should still keep HIGH diagnostic discipline.
+
+The current chat benchmark is:
+
+```bash
+npm run diagnostic:chat:excellence:check
+```
+
+This check verifies that AI-BOSS does not accept "we need CRM" as the root problem, does not jump from lead overload to hiring, and gives a concrete verification step for money, leads and team symptoms.

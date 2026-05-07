@@ -1332,15 +1332,69 @@ function buildDoubtSurfaceResponse(response, entryState) {
   ]);
 }
 
-function buildAnswerSurfaceResponse(response, entryState) {
+function answerSurfaceContextText(response, entryState, context) {
+  return ensureString([
+    context?.userText,
+    response?.whatIUnderstood,
+    response?.whyItMatters,
+    response?.nextStep,
+    entryState?.selectedConstraint,
+    entryState?.nextBestStep,
+    entryState?.nextBestQuestion,
+    ...((entryState?.candidateConstraints || []).map((item) => item?.label))
+  ].join(" ")).toLowerCase();
+}
+
+function sanitizeRawNextStep(value) {
+  const normalized = ensureString(value)
+    .replace(/^первый\s+шаг:\s*/i, "")
+    .replace(/^следующий\s+шаг:\s*/i, "")
+    .trim();
+
+  if (!normalized || /проверь\s+ограничение\s+["«]/i.test(normalized)) {
+    return "";
+  }
+
+  return ensureSentence(normalized);
+}
+
+function buildConcreteAnswerNextMove(response, entryState, context = {}) {
+  const text = answerSurfaceContextText(response, entryState, context);
+  const rawNextStep = sanitizeRawNextStep(response.nextStep || entryState.nextBestStep || entryState.nextBestQuestion);
+
+  if (/выручк|прибыл|марж|касс|деньг|юнит-эконом|финанс/.test(text)) {
+    return "Следующий ход один: собрать короткий срез по 5-10 последним сделкам: выручка, прямые расходы, маржа, источник клиента, срок оплаты и кассовый эффект. Это быстрее всего покажет, деньги теряются в цене, типе клиента, канале, исполнении или оплате.";
+  }
+
+  if (/лид|заяв|входящ|воронк|квалификац|продаж/.test(text)) {
+    return "Следующий ход один: разобрать последние 20 входящих заявок по источнику, типу клиента, качеству запроса, скорости первого ответа и исходу. Это отделит проблему спроса и квалификации от проблемы обработки внутри команды.";
+  }
+
+  if (/команд|люд|роль|ответствен|не\s+тян|перегруз|операц/.test(text)) {
+    return "Следующий ход один: взять 5 последних задач или заказов, где был срыв, и разложить по ролям: кто принял, кто отвечал за результат, где возникла задержка и кто должен был принять решение. Это покажет, проблема в людях, ролях, процессе или управлении.";
+  }
+
+  if (/стратег|рынок|сегмент|фокус|ниша|спрос|позиционир/.test(text)) {
+    return "Следующий ход один: зафиксировать один целевой сегмент, одну главную боль клиента и один критерий, по которому этот сегмент для нас прибыльный и управляемый. Без этого нижние улучшения могут чинить не ту игру.";
+  }
+
+  if (rawNextStep) {
+    return rawNextStep;
+  }
+
+  return "Следующий ход один: взять 3-5 последних реальных случаев, где результат потерялся, и восстановить путь от входа до денег. Это покажет, где симптом становится управленческим разрывом.";
+}
+
+function buildAnswerSurfaceResponse(response, entryState, context = {}) {
   const selectedConstraint = humanizeConstraintLabel(entryState.selectedConstraint);
   const firstParagraph = selectedConstraint
-    ? `${ensureSentence(response.whatIUnderstood)} Похоже, сейчас главный рычаг в том, что ${selectedConstraint}.`
+    ? `${ensureSentence(response.whatIUnderstood)} Рабочая версия сейчас такая: ${selectedConstraint}. Это не финальный диагноз, а версия, которую нужно быстро проверить фактами.`
     : ensureSentence(response.whatIUnderstood);
+  const nextMove = buildConcreteAnswerNextMove(response, entryState, context);
 
   return joinParagraphs([
     firstParagraph,
-    `${ensureSentence(response.whyItMatters)} ${ensureString(response.nextStep)}`
+    `${ensureSentence(response.whyItMatters)} ${nextMove}`
   ]);
 }
 
@@ -1533,7 +1587,7 @@ function buildSurfaceResponse(decision, context) {
   }
 
   if (action === "answer" || action === "diagnose") {
-    reply = buildAnswerSurfaceResponse(response, entryState);
+    reply = buildAnswerSurfaceResponse(response, entryState, context);
     return explainBusinessTerms(reply, context);
   }
 

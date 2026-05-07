@@ -24,6 +24,7 @@ import { analyzeWithGraph } from "./graph-reasoner.js";
 import { applyGuardrails } from "./guardrails.js";
 import { buildMiniAppInvite, createMiniAppInviteSnapshot } from "./mini-app-invite-policy.js";
 import { AutonomousDataCollector } from "./autonomous-data-collector.js";
+import { assessChatDiagnosticExcellence } from "./chat-diagnostic-excellence-assessor.js";
 import { ConsultantTelegramMode } from "./consultant-telegram-mode.js";
 import { DataSufficiencyChecker } from "./data-sufficiency-checker.js";
 import { ReferenceModelService } from "./reference-model-service.js";
@@ -812,6 +813,7 @@ export class ConversationService {
 
       let decision = await this.reasoner.decide(context);
       decision = applyGuardrails(decision, context);
+      decision.diagnosticQuality = assessChatDiagnosticExcellence({ decision, context });
 
       const userMessage = createMessage({
         threadId: thread.id,
