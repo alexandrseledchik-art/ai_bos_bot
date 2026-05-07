@@ -175,6 +175,7 @@ function renderOverview(detail) {
         </div>
         <div class="actions">
           <button class="secondary" id="editCompanyButton" type="button">Редактировать</button>
+          <button class="danger secondary" id="deleteCompanyButton" type="button">Удалить</button>
           <button id="analyzeButton" type="button">Проанализировать</button>
         </div>
       </div>
@@ -505,6 +506,7 @@ function renderDetail() {
 
   document.querySelector("#analyzeButton")?.addEventListener("click", analyzeSelectedCompany);
   document.querySelector("#editCompanyButton")?.addEventListener("click", () => openCompanyModal(detail.company));
+  document.querySelector("#deleteCompanyButton")?.addEventListener("click", deleteSelectedCompany);
   document.querySelector("#addSourceButton")?.addEventListener("click", openSourceModal);
   document.querySelector("#importDeepDiagnosticButton")?.addEventListener("click", importSelectedDeepDiagnostic);
 }
@@ -651,6 +653,36 @@ async function analyzeSelectedCompany() {
   await api(`/${encodeURIComponent(state.selectedCompanyId)}/analyze`, { method: "POST" });
   await loadCompanies();
   await openCompany(state.selectedCompanyId, { replaceRoute: true });
+}
+
+async function deleteSelectedCompany() {
+  const detail = state.selectedDetail;
+  const company = detail?.company;
+  if (!company?.id) {
+    return;
+  }
+
+  const confirmation = window.prompt(`Удалить компанию «${company.name}» и все связанные данные?\n\nЧтобы подтвердить, введи: УДАЛИТЬ`);
+  if (confirmation !== "УДАЛИТЬ") {
+    return;
+  }
+
+  try {
+    renderLoading("Удаляю компанию");
+    await api(`/${encodeURIComponent(company.id)}`, { method: "DELETE" });
+    state.selectedCompanyId = "";
+    state.selectedDetail = null;
+    setRoute("");
+    await loadCompanies();
+    const nextCompanyId = state.companies[0]?.id || "";
+    if (nextCompanyId) {
+      await openCompany(nextCompanyId);
+    } else {
+      renderEmpty();
+    }
+  } catch (error) {
+    renderError(error);
+  }
 }
 
 function fileToBase64(file) {

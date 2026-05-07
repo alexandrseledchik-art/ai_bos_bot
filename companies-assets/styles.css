@@ -64,9 +64,19 @@ button:disabled {
   border: 1px solid var(--line);
 }
 
+.danger {
+  color: #9a2c10;
+}
+
 .ghost:hover,
 .secondary:hover {
   background: var(--panel-soft);
+}
+
+.danger:hover {
+  border-color: #e3b5a5;
+  background: #fff3ee;
+  color: #7a210a;
 }
 
 .shell {

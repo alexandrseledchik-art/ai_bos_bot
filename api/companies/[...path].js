@@ -73,6 +73,10 @@ async function dispatch(request) {
       const payload = await readAdminJsonBody(request);
       return json({ ok: true, ...(await service.updateCompany(companyId, payload)) });
     }
+
+    if (request.method === "DELETE") {
+      return json({ ok: true, ...(await service.deleteCompany(companyId)) });
+    }
   }
 
   const sourceMatch = path.match(/^([^/]+)\/sources$/);

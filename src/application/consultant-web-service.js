@@ -66,6 +66,36 @@ function assertCompany(state, companyId) {
   return company;
 }
 
+function byCompanyId(companyId) {
+  return (item) => item?.companyId === companyId || item?.company_id === companyId;
+}
+
+function notByCompanyId(companyId) {
+  return (item) => !byCompanyId(companyId)(item);
+}
+
+function byCaseIds(caseIds) {
+  return (item) => caseIds.has(item?.caseId) || caseIds.has(item?.case_id);
+}
+
+function notByCaseIds(caseIds) {
+  return (item) => !byCaseIds(caseIds)(item);
+}
+
+function byThreadIds(threadIds) {
+  return (item) => threadIds.has(item?.threadId) || threadIds.has(item?.thread_id);
+}
+
+function notByThreadIds(threadIds) {
+  return (item) => !byThreadIds(threadIds)(item);
+}
+
+function filterStateArray(state, key, predicate) {
+  if (Array.isArray(state[key])) {
+    state[key] = state[key].filter(predicate);
+  }
+}
+
 function decodeBase64(value) {
   const raw = cleanText(value).replace(/^data:[^;]+;base64,/, "");
   if (!raw) {
@@ -189,6 +219,72 @@ export class ConsultantWebService {
 
       company.updatedAt = nowIso();
       return { company: companySummary(state, company) };
+    });
+  }
+
+  async deleteCompany(companyId) {
+    return this.store.update(async (state) => {
+      const company = assertCompany(state, companyId);
+      const companyCases = (state.cases || []).filter(byCompanyId(companyId));
+      const caseIds = new Set(companyCases.map((item) => item.id).filter(Boolean));
+      const companyThreads = (state.threads || []).filter(byCompanyId(companyId));
+      const threadIds = new Set(companyThreads.map((item) => item.id).filter(Boolean));
+      const diagnosticRuns = [
+        ...(state.diagnosticRuns || []),
+        ...(state.diagnostic_runs || [])
+      ].filter(byCompanyId(companyId));
+      const diagnosticRunIds = new Set(diagnosticRuns.map((item) => item.id).filter(Boolean));
+
+      filterStateArray(state, "companies", (item) => item.id !== companyId);
+      filterStateArray(state, "companySources", notByCompanyId(companyId));
+      filterStateArray(state, "layerAnalyses", notByCompanyId(companyId));
+      filterStateArray(state, "toolResults", notByCompanyId(companyId));
+      filterStateArray(state, "companyAnalyses", notByCompanyId(companyId));
+      filterStateArray(state, "companyProfiles", notByCompanyId(companyId));
+      filterStateArray(state, "company_profiles", notByCompanyId(companyId));
+      filterStateArray(state, "diagnosticRuns", notByCompanyId(companyId));
+      filterStateArray(state, "diagnostic_runs", notByCompanyId(companyId));
+
+      filterStateArray(state, "cases", notByCompanyId(companyId));
+      filterStateArray(state, "observations", notByCaseIds(caseIds));
+      filterStateArray(state, "goals", notByCaseIds(caseIds));
+      filterStateArray(state, "symptoms", notByCaseIds(caseIds));
+      filterStateArray(state, "hypotheses", notByCaseIds(caseIds));
+      filterStateArray(state, "constraints", notByCaseIds(caseIds));
+      filterStateArray(state, "situations", notByCaseIds(caseIds));
+      filterStateArray(state, "actionWaves", notByCaseIds(caseIds));
+      filterStateArray(state, "toolRecommendations", notByCaseIds(caseIds));
+      filterStateArray(state, "artifacts", notByCaseIds(caseIds));
+      filterStateArray(state, "snapshots", notByCaseIds(caseIds));
+
+      filterStateArray(state, "threads", notByCompanyId(companyId));
+      filterStateArray(state, "messages", notByThreadIds(threadIds));
+      filterStateArray(state, "diagnosticAnswers", (item) => !diagnosticRunIds.has(item?.diagnosticRunId) && !diagnosticRunIds.has(item?.diagnostic_run_id));
+      filterStateArray(state, "diagnostic_answers", (item) => !diagnosticRunIds.has(item?.diagnosticRunId) && !diagnosticRunIds.has(item?.diagnostic_run_id));
+
+      for (const context of state.telegramContexts || []) {
+        if (context.activeCompanyId === companyId || context.active_company_id === companyId) {
+          context.activeCompanyId = "";
+          context.active_company_id = "";
+          context.lastMessageAt = nowIso();
+          context.last_message_at = context.lastMessageAt;
+        }
+      }
+
+      return {
+        deletedCompany: companySummary(
+          {
+            ...state,
+            companyAnalyses: []
+          },
+          company
+        ),
+        removed: {
+          cases: caseIds.size,
+          threads: threadIds.size,
+          diagnosticRuns: diagnosticRunIds.size
+        }
+      };
     });
   }
 

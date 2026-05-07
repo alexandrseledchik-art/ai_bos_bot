@@ -53,6 +53,15 @@ async function main() {
   assert.equal(list.companies.length, 1);
   assert.ok(list.companies[0].nextStep.title);
 
+  const deleted = await service.deleteCompany(created.company.id);
+  assert.equal(deleted.deletedCompany.id, created.company.id);
+  assert.equal(store.state.companies.length, 0);
+  assert.equal(store.state.companySources.length, 0);
+  assert.equal(store.state.layerAnalyses.length, 0);
+  assert.equal(store.state.toolResults.length, 0);
+  assert.equal(store.state.companyAnalyses.length, 0);
+  await assert.rejects(() => service.getCompany(created.company.id), /Company not found/);
+
   console.log("Consultant Web checks passed.");
 }
 
