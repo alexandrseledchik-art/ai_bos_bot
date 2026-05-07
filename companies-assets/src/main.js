@@ -383,28 +383,46 @@ function renderOverview(detail) {
 
 function renderSources(detail) {
   const rows = detail.sources || [];
+  const processedCount = rows.filter((source) => source.processingStatus === "processed").length;
+  const driveCount = rows.filter((source) => ["google_drive", "google_public_folder"].includes(source.sourceOrigin)).length;
+  const layerCount = new Set(rows.flatMap((source) => source.relatedLayers || [])).size;
+
   return `
     <section class="content-section">
       <div class="section-head">
-        <h3>Данные</h3>
+        <div>
+          <h3>Данные</h3>
+          <p class="section-note">Источники лежат в рабочем пространстве компании и учитываются при следующем анализе.</p>
+        </div>
         <div class="actions">
           <button class="secondary" id="importDeepDiagnosticButton" type="button">Импорт диагностики Excel</button>
           <button id="addSourceButton" type="button">Добавить источник</button>
         </div>
       </div>
-      <div class="stack">
-        ${rows.length ? rows.map((source) => `
-          <article class="source-row">
-            <h4>${escapeHtml(source.title || "Источник")}</h4>
-            <p>${escapeHtml(source.aiSummary || source.contentText || source.fileUrl || "")}</p>
-            <div class="pill-row">
-              <span class="pill">${escapeHtml(source.sourceOrigin || "source")}</span>
-              <span class="pill">${escapeHtml(source.processingStatus || "")}</span>
-              ${(source.relatedLayers || []).slice(0, 4).map((layer) => `<span class="pill orange">${escapeHtml(LAYER_LABELS[layer] || layer)}</span>`).join("")}
+      ${rows.length ? `
+        <details class="data-drawer">
+          <summary>
+            <div>
+              <strong>${escapeHtml(rows.length)} источников</strong>
+              <span>${escapeHtml(processedCount)} прочитано · ${escapeHtml(driveCount)} из Google Drive · ${escapeHtml(layerCount)} слоёв затронуто</span>
             </div>
-          </article>
-        `).join("") : `<div class="empty-state"><h2>Источников нет</h2><p>Добавь заметку или публичную ссылку на Google Doc / Sheet.</p></div>`}
-      </div>
+            <span class="drawer-toggle"></span>
+          </summary>
+          <div class="stack data-source-list">
+            ${rows.map((source) => `
+              <article class="source-row">
+                <h4>${escapeHtml(source.title || "Источник")}</h4>
+                <p>${escapeHtml(source.aiSummary || source.contentText || source.fileUrl || "")}</p>
+                <div class="pill-row">
+                  <span class="pill">${escapeHtml(source.sourceOrigin || "source")}</span>
+                  <span class="pill">${escapeHtml(source.processingStatus || "")}</span>
+                  ${(source.relatedLayers || []).slice(0, 4).map((layer) => `<span class="pill orange">${escapeHtml(LAYER_LABELS[layer] || layer)}</span>`).join("")}
+                </div>
+              </article>
+            `).join("")}
+          </div>
+        </details>
+      ` : `<div class="empty-state compact-empty"><h2>Источников нет</h2><p>Добавь заметку, файл или публичную ссылку на Google Doc / Sheet.</p></div>`}
     </section>
   `;
 }

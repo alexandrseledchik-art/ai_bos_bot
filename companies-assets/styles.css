@@ -439,6 +439,75 @@ label {
   line-height: 1.45;
 }
 
+.section-note {
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.data-drawer {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.data-drawer summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.data-drawer summary::-webkit-details-marker {
+  display: none;
+}
+
+.data-drawer summary:hover {
+  background: var(--panel-soft);
+}
+
+.data-drawer summary strong {
+  display: block;
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.data-drawer summary span {
+  color: var(--muted);
+}
+
+.drawer-toggle {
+  display: inline-flex;
+  min-width: max-content;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: var(--teal-dark);
+  font-weight: 900;
+}
+
+.drawer-toggle::after {
+  content: "Показать источники";
+}
+
+.data-drawer[open] .drawer-toggle::after {
+  content: "Скрыть источники";
+}
+
+.data-source-list {
+  border-top: 1px solid var(--line);
+  padding: 16px;
+  background: #fbfcfb;
+}
+
+.compact-empty {
+  padding: 18px;
+}
+
 .code-list {
   display: flex;
   flex-wrap: wrap;
@@ -719,6 +788,11 @@ label {
   .layer-summary,
   .layer-expand-grid {
     grid-template-columns: 1fr;
+  }
+
+  .data-drawer summary {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .section-head {
