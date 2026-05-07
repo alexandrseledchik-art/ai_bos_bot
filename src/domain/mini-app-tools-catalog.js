@@ -61,6 +61,10 @@ function toCatalogTool(tool, index) {
     layer_keys: tool.layerId ? [normalizeLayerKey(tool.layerId)] : [],
     layer: tool.layer,
     domain: tool.domain,
+    status: tool.status || "",
+    relation: tool.relation || "",
+    link_label: tool.linkLabel || "",
+    source_row: tool.sourceRow || null,
     problem_types: inferProblemTypes(tool),
     is_active: true,
     source: "business_architecture_tools"
