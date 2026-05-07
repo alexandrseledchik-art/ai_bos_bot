@@ -316,6 +316,90 @@ function sourceArchitectureContentMatches(source, item) {
   return sourceContentMatches(source).filter((match) => sourceMatchCoversArchitectureItem(match, item));
 }
 
+function sourceReadableContent(source) {
+  return [source?.contentText, source?.aiSummary].filter(Boolean).join(" ");
+}
+
+function sourceWordCount(source) {
+  return normalizeLookup(sourceReadableContent(source))
+    .split(" ")
+    .filter((token) => token.length >= 3).length;
+}
+
+function sourceBusinessDetailScore(source) {
+  const text = normalizeLookup(sourceReadableContent(source));
+  const detailSignals = [
+    /\d/,
+    /руб|млн|тыс/,
+    /цель|горизонт|мисси|видени|ценност|смысл|сильн/,
+    /сегмент|рынк|спрос|конкурент|клиент/,
+    /выруч|марж|прибыл|cash|деньг/,
+    /роль|ответствен|команд|решени|процесс/,
+    /канал|заявк|лид|воронк|продаж/,
+    /вывод|риск|огранич|следующ|приоритет/
+  ];
+
+  return detailSignals.reduce((count, pattern) => count + Number(pattern.test(text)), 0);
+}
+
+function contentMatchQuality(contentMatches = []) {
+  if (contentMatches.some((match) => match.contentQuality === "sufficient")) {
+    return "sufficient";
+  }
+  if (contentMatches.some((match) => match.contentQuality === "partial")) {
+    return "partial";
+  }
+  return "";
+}
+
+function assessSourceFillingForItem({ source, item, contentMatches = [] }) {
+  const explicitQuality = contentMatchQuality(contentMatches);
+  const words = sourceWordCount(source);
+  const detailScore = sourceBusinessDetailScore(source);
+  const hasText = Boolean(sourceReadableContent(source).trim());
+
+  if (!hasText) {
+    return {
+      status: "unreadable",
+      label: "текст не прочитан",
+      summary: "Название файла похоже на нужный инструмент, но текст внутри не извлечён. По одному названию нельзя считать строку закрытой.",
+      missing: ["нужно открыть файл или добавить текстовое содержимое"]
+    };
+  }
+
+  if (explicitQuality === "sufficient") {
+    return {
+      status: "sufficient",
+      label: "заполнение подтверждено",
+      summary: "Внутри есть данные, которые совпадают с описанием строки и похожи на заполненный инструмент.",
+      reasons: contentMatches.flatMap((match) => match.qualityReasons || []).slice(0, 3)
+    };
+  }
+
+  if (explicitQuality === "partial" || (words >= 12 && detailScore >= 2)) {
+    const missing = contentMatches.flatMap((match) => match.missingEvidence || []).filter(Boolean);
+    return {
+      status: "partial",
+      label: "нужно дополнить",
+      summary: "Артефакт не пустой, но пока не видно полного результата по описанию и ожидаемому итогу строки.",
+      missing: missing.length ? missing.slice(0, 3) : [
+        item.expectedResult ? `проверить, есть ли результат: ${item.expectedResult}` : "добавить явный вывод по инструменту",
+        item.description ? `сверить с описанием: ${item.description}` : "добавить данные по смыслу строки"
+      ]
+    };
+  }
+
+  return {
+    status: "insufficient",
+    label: "не подтверждает строку",
+    summary: "Файл найден, но в прочитанном тексте пока нет достаточного содержания по этой строке карты.",
+    missing: [
+      item.description ? `добавить данные по описанию: ${item.description}` : "добавить данные по описанию строки",
+      item.expectedResult ? `зафиксировать ожидаемый результат: ${item.expectedResult}` : "зафиксировать результат инструмента"
+    ].slice(0, 2)
+  };
+}
+
 function architectureItemEvidence(item, sources) {
   const directArtifacts = sources
     .map((source) => ({
@@ -323,16 +407,33 @@ function architectureItemEvidence(item, sources) {
       matches: sourceArchitectureItemMatches(source, item),
       contentMatches: sourceArchitectureContentMatches(source, item)
     }))
-    .filter((entry) => entry.matches.length);
-  const confirmedArtifacts = directArtifacts.filter((entry) => entry.contentMatches.length);
-  const incompleteArtifacts = directArtifacts.filter((entry) => !entry.contentMatches.length);
+    .filter((entry) => entry.matches.length)
+    .map((entry) => ({
+      ...entry,
+      quality: assessSourceFillingForItem({
+        source: entry.source,
+        item,
+        contentMatches: entry.contentMatches
+      })
+    }));
+  const confirmedArtifacts = directArtifacts.filter((entry) => entry.quality.status === "sufficient");
+  const incompleteArtifacts = directArtifacts.filter((entry) => entry.quality.status !== "sufficient");
   const draftSources = sources
     .map((source) => ({
       source,
       contentMatches: sourceArchitectureContentMatches(source, item)
     }))
+    .map((entry) => ({
+      ...entry,
+      quality: assessSourceFillingForItem({
+        source: entry.source,
+        item,
+        contentMatches: entry.contentMatches
+      })
+    }))
     .filter((entry) =>
       entry.contentMatches.length &&
+      ["sufficient", "partial"].includes(entry.quality.status) &&
       !sourceToolMatches(entry.source).length &&
       !sourceArchitectureItemMatches(entry.source, item).length
     );
@@ -353,7 +454,7 @@ function layerHasEvidence(source, layerCode) {
   return sourceMatchesLayerByContent(source, layerCode);
 }
 
-function renderEvidenceEntry({ source, matches = [], contentMatches = [] }) {
+function renderEvidenceEntry({ source, matches = [], contentMatches = [], quality = null }) {
   const matchLabels = [
     ...matches.map((match) => match.name || match.domain),
     ...contentMatches.map((match) => match.domain || match.description)
@@ -364,7 +465,10 @@ function renderEvidenceEntry({ source, matches = [], contentMatches = [] }) {
       ${source.fileUrl
         ? `<a href="${escapeHtml(source.fileUrl)}" target="_blank" rel="noreferrer">${escapeHtml(source.title || source.fileUrl)}</a>`
         : `<span>${escapeHtml(source.title || "Источник")}</span>`}
+      ${quality ? `<em class="source-quality source-quality-${escapeHtml(quality.status)}">${escapeHtml(quality.label)}</em>` : ""}
       ${matchLabels.length ? `<small>${escapeHtml(matchLabels.join("; "))}</small>` : ""}
+      ${quality?.summary ? `<small>${escapeHtml(quality.summary)}</small>` : ""}
+      ${quality?.missing?.length ? `<small><b>Что проверить:</b> ${escapeHtml(quality.missing.slice(0, 2).join("; "))}</small>` : ""}
     </span>
   `;
 }
@@ -936,7 +1040,7 @@ function renderLayers(detail) {
                     <p>Строку закрывает только свой артефакт из карты инструментов и его содержание. Данные из чужих инструментов могут быть связанной опорой, но не заменяют отсутствующий артефакт.</p>
                     <div class="architecture-split">
                       <div>
-                        <strong>Подтверждено артефактом</strong>
+                        <strong>Проверено: артефакт заполнен</strong>
                         <div class="architecture-list">
                           ${confirmedArchitectureItems.length
                             ? confirmedArchitectureItems.map((item) => `
@@ -970,13 +1074,13 @@ function renderLayers(detail) {
                           </div>
                         ` : ""}
                         ${needsReviewArchitectureItems.length ? `
-                          <strong class="subsection-title">Артефакт есть, надо проверить наполнение</strong>
+                          <strong class="subsection-title">Артефакт есть, но заполнение требует контроля</strong>
                           <div class="architecture-list">
                             ${needsReviewArchitectureItems.map((item) => `
                               <div class="architecture-item is-review">
                                 <strong>${escapeHtml(item.domain)}</strong>
                                 <span>${escapeHtml(item.block || "Параметр")}</span>
-                                <p>Файл похож на нужный артефакт, но в прочитанном тексте пока не видно нужных данных по этой строке.</p>
+                                <p>Файл похож на нужный артефакт, но AI-BOSS не считает строку закрытой, пока внутри не видно нужного содержания.</p>
                                 <div class="source-link-list compact-source-list">
                                   <strong>Проверить:</strong>
                                   ${item.evidence.incompleteArtifacts.map(renderEvidenceEntry).join("")}

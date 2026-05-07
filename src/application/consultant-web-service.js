@@ -173,7 +173,8 @@ function enrichSourceForRead(source) {
 
   const existingToolMatches = source?.sourceMeta?.toolMatches || [];
   const existingContentMatches = source?.sourceMeta?.contentMatches || [];
-  if (existingToolMatches.length && existingContentMatches.length) {
+  const contentMatchesHaveQuality = existingContentMatches.every((match) => match.contentQuality);
+  if (existingToolMatches.length && existingContentMatches.length && contentMatchesHaveQuality) {
     return source;
   }
 

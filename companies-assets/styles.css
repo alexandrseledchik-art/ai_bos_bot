@@ -750,6 +750,33 @@ label {
   overflow-wrap: anywhere;
 }
 
+.source-quality {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.source-quality-sufficient {
+  background: var(--green-soft);
+  color: #1d6a36;
+}
+
+.source-quality-partial {
+  background: var(--amber-soft);
+  color: #9b3c00;
+}
+
+.source-quality-insufficient,
+.source-quality-unreadable {
+  background: #f3eeee;
+  color: #8a2b10;
+}
+
 .layer-row h4,
 .source-row h4,
 .problem-row h4 {

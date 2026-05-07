@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 
 import { ConsultantWebService } from "../application/consultant-web-service.js";
 import { classifyConsultantSource, detectConsultantLayersForText } from "../application/company-analysis-core.js";
+import { BUSINESS_ARCHITECTURE_ITEMS } from "../domain/business-architecture-knowledge.js";
+import { assessArchitectureItemContent } from "../domain/business-architecture-tool-matcher.js";
 import { emptyState } from "../domain/entities.js";
 import { GoogleDriveClient } from "../infrastructure/google/google-drive-client.js";
 import { PublicGoogleLinkReader } from "../infrastructure/google/public-google-link-reader.js";
@@ -204,6 +206,22 @@ async function main() {
   });
   assert.deepEqual(ikigai.relatedLayers, ["owner_context"]);
   assert.equal(ikigai.toolMatches.some((match) => String(match.domain || "").includes("Цели")), false);
+
+  const ikigaiItem = BUSINESS_ARCHITECTURE_ITEMS.find((item) => item.domain === "Икигай для бизнеса, Миссия");
+  assert.equal(
+    assessArchitectureItemContent(ikigaiItem, { title: "Ikigai для бизнеса. Мой консалтинг" }).contentQuality,
+    "unreadable"
+  );
+  assert.equal(
+    assessArchitectureItemContent(ikigaiItem, { contentText: "Ikigai для бизнеса" }).contentQuality,
+    "insufficient"
+  );
+  assert.equal(
+    assessArchitectureItemContent(ikigaiItem, {
+      contentText: "Икигай для бизнеса: собственник формулирует смысл компании, миссию, ценность для клиентов, сильные стороны, связь с рынком и вывод, ради чего компания работает не только ради денег."
+    }).contentQuality,
+    "sufficient"
+  );
 
   const ikigaiWithMarketContext = classifyConsultantSource({
     title: "Ikigai для бизнеса. Мой консалтинг",
