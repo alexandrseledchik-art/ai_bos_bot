@@ -68,12 +68,35 @@ function confidenceClass(value) {
 
 function confidenceLabel(value) {
   if (value === "HIGH") {
-    return "данных достаточно";
+    return "много сигналов";
   }
   if (value === "MEDIUM") {
-    return "часть данных есть";
+    return "есть сигналы";
   }
-  return "данных мало";
+  return "сигналов мало";
+}
+
+function coverageClass(percent) {
+  if (percent >= 70) {
+    return "green";
+  }
+  if (percent > 0) {
+    return "orange";
+  }
+  return "";
+}
+
+function coverageLabel(percent) {
+  if (percent >= 70) {
+    return "хорошо заполнено";
+  }
+  if (percent >= 35) {
+    return "заполнено частично";
+  }
+  if (percent > 0) {
+    return "заполнено мало";
+  }
+  return "данных нет";
 }
 
 function conclusionConfidenceLabel(value) {
@@ -1062,24 +1085,24 @@ function renderLayers(detail) {
           );
           const visibleFacts = layerSources.length ? (layer.facts || []) : [];
           return `
-            <details class="layer-row layer-row-details" ${index === 0 ? "open" : ""}>
-              <summary class="layer-summary">
-                <div>
-                  <h4>${escapeHtml(layerLabel(layer))}</h4>
-                  <span class="meta">Слой ${index + 1} из 11</span>
-                  <span class="pill ${confidenceClass(layer.confidence)}">${escapeHtml(confidenceLabel(layer.confidence))}</span>
-                </div>
-                <div>
-                  <p>${escapeHtml((layer.conclusions || [])[0] || "")}</p>
-                  <div class="layer-quick-stats">
-                    <span>${escapeHtml(filledEntries.length)} собрано</span>
-                    <span>${escapeHtml(missingFields.length)} не заполнено</span>
-                    <span>${escapeHtml(confirmedArchitectureItems.length)} поддоменов подтверждено</span>
-                    <span>${escapeHtml(needsReviewArchitectureItems.length)} проверить</span>
-                    <span>${escapeHtml(draftArchitectureItems.length)} можно собрать</span>
-                    <span>${escapeHtml(missingArchitectureItems.length)} без данных</span>
-                  </div>
-                </div>
+	            <details class="layer-row layer-row-details" ${index === 0 ? "open" : ""}>
+	              <summary class="layer-summary">
+	                <div>
+	                  <h4>${escapeHtml(layerLabel(layer))}</h4>
+	                  <span class="meta">Слой ${index + 1} из 11</span>
+	                  <span class="pill ${coverageClass(percent)}" title="Заполненность считается по поддоменам карты инструментов, а не по общему числу сигналов.">${escapeHtml(coverageLabel(percent))}</span>
+	                </div>
+	                <div>
+	                  <p>${escapeHtml((layer.conclusions || [])[0] || "")}</p>
+	                  <div class="layer-quick-stats">
+	                    <span>сигналы: ${escapeHtml(confidenceLabel(layer.confidence))}</span>
+	                    <span>эталон: ${escapeHtml(filledEntries.length)}/${escapeHtml(filledEntries.length + missingFields.length)}</span>
+	                    <span>${escapeHtml(confirmedArchitectureItems.length)} поддоменов подтверждено</span>
+	                    <span>${escapeHtml(needsReviewArchitectureItems.length)} проверить</span>
+	                    <span>${escapeHtml(draftArchitectureItems.length)} можно собрать</span>
+	                    <span>${escapeHtml(missingArchitectureItems.length)} без данных</span>
+	                  </div>
+	                </div>
                 <div>
                   <span class="meta">${percent}%</span>
                   <div class="progress" aria-hidden="true"><span style="--value: ${percent}%"></span></div>
