@@ -286,6 +286,12 @@ label {
   font-size: 28px;
 }
 
+.section-note {
+  max-width: 860px;
+  margin: -6px 0 18px;
+  color: var(--muted);
+}
+
 .actions {
   display: flex;
   gap: 10px;

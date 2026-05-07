@@ -76,6 +76,27 @@ function confidenceLabel(value) {
   return "мало фактов";
 }
 
+function conclusionConfidenceLabel(value) {
+  if (value === "HIGH") {
+    return "уверенность вывода: высокая";
+  }
+  if (value === "MEDIUM") {
+    return "уверенность вывода: рабочая";
+  }
+  if (value === "LOW") {
+    return "уверенность вывода: низкая";
+  }
+  return "без анализа";
+}
+
+function diagnosticQualityLabel(score) {
+  if (score == null) {
+    return "";
+  }
+
+  return `диагностическая логика: ${score}/10`;
+}
+
 function layerLabel(layer) {
   return layer?.layerName || LAYER_LABELS[layer?.layerCode] || layer?.layerCode || "Слой";
 }
@@ -241,11 +262,14 @@ function renderOverview(detail) {
       <div class="section-head">
         <h3>Вывод AI-BOSS</h3>
         <div class="pill-row">
-          <span class="pill ${confidenceClass(analysis?.confidence)}">${escapeHtml(analysis?.confidence || "без анализа")}</span>
-          ${diagnosticQuality.score10 != null ? `<span class="pill green">логика диагностики: ${escapeHtml(diagnosticQuality.score10)}/10</span>` : ""}
+          <span class="pill ${confidenceClass(analysis?.confidence)}" title="Насколько фактов хватает, чтобы опираться на текущий вывод.">${escapeHtml(conclusionConfidenceLabel(analysis?.confidence))}</span>
+          ${diagnosticQuality.score10 != null ? `<span class="pill green" title="Оценивает не результат бизнеса, а качество рассуждения AI-BOSS: отделяет факты от гипотез, не путает причину и следствие, выбирает один следующий шаг.">${escapeHtml(diagnosticQualityLabel(diagnosticQuality.score10))}</span>` : ""}
           <span class="pill">${escapeHtml(formatDate(analysis?.createdAt || company.lastAnalysisAt))}</span>
         </div>
       </div>
+      ${analysis ? `
+        <p class="section-note">Уверенность показывает, насколько вывод подтверждён данными. Оценка диагностической логики показывает, насколько корректно AI-BOSS рассуждал по методологии.</p>
+      ` : ""}
       <div class="grid-two">
         <article class="card">
           <h3>Главный вывод</h3>
@@ -538,7 +562,7 @@ function renderProblems(detail) {
             <p>${escapeHtml(problem.whyImportant)}</p>
             <div class="pill-row">
               <span class="pill orange">${escapeHtml(problem.layerName || problem.layer)}</span>
-              <span class="pill ${confidenceClass(problem.confidence)}">${escapeHtml(problem.confidence)}</span>
+              <span class="pill ${confidenceClass(problem.confidence)}">${escapeHtml(confidenceLabel(problem.confidence))}</span>
             </div>
           </article>
         `).join("") : `<div class="empty-state"><h2>Нет проблематик</h2><p>Нужны данные или анализ.</p></div>`}
@@ -548,7 +572,7 @@ function renderProblems(detail) {
     <section class="content-section">
       <div class="section-head">
         <h3>Вероятное ограничение</h3>
-        <span class="pill ${confidenceClass(constraint.confidence)}">${escapeHtml(constraint.confidence || "LOW")}</span>
+        <span class="pill ${confidenceClass(constraint.confidence)}">${escapeHtml(conclusionConfidenceLabel(constraint.confidence))}</span>
       </div>
       <article class="card">
         <h3>${escapeHtml(constraint.title || "Пока не выбрано")}</h3>
