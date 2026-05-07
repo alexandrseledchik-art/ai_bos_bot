@@ -58,6 +58,12 @@ const result = await service.handleUserMessage({
 const decisionObject = result.decision?.decisionObject;
 assert.ok(decisionObject, "decisionObject should be created for a serious diagnostic answer");
 assert.equal(decisionObject.schemaVersion, "decision_object_v1");
+assert.ok(Date.parse(decisionObject.createdAt), "createdAt should be an ISO date");
+assert.equal(decisionObject.reviewStatus, "not_reviewed");
+assert.deepEqual(decisionObject.improvementProposalIds, []);
+assert.equal(decisionObject.outcome?.status, "unknown");
+assert.equal(decisionObject.outcome?.resultSummary, "");
+assert.equal(decisionObject.outcome?.learned, "");
 assert.equal(decisionObject.transition, "diagnosis_to_execution");
 assert.equal(decisionObject.needsExecutionContainer, true);
 assert.equal(decisionObject.operatingMode, "diagnostician");

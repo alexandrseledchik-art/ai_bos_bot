@@ -253,6 +253,9 @@ Example:
 ```json
 {
   "schemaVersion": "decision_object_v1",
+  "createdAt": "ISO_DATE",
+  "reviewStatus": "not_reviewed",
+  "improvementProposalIds": [],
   "businessStateMode": "stabilization",
   "operatingMode": "diagnostician",
   "dataConfidence": "low",
@@ -284,6 +287,11 @@ Example:
     "deadline": "0-7 days",
     "metric": "...",
     "reviewMoment": "..."
+  },
+  "outcome": {
+    "status": "unknown",
+    "resultSummary": "",
+    "learned": ""
   }
 }
 ```
@@ -300,6 +308,9 @@ Purpose:
 Required fields:
 
 - schemaVersion;
+- createdAt;
+- reviewStatus;
+- improvementProposalIds;
 - companyId;
 - caseId;
 - businessStateMode;
@@ -325,17 +336,22 @@ Required fields:
 - userFacingSummary;
 - internalReasoningSummary;
 - evidence;
-- reviewPolicy.
+- reviewPolicy;
+- outcome.
 
 Important:
 
 - `schemaVersion` protects old snapshots from future field changes;
+- `createdAt` makes the decision object usable for history, sorting and review;
+- `reviewStatus` powers admin workflow: `not_reviewed`, `reviewed`, `needs_improvement`, `accepted`, `rejected`;
+- `improvementProposalIds` links the answer to future improvement proposals;
 - `reasonCodes` explain why the orchestrator selected a mode without exposing chain-of-thought;
 - `userFacingSummary` is safe to show in admin review;
 - `internalReasoningSummary` is a short operational explanation, not hidden chain-of-thought;
 - `hiddenEvaluation` stores quality signals for internal review;
 - `ownerDecisionRequired` and `ownerDecisionType` protect owner authority;
-- `modeSwitch` records when the bot moved from one operating mode to another during the turn.
+- `modeSwitch` records when the bot moved from one operating mode to another during the turn;
+- `outcome` later records whether the proposed next move worked: `unknown`, `completed`, `failed` or `skipped`.
 
 ## 9. Execution Container
 
@@ -450,6 +466,14 @@ decision objects
 → improvement proposals
 → accept / reject improvements
 ```
+
+Admin review should update:
+
+- `reviewStatus`;
+- `improvementProposalIds`;
+- `outcome.status`;
+- `outcome.resultSummary`;
+- `outcome.learned`.
 
 The review loop should inspect:
 

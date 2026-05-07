@@ -75,6 +75,10 @@ assert.equal(profit.decision?.decisionObject?.businessStateMode, "stabilization"
 assert.equal(profit.decision?.decisionObject?.operatingMode, "diagnostician");
 assert.equal(profit.decision?.decisionObject?.transition, "diagnosis_to_execution");
 assert.equal(profit.decision?.decisionObject?.schemaVersion, "decision_object_v1");
+assert.ok(Date.parse(profit.decision?.decisionObject?.createdAt), "createdAt should be an ISO date");
+assert.equal(profit.decision?.decisionObject?.reviewStatus, "not_reviewed");
+assert.deepEqual(profit.decision?.decisionObject?.improvementProposalIds, []);
+assert.equal(profit.decision?.decisionObject?.outcome?.status, "unknown");
 assert.ok(profit.decision?.decisionObject?.reasonCodes?.length, "decision reasonCodes are missing");
 assert.ok(profit.decision?.decisionObject?.userFacingSummary, "userFacingSummary is missing");
 assert.ok(profit.decision?.decisionObject?.internalReasoningSummary, "internalReasoningSummary is missing");
@@ -94,5 +98,6 @@ const projected = projectStateToRelationalRows(state);
 const projectedSnapshot = projected.snapshots[projected.snapshots.length - 1];
 assert.ok(projectedSnapshot?.graph_snapshot?.decisionObject, "projected snapshot should preserve decisionObject in graph_snapshot");
 assert.equal(projectedSnapshot.graph_snapshot.decisionObject.schemaVersion, "decision_object_v1");
+assert.equal(projectedSnapshot.graph_snapshot.decisionObject.reviewStatus, "not_reviewed");
 
 console.log("Core behavior end-to-end checks passed.");

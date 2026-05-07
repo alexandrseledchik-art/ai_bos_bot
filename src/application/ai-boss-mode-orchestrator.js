@@ -671,6 +671,9 @@ export class AIBossModeOrchestrator {
 
     return {
       schemaVersion: "decision_object_v1",
+      createdAt: new Date().toISOString(),
+      reviewStatus: "not_reviewed",
+      improvementProposalIds: [],
       companyId: company?.id || context.company?.id || "",
       caseId: activeCase?.id || context.activeCase?.id || "",
       businessStateMode: orchestration.businessStateMode,
@@ -723,6 +726,11 @@ export class AIBossModeOrchestrator {
           "появилась более сильная гипотеза",
           "данные оказались ненадёжными"
         ]
+      },
+      outcome: {
+        status: "unknown",
+        resultSummary: "",
+        learned: ""
       }
     };
   }
