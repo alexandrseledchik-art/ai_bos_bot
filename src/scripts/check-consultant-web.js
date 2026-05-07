@@ -63,11 +63,37 @@ class MockGoogleDrive {
   }
 }
 
+class MockPublicGoogleLinkReader {
+  async read(url) {
+    if (url.includes("docs.google.com/document")) {
+      return {
+        supported: true,
+        readable: true,
+        id: "public_doc_1",
+        kind: "document",
+        sourceType: "document",
+        title: "Google Docs",
+        exportUrl: "https://docs.google.com/document/d/public_doc_1/export?format=txt",
+        text: "Публичная заметка: собственник не понимает, какие заявки целевые, а какие перегружают производство.",
+        reason: ""
+      };
+    }
+
+    return {
+      supported: false,
+      readable: false,
+      text: "",
+      reason: ""
+    };
+  }
+}
+
 async function main() {
   const store = new InMemoryStore();
   const service = new ConsultantWebService({
     store,
-    googleDrive: new MockGoogleDrive()
+    googleDrive: new MockGoogleDrive(),
+    publicGoogleLinkReader: new MockPublicGoogleLinkReader()
   });
 
   const created = await service.createCompany({
@@ -88,6 +114,15 @@ async function main() {
   });
   assert.equal(source.source.sourceOrigin, "web");
 
+  const publicGoogleSource = await service.addSource(created.company.id, {
+    title: "Публичный Google Doc",
+    fileUrl: "https://docs.google.com/document/d/public_doc_1/edit?usp=sharing"
+  });
+  assert.equal(publicGoogleSource.source.sourceOrigin, "google_link");
+  assert.equal(publicGoogleSource.source.type, "document");
+  assert.equal(publicGoogleSource.source.processingStatus, "processed");
+  assert.match(publicGoogleSource.source.contentText, /Публичная заметка/);
+
   const analyzed = await service.analyzeCompany(created.company.id);
   assert.equal(analyzed.layerAnalyses.length, 11);
   assert.equal(analyzed.toolResults.length, 11);
@@ -95,7 +130,7 @@ async function main() {
   assert.ok(analyzed.analysis.diagnosticQuality?.score10 >= 8);
 
   const detail = await service.getCompany(created.company.id);
-  assert.equal(detail.sources.length, 2);
+  assert.equal(detail.sources.length, 3);
   assert.ok(detail.analysis.probableConstraint.title);
 
   const list = await service.listCompanies();

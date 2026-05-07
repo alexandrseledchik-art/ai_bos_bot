@@ -3,6 +3,7 @@ import {
   createCompanySource,
   nowIso
 } from "../domain/entities.js";
+import { PublicGoogleLinkReader } from "../infrastructure/google/public-google-link-reader.js";
 import { CompanyAnalysisCore, detectConsultantLayersForText } from "./company-analysis-core.js";
 import { importDeepDiagnosticXlsx } from "./deep-diagnostic-importer.js";
 
@@ -129,6 +130,15 @@ function buildDriveSourceSummary({ file, readable, reason }) {
   return reason || `Google Drive: ${file.name}. Файл сохранён как ссылка, текст пока не извлечён.`;
 }
 
+function buildPublicGoogleSummary({ title, readable, reason, text }) {
+  if (readable) {
+    const preview = cleanText(text).slice(0, 220);
+    return `${title || "Google"}: текст извлечён по публичной ссылке${preview ? `. ${preview}` : ""}`;
+  }
+
+  return reason || "Google-ссылка сохранена, но текст пока не извлечён.";
+}
+
 function latestTimestamp(items = []) {
   return items
     .map((item) => item?.updatedAt || item?.processedAt || item?.createdAt || "")
@@ -149,10 +159,16 @@ function buildProfileDescription(profile) {
 }
 
 export class ConsultantWebService {
-  constructor({ store, analyzer = new CompanyAnalysisCore(), googleDrive = null }) {
+  constructor({
+    store,
+    analyzer = new CompanyAnalysisCore(),
+    googleDrive = null,
+    publicGoogleLinkReader = new PublicGoogleLinkReader()
+  }) {
     this.store = store;
     this.analyzer = analyzer;
     this.googleDrive = googleDrive;
+    this.publicGoogleLinkReader = publicGoogleLinkReader;
   }
 
   async listCompanies() {
@@ -478,9 +494,15 @@ export class ConsultantWebService {
   async addSource(companyId, payload) {
     return this.store.update(async (state) => {
       const company = assertCompany(state, companyId);
-      const contentText = cleanText(payload.contentText || payload.content);
+      let contentText = cleanText(payload.contentText || payload.content);
       const fileUrl = cleanText(payload.fileUrl || payload.url);
       const title = cleanText(payload.title) || (fileUrl ? "Ссылка на источник" : "Заметка");
+      const requestedType = cleanText(payload.type);
+      let sourceOrigin = "web";
+      let processingStatus = contentText ? "processed" : "link_added";
+      let sourceType = requestedType || (fileUrl ? "link" : "text");
+      let aiSummary = contentText.slice(0, 260) || fileUrl;
+      let sourceMeta = {};
 
       if (!contentText && !fileUrl) {
         const error = new Error("Добавьте текст или ссылку на источник.");
@@ -488,17 +510,45 @@ export class ConsultantWebService {
         throw error;
       }
 
+      if (fileUrl && !contentText && this.publicGoogleLinkReader) {
+        const googleLink = await this.publicGoogleLinkReader.read(fileUrl);
+        if (googleLink.supported) {
+          contentText = cleanText(googleLink.text);
+          sourceOrigin = "google_link";
+          sourceType = googleLink.readable
+            ? googleLink.sourceType
+            : (requestedType && requestedType !== "text" ? requestedType : "link");
+          processingStatus = googleLink.readable ? "processed" : "link_added";
+          aiSummary = buildPublicGoogleSummary({
+            title: googleLink.title,
+            readable: googleLink.readable,
+            reason: googleLink.reason,
+            text: contentText
+          });
+          sourceMeta = {
+            publicGoogleLink: {
+              id: googleLink.id,
+              kind: googleLink.kind,
+              exportUrl: googleLink.exportUrl,
+              readable: googleLink.readable,
+              readReason: googleLink.reason || ""
+            }
+          };
+        }
+      }
+
       const relatedLayers = detectConsultantLayersForText(`${title}\n${contentText}\n${fileUrl}`);
       const source = createCompanySource({
         companyId,
-        type: cleanText(payload.type) || (fileUrl ? "link" : "text"),
+        type: sourceType,
         title,
         contentText,
         fileUrl,
-        sourceOrigin: "web",
-        aiSummary: contentText.slice(0, 260) || fileUrl,
+        sourceOrigin,
+        aiSummary,
         relatedLayers,
-        processingStatus: contentText ? "processed" : "link_added"
+        sourceMeta,
+        processingStatus
       });
       state.companySources = state.companySources || [];
       state.companySources.push(source);

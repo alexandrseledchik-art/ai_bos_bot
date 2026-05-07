@@ -272,7 +272,7 @@ function renderSources(detail) {
               ${(source.relatedLayers || []).slice(0, 4).map((layer) => `<span class="pill orange">${escapeHtml(layer)}</span>`).join("")}
             </div>
           </article>
-        `).join("") : `<div class="empty-state"><h2>Источников нет</h2><p>Добавь заметку или ссылку.</p></div>`}
+        `).join("") : `<div class="empty-state"><h2>Источников нет</h2><p>Добавь заметку или публичную ссылку на Google Doc / Sheet.</p></div>`}
       </div>
     </section>
   `;
@@ -664,10 +664,11 @@ function openSourceModal() {
         </select>
       </label>
       <label class="wide">Ссылка
-        <input name="fileUrl" value="">
+        <input name="fileUrl" placeholder="Google Doc / Sheet или другая ссылка" value="">
+        <span class="hint">Быстрый вариант: открой доступ «Все, у кого есть ссылка, могут просматривать» и вставь ссылку на Google Doc или Sheet. Папки целиком подключаются через Drive-интеграцию.</span>
       </label>
       <label class="wide">Текст
-        <textarea name="contentText"></textarea>
+        <textarea name="contentText" placeholder="Можно вставить текст вручную, если ссылка закрытая или это не Google Doc / Sheet."></textarea>
       </label>
       <div class="wide actions">
         <button class="secondary" data-close-modal type="button">Отмена</button>
