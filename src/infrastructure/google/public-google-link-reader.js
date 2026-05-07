@@ -22,6 +22,15 @@ const SUPPORTED_DOCS_TYPES = {
   }
 };
 
+function decodeHtmlEntities(value) {
+  return String(value || "")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
 function compactText(value, maxChars) {
   const text = String(value || "").trim();
   if (!maxChars || text.length <= maxChars) {
@@ -43,6 +52,79 @@ function readHashParam(hash, key) {
 function looksLikeHtml(value) {
   const head = String(value || "").trim().slice(0, 300).toLowerCase();
   return head.startsWith("<!doctype html") || head.startsWith("<html") || head.includes("<html");
+}
+
+function stripTags(value) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]*>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeGoogleLink(value) {
+  const raw = decodeHtmlEntities(String(value || ""))
+    .replace(/\\u003d/g, "=")
+    .replace(/\\u0026/g, "&")
+    .replace(/\\\//g, "/")
+    .trim();
+
+  if (raw.startsWith("/document/") || raw.startsWith("/spreadsheets/") || raw.startsWith("/presentation/")) {
+    return `https://${GOOGLE_DOCS_HOST}${raw}`;
+  }
+
+  if (raw.startsWith("/file/") || raw.startsWith("/drive/") || raw.startsWith("/open")) {
+    return `https://${GOOGLE_DRIVE_HOST}${raw}`;
+  }
+
+  return raw;
+}
+
+function isGoogleFileLink(value) {
+  const link = normalizeGoogleLink(value);
+  return /^https:\/\/docs\.google\.com\/(document|spreadsheets|presentation)\/d\//.test(link) ||
+    /^https:\/\/drive\.google\.com\/file\/d\//.test(link) ||
+    /^https:\/\/drive\.google\.com\/open\?id=/.test(link);
+}
+
+function extractPublicFolderLinks(html, maxFiles) {
+  const normalizedHtml = String(html || "")
+    .replace(/\\u003d/g, "=")
+    .replace(/\\u0026/g, "&")
+    .replace(/\\\//g, "/");
+  const candidates = [];
+  const seen = new Set();
+  const add = (url, title = "") => {
+    const normalizedUrl = normalizeGoogleLink(url).split("#")[0];
+    if (!isGoogleFileLink(normalizedUrl) || seen.has(normalizedUrl)) {
+      return;
+    }
+
+    seen.add(normalizedUrl);
+    candidates.push({
+      url: normalizedUrl,
+      title: cleanText(title)
+    });
+  };
+
+  const anchorRegex = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let anchorMatch;
+  while ((anchorMatch = anchorRegex.exec(normalizedHtml))) {
+    add(anchorMatch[1], stripTags(anchorMatch[2]));
+  }
+
+  const absoluteRegex = /https:\/\/(?:docs|drive)\.google\.com\/[^\s"'<>\\)]+/g;
+  let absoluteMatch;
+  while ((absoluteMatch = absoluteRegex.exec(normalizedHtml))) {
+    add(absoluteMatch[0]);
+  }
+
+  const relativeRegex = /\/(?:document|spreadsheets|presentation|file)\/d\/[-\w]+[^\s"'<>\\)]*/g;
+  let relativeMatch;
+  while ((relativeMatch = relativeRegex.exec(normalizedHtml))) {
+    const prefix = relativeMatch[0].startsWith("/file/") ? `https://${GOOGLE_DRIVE_HOST}` : `https://${GOOGLE_DOCS_HOST}`;
+    add(`${prefix}${relativeMatch[0]}`);
+  }
+
+  return candidates.slice(0, maxFiles);
 }
 
 function publicLinkResult(input) {
@@ -116,7 +198,9 @@ export function parsePublicGoogleLink(inputUrl) {
   }
 
   if (hostname === GOOGLE_DRIVE_HOST) {
-    const folderId = parts[0] === "drive" && parts[1] === "folders" ? cleanText(parts[2]) : "";
+    const folderId = parts[0] === "drive" && parts[1] === "folders"
+      ? cleanText(parts[2])
+      : cleanText(url.searchParams.get("id"));
     const fileId = parts[0] === "file" && parts[1] === "d" ? cleanText(parts[2]) : "";
 
     if (folderId) {
@@ -144,9 +228,10 @@ export function parsePublicGoogleLink(inputUrl) {
 }
 
 export class PublicGoogleLinkReader {
-  constructor({ maxTextChars = 120000, timeoutMs = 8000, fetchImpl = fetch } = {}) {
+  constructor({ maxTextChars = 120000, timeoutMs = 8000, maxFolderFiles = 40, fetchImpl = fetch } = {}) {
     this.maxTextChars = maxTextChars;
     this.timeoutMs = timeoutMs;
+    this.maxFolderFiles = maxFolderFiles;
     this.fetchImpl = fetchImpl;
   }
 
@@ -197,6 +282,73 @@ export class PublicGoogleLinkReader {
         reason: error?.name === "AbortError"
           ? "Google не ответил за отведённое время. Ссылка сохранена, текст можно попробовать подтянуть позже."
           : `Не удалось прочитать Google-ссылку: ${error?.message || "ошибка сети"}.`
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  async readFolder(inputUrl) {
+    const parsed = parsePublicGoogleLink(inputUrl);
+    if (!parsed.supported || parsed.kind !== "folder" || !parsed.id) {
+      return {
+        ...parsed,
+        reason: parsed.reason || "Ссылка не похожа на публичную папку Google Drive."
+      };
+    }
+
+    const folderViewUrl = `https://${GOOGLE_DRIVE_HOST}/embeddedfolderview?id=${encodeURIComponent(parsed.id)}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+
+    try {
+      const response = await this.fetchImpl(folderViewUrl, {
+        signal: controller.signal,
+        redirect: "follow"
+      });
+
+      if (!response.ok) {
+        return {
+          ...parsed,
+          folderViewUrl,
+          files: [],
+          filesFound: 0,
+          reason: "Не удалось открыть публичную папку. Проверь доступ: «Все, у кого есть ссылка, могут просматривать»."
+        };
+      }
+
+      const html = await response.text();
+      const links = extractPublicFolderLinks(html, this.maxFolderFiles);
+      const files = [];
+
+      for (const link of links) {
+        const file = await this.read(link.url);
+        files.push({
+          ...file,
+          url: link.url,
+          title: link.title || file.title || "Google Drive файл"
+        });
+      }
+
+      return {
+        ...parsed,
+        readable: files.some((file) => file.readable),
+        folderViewUrl,
+        files,
+        filesFound: links.length,
+        reason: links.length
+          ? ""
+          : "Папка открылась, но в публичном HTML не нашлось Google Docs / Sheets / Slides. Возможно, внутри только PDF/изображения или Google не отдал список без входа."
+      };
+    } catch (error) {
+      return {
+        ...parsed,
+        folderViewUrl,
+        files: [],
+        filesFound: 0,
+        reason: error?.name === "AbortError"
+          ? "Google не ответил за отведённое время. Попробуй ещё раз или добавь важные файлы отдельными ссылками."
+          : `Не удалось прочитать папку Google Drive: ${error?.message || "ошибка сети"}.`
       };
     } finally {
       clearTimeout(timeout);

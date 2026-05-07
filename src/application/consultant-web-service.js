@@ -122,6 +122,14 @@ function findExistingDriveSource(state, companyId, file) {
   ) || null;
 }
 
+function findExistingPublicFolderSource(state, companyId, folderId, file) {
+  const externalId = `google_public_folder:${folderId}:${file.id || file.url}`;
+  return (state.companySources || []).find((source) =>
+    source.companyId === companyId &&
+    (source.externalId === externalId || (file.url && source.fileUrl === file.url))
+  ) || null;
+}
+
 function buildDriveSourceSummary({ file, readable, reason }) {
   if (readable) {
     return `Google Drive: ${file.name}`;
@@ -245,7 +253,7 @@ export class ConsultantWebService {
   buildIntegrationsStatus(state, company) {
     const driveSources = (state.companySources || []).filter((source) =>
       source.companyId === company.id &&
-      source.sourceOrigin === "google_drive"
+      ["google_drive", "google_public_folder"].includes(source.sourceOrigin)
     );
     const readableCount = driveSources.filter((source) => source.processingStatus === "processed" && cleanText(source.contentText)).length;
 
@@ -488,6 +496,119 @@ export class ConsultantWebService {
           syncedCount,
           readableCount,
           unsupported
+        }
+      };
+    });
+  }
+
+  async syncPublicGoogleFolder(companyId, payload) {
+    return this.store.update(async (state) => {
+      const company = assertCompany(state, companyId);
+      const folderUrl = cleanText(payload.folderUrl || payload.url || payload.fileUrl);
+
+      if (!folderUrl) {
+        const error = new Error("Вставьте ссылку на папку Google Drive.");
+        error.status = 400;
+        throw error;
+      }
+
+      const folder = await this.publicGoogleLinkReader.readFolder(folderUrl);
+      if (!folder.supported || folder.kind !== "folder") {
+        return {
+          company: companySummary(state, company),
+          integrations: this.buildIntegrationsStatus(state, company),
+          publicFolder: {
+            ok: false,
+            reason: folder.reason || "Ссылка не похожа на папку Google Drive.",
+            syncedCount: 0,
+            readableCount: 0,
+            unsupported: []
+          }
+        };
+      }
+
+      const files = folder.files || [];
+      const unsupported = [];
+      let syncedCount = 0;
+      let readableCount = 0;
+
+      state.companySources = state.companySources || [];
+
+      for (const file of files) {
+        const contentText = cleanText(file.text);
+        const title = cleanText(file.title) || file.title || "Google Drive файл";
+        const fileUrl = cleanText(file.url || file.inputUrl);
+        const relatedLayers = detectConsultantLayersForText(`${title}\n${contentText}\n${fileUrl}`);
+        const existing = findExistingPublicFolderSource(state, company.id, folder.id, file);
+        const common = {
+          externalId: `google_public_folder:${folder.id}:${file.id || fileUrl}`,
+          type: file.readable ? (file.sourceType || "document") : "link",
+          title,
+          contentText,
+          fileUrl,
+          sourceOrigin: "google_public_folder",
+          aiSummary: buildPublicGoogleSummary({
+            title: file.title || file.kind || "Google Drive",
+            readable: file.readable,
+            reason: file.reason,
+            text: contentText
+          }),
+          relatedLayers,
+          sourceMeta: {
+            publicGoogleFolder: {
+              id: folder.id,
+              url: folderUrl,
+              folderViewUrl: folder.folderViewUrl || "",
+              filesFound: folder.filesFound || 0
+            },
+            publicGoogleLink: {
+              id: file.id || "",
+              kind: file.kind || "",
+              exportUrl: file.exportUrl || "",
+              readable: file.readable,
+              readReason: file.reason || ""
+            }
+          },
+          processingStatus: file.readable ? "processed" : "link_added"
+        };
+
+        if (existing) {
+          Object.assign(existing, common, {
+            processedAt: file.readable ? nowIso() : existing.processedAt || "",
+            updatedAt: nowIso()
+          });
+        } else {
+          state.companySources.push(createCompanySource({
+            companyId: company.id,
+            ...common
+          }));
+        }
+
+        syncedCount += 1;
+        if (file.readable) {
+          readableCount += 1;
+        } else {
+          unsupported.push({
+            title,
+            reason: file.reason || "Текст не извлечён."
+          });
+        }
+      }
+
+      company.updatedAt = nowIso();
+
+      return {
+        company: companySummary(state, company),
+        integrations: this.buildIntegrationsStatus(state, company),
+        publicFolder: {
+          ok: Boolean(files.length),
+          folderId: folder.id,
+          folderUrl,
+          filesFound: folder.filesFound || 0,
+          syncedCount,
+          readableCount,
+          unsupported,
+          reason: files.length ? "" : folder.reason
         }
       };
     });

@@ -98,6 +98,12 @@ async function dispatch(request) {
     return json({ ok: true, ...(await service.syncGoogleDrive(decodeURIComponent(googleDriveSyncMatch[1]))) });
   }
 
+  const publicGoogleFolderSyncMatch = path.match(/^([^/]+)\/integrations\/google-drive\/public-folder\/sync$/);
+  if (publicGoogleFolderSyncMatch && request.method === "POST") {
+    const payload = await readAdminJsonBody(request);
+    return json({ ok: true, ...(await service.syncPublicGoogleFolder(decodeURIComponent(publicGoogleFolderSyncMatch[1]), payload)) });
+  }
+
   const importDeepDiagnosticMatch = path.match(/^([^/]+)\/import\/deep-diagnostic$/);
   if (importDeepDiagnosticMatch && request.method === "POST") {
     const payload = await readAdminJsonBody(request);

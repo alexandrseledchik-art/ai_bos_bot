@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { ConsultantWebService } from "../application/consultant-web-service.js";
 import { emptyState } from "../domain/entities.js";
 import { GoogleDriveClient } from "../infrastructure/google/google-drive-client.js";
+import { PublicGoogleLinkReader } from "../infrastructure/google/public-google-link-reader.js";
 
 class InMemoryStore {
   constructor() {
@@ -87,6 +88,54 @@ class MockPublicGoogleLinkReader {
       reason: ""
     };
   }
+
+  async readFolder(url) {
+    if (url.includes("drive.google.com/drive/folders/public_folder_1")) {
+      return {
+        supported: true,
+        readable: true,
+        id: "public_folder_1",
+        kind: "folder",
+        folderViewUrl: "https://drive.google.com/embeddedfolderview?id=public_folder_1",
+        filesFound: 2,
+        files: [
+          {
+            supported: true,
+            readable: true,
+            id: "folder_doc_1",
+            kind: "document",
+            sourceType: "document",
+            title: "Видение и икигай",
+            url: "https://docs.google.com/document/d/folder_doc_1/edit",
+            exportUrl: "https://docs.google.com/document/d/folder_doc_1/export?format=txt",
+            text: "Видение: собственник хочет собрать продукт, где икигай соединяет рынок, сильные стороны, стратегию и операционную модель.",
+            reason: ""
+          },
+          {
+            supported: true,
+            readable: false,
+            id: "folder_pdf_1",
+            kind: "drive_file",
+            sourceType: "link",
+            title: "Скан рынка.pdf",
+            url: "https://drive.google.com/file/d/folder_pdf_1/view",
+            text: "",
+            reason: "PDF пока сохраняется ссылкой."
+          }
+        ],
+        reason: ""
+      };
+    }
+
+    return {
+      supported: false,
+      readable: false,
+      kind: "",
+      files: [],
+      filesFound: 0,
+      reason: "unsupported"
+    };
+  }
 }
 
 class FakeRootFolderGoogleDriveClient extends GoogleDriveClient {
@@ -169,6 +218,14 @@ async function main() {
   assert.ok(visionSource.source.relatedLayers.includes("owner_context"));
   assert.ok(visionSource.source.relatedLayers.includes("strategy"));
 
+  const publicFolderSync = await service.syncPublicGoogleFolder(created.company.id, {
+    folderUrl: "https://drive.google.com/drive/folders/public_folder_1"
+  });
+  assert.equal(publicFolderSync.publicFolder.ok, true);
+  assert.equal(publicFolderSync.publicFolder.syncedCount, 2);
+  assert.equal(publicFolderSync.publicFolder.readableCount, 1);
+  assert.equal(store.state.companySources.filter((item) => item.sourceOrigin === "google_public_folder").length, 2);
+
   const analyzed = await service.analyzeCompany(created.company.id);
   assert.equal(analyzed.layerAnalyses.length, 11);
   assert.equal(analyzed.toolResults.length, 11);
@@ -183,7 +240,7 @@ async function main() {
   );
 
   const detail = await service.getCompany(created.company.id);
-  assert.equal(detail.sources.length, 4);
+  assert.equal(detail.sources.length, 6);
   assert.ok(detail.analysis.probableConstraint.title);
 
   const list = await service.listCompanies();
@@ -192,7 +249,7 @@ async function main() {
 
   const integrations = await service.getIntegrations(created.company.id);
   assert.equal(integrations.integrations.googleDrive.configured, true);
-  assert.equal(integrations.integrations.googleDrive.sourceCount, 0);
+  assert.equal(integrations.integrations.googleDrive.sourceCount, 2);
 
   const driveSync = await service.syncGoogleDrive(created.company.id);
   assert.equal(driveSync.googleDrive.ok, true);
@@ -205,6 +262,30 @@ async function main() {
   assert.equal(rootFiles.usedRootFolder, true);
   assert.equal(rootFiles.companyFolder.name, "Селедчик консалтинг");
   assert.equal(rootFiles.files[0].name, "Видение и икигай");
+
+  const reader = new PublicGoogleLinkReader({
+    fetchImpl: async (url) => {
+      const href = String(url);
+      if (href.includes("embeddedfolderview")) {
+        return new Response(`
+          <html><body>
+            <a href="https://docs.google.com/document/d/html_doc_1/edit">Видение</a>
+            <a href="https://docs.google.com/spreadsheets/d/html_sheet_1/edit#gid=123">Сегменты рынка</a>
+          </body></html>
+        `);
+      }
+      if (href.includes("html_doc_1/export")) {
+        return new Response("Видение собственника и стратегический фокус.");
+      }
+      if (href.includes("html_sheet_1/export")) {
+        return new Response("Сегмент, спрос, маржа\nA, высокий, 45%");
+      }
+      return new Response("", { status: 404 });
+    }
+  });
+  const parsedPublicFolder = await reader.readFolder("https://drive.google.com/drive/folders/html_folder_1");
+  assert.equal(parsedPublicFolder.filesFound, 2);
+  assert.equal(parsedPublicFolder.files.filter((file) => file.readable).length, 2);
 
   const deleted = await service.deleteCompany(created.company.id);
   assert.equal(deleted.deletedCompany.id, created.company.id);

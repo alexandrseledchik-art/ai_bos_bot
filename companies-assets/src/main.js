@@ -297,7 +297,7 @@ function renderSources(detail) {
             <div class="pill-row">
               <span class="pill">${escapeHtml(source.sourceOrigin || "source")}</span>
               <span class="pill">${escapeHtml(source.processingStatus || "")}</span>
-              ${(source.relatedLayers || []).slice(0, 4).map((layer) => `<span class="pill orange">${escapeHtml(layer)}</span>`).join("")}
+              ${(source.relatedLayers || []).slice(0, 4).map((layer) => `<span class="pill orange">${escapeHtml(LAYER_LABELS[layer] || layer)}</span>`).join("")}
             </div>
           </article>
         `).join("") : `<div class="empty-state"><h2>Источников нет</h2><p>Добавь заметку или публичную ссылку на Google Doc / Sheet.</p></div>`}
@@ -333,13 +333,16 @@ function renderIntegrations(detail) {
             <p><strong>Ожидаемая папка:</strong> ${escapeHtml(drive.expectedFolderName || detail.company?.name || "")}</p>
             <p><strong>Источников из Drive:</strong> ${escapeHtml(drive.sourceCount || 0)} · прочитано текстом: ${escapeHtml(drive.readableCount || 0)}</p>
             <p><strong>Последняя синхронизация:</strong> ${escapeHtml(formatDate(drive.lastSyncedAt))}</p>
+            <div class="actions inline-actions">
+              <button class="secondary" id="syncPublicGoogleFolderButton" type="button">Подключить папку по ссылке</button>
+            </div>
             ${driveReady ? `
               <div class="actions inline-actions">
                 <button id="syncGoogleDriveButton" type="button">Синхронизировать Drive</button>
               </div>
             ` : `
               <p><strong>Важно:</strong> доступ по ссылке или расшаривание папки само по себе не подключает интеграцию. Приложению нужен service account: его email, private key и id корневой папки в Vercel env.</p>
-              <p>Если нужно быстро добавить 1-2 файла, используй кнопку «Добавить источник» и вставь публичную ссылку на Google Doc / Sheet.</p>
+              <p>Если нужно быстро добавить файлы без service account, нажми «Подключить папку по ссылке» или добавь отдельный Google Doc / Sheet как источник.</p>
               <div class="code-list">
                 ${(drive.setupRequired || []).map((item) => `<code>${escapeHtml(item)}</code>`).join("")}
               </div>
@@ -616,6 +619,7 @@ function renderDetail() {
   document.querySelector("#editCompanyButton")?.addEventListener("click", () => openCompanyModal(detail.company));
   document.querySelector("#deleteCompanyButton")?.addEventListener("click", deleteSelectedCompany);
   document.querySelector("#syncGoogleDriveButton")?.addEventListener("click", syncGoogleDrive);
+  document.querySelector("#syncPublicGoogleFolderButton")?.addEventListener("click", openPublicGoogleFolderModal);
   document.querySelector("#addSourceButton")?.addEventListener("click", openSourceModal);
   document.querySelector("#importDeepDiagnosticButton")?.addEventListener("click", importSelectedDeepDiagnostic);
 }
@@ -709,7 +713,7 @@ function openSourceModal() {
       </label>
       <label class="wide">Ссылка
         <input name="fileUrl" placeholder="Google Doc / Sheet или другая ссылка" value="">
-        <span class="hint">Быстрый вариант: открой доступ «Все, у кого есть ссылка, могут просматривать» и вставь ссылку на Google Doc или Sheet. Папки целиком подключаются через Drive-интеграцию.</span>
+        <span class="hint">Быстрый вариант: открой доступ «Все, у кого есть ссылка, могут просматривать» и вставь ссылку на Google Doc или Sheet. Для папки используй кнопку «Подключить папку по ссылке» в блоке интеграций.</span>
       </label>
       <label class="wide">Текст
         <textarea name="contentText" placeholder="Можно вставить текст вручную, если ссылка закрытая или это не Google Doc / Sheet."></textarea>
@@ -731,6 +735,52 @@ function openSourceModal() {
       backdrop.remove();
     } catch (error) {
       alert(error.message || error);
+    }
+  });
+}
+
+function openPublicGoogleFolderModal() {
+  const backdrop = openModal(`
+    <div class="modal-head">
+      <h2>Папка Google Drive</h2>
+      <button class="close-button ghost" data-close-modal type="button">×</button>
+    </div>
+    <form id="publicFolderForm" class="form-grid">
+      <label class="wide">Ссылка на папку
+        <input name="folderUrl" required placeholder="https://drive.google.com/drive/folders/..." value="">
+        <span class="hint">Открой доступ к папке: «Все, у кого есть ссылка, могут просматривать». AI-BOSS попробует прочитать Google Docs, Sheets и Slides внутри папки. PDF и изображения сохранятся ссылками или потребуют отдельного извлечения.</span>
+      </label>
+      <div class="wide actions">
+        <button class="secondary" data-close-modal type="button">Отмена</button>
+        <button type="submit">Синхронизировать</button>
+      </div>
+    </form>
+  `);
+
+  backdrop.querySelector("#publicFolderForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const body = Object.fromEntries(form.entries());
+    try {
+      renderLoading("Читаю публичную папку Google Drive");
+      const payload = await api(`/${encodeURIComponent(state.selectedCompanyId)}/integrations/google-drive/public-folder/sync`, {
+        method: "POST",
+        body
+      });
+      await loadCompanies();
+      await openCompany(state.selectedCompanyId, { replaceRoute: true });
+      backdrop.remove();
+
+      const result = payload.publicFolder || {};
+      if (!result.ok) {
+        alert(result.reason || "Папка не синхронизирована.");
+        return;
+      }
+
+      alert(`Папка синхронизирована.\nНайдено файлов: ${result.filesFound || 0}\nСохранено источников: ${result.syncedCount || 0}\nПрочитано текстом: ${result.readableCount || 0}`);
+    } catch (error) {
+      backdrop.remove();
+      renderError(error);
     }
   });
 }
