@@ -113,6 +113,30 @@ function profileAnswer(profile, names) {
   return cleanText(found?.[1] || "");
 }
 
+function findExistingDriveSource(state, companyId, file) {
+  const externalId = `google_drive:${file.id}`;
+  return (state.companySources || []).find((source) =>
+    source.companyId === companyId &&
+    (source.externalId === externalId || (file.webViewLink && source.fileUrl === file.webViewLink))
+  ) || null;
+}
+
+function buildDriveSourceSummary({ file, readable, reason }) {
+  if (readable) {
+    return `Google Drive: ${file.name}`;
+  }
+
+  return reason || `Google Drive: ${file.name}. Файл сохранён как ссылка, текст пока не извлечён.`;
+}
+
+function latestTimestamp(items = []) {
+  return items
+    .map((item) => item?.updatedAt || item?.processedAt || item?.createdAt || "")
+    .filter(Boolean)
+    .sort()
+    .at(-1) || "";
+}
+
 function buildProfileDescription(profile) {
   const parts = [
     profileAnswer(profile, ["Основной продукт / услуга"]),
@@ -125,9 +149,10 @@ function buildProfileDescription(profile) {
 }
 
 export class ConsultantWebService {
-  constructor({ store, analyzer = new CompanyAnalysisCore() }) {
+  constructor({ store, analyzer = new CompanyAnalysisCore(), googleDrive = null }) {
     this.store = store;
     this.analyzer = analyzer;
+    this.googleDrive = googleDrive;
   }
 
   async listCompanies() {
@@ -193,10 +218,59 @@ export class ConsultantWebService {
       layerAnalyses: (state.layerAnalyses || []).filter((item) => item.companyId === companyId),
       toolResults: (state.toolResults || []).filter((item) => item.companyId === companyId),
       analysis,
+      integrations: this.buildIntegrationsStatus(state, company),
       analyses: (state.companyAnalyses || [])
         .filter((item) => item.companyId === companyId)
         .slice(-5)
         .reverse()
+    };
+  }
+
+  buildIntegrationsStatus(state, company) {
+    const driveSources = (state.companySources || []).filter((source) =>
+      source.companyId === company.id &&
+      source.sourceOrigin === "google_drive"
+    );
+    const readableCount = driveSources.filter((source) => source.processingStatus === "processed" && cleanText(source.contentText)).length;
+
+    return {
+      googleDrive: {
+        type: "google_drive",
+        title: "Google Drive",
+        configured: Boolean(this.googleDrive?.enabled),
+        status: this.googleDrive?.enabled ? "ready" : "not_configured",
+        sourceCount: driveSources.length,
+        readableCount,
+        lastSyncedAt: latestTimestamp(driveSources),
+        expectedFolderName: company.name,
+        setupRequired: this.googleDrive?.enabled
+          ? []
+          : [
+              "GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL",
+              "GOOGLE_DRIVE_PRIVATE_KEY",
+              "GOOGLE_DRIVE_FOLDER_ID"
+            ]
+      },
+      apiConnectors: [
+        {
+          type: "crm",
+          title: "CRM",
+          status: "planned",
+          description: "amoCRM / Bitrix24 / другая CRM: лиды, сделки, статусы, причины отказов."
+        },
+        {
+          type: "finance",
+          title: "Финансы",
+          status: "planned",
+          description: "P&L, cash flow, платежи, маржа и финансовые обязательства."
+        },
+        {
+          type: "marketing",
+          title: "Маркетинг",
+          status: "planned",
+          description: "Рекламные кабинеты, аналитика сайта, каналы и стоимость потока."
+        }
+      ]
     };
   }
 
@@ -283,6 +357,119 @@ export class ConsultantWebService {
           cases: caseIds.size,
           threads: threadIds.size,
           diagnosticRuns: diagnosticRunIds.size
+        }
+      };
+    });
+  }
+
+  async getIntegrations(companyId) {
+    const state = await this.store.readState();
+    const company = assertCompany(state, companyId);
+    return {
+      company: companySummary(state, company),
+      integrations: this.buildIntegrationsStatus(state, company)
+    };
+  }
+
+  async syncGoogleDrive(companyId) {
+    return this.store.update(async (state) => {
+      const company = assertCompany(state, companyId);
+
+      if (!this.googleDrive?.enabled) {
+        return {
+          company: companySummary(state, company),
+          integrations: this.buildIntegrationsStatus(state, company),
+          googleDrive: {
+            ok: false,
+            reason: "not_configured",
+            message: "Google Drive не настроен. Добавь в Vercel env GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL, GOOGLE_DRIVE_PRIVATE_KEY и GOOGLE_DRIVE_FOLDER_ID.",
+            syncedCount: 0,
+            readableCount: 0,
+            unsupported: []
+          }
+        };
+      }
+
+      const { companyFolder, files } = await this.googleDrive.listCompanyFiles(company.name);
+      if (!companyFolder) {
+        return {
+          company: companySummary(state, company),
+          integrations: this.buildIntegrationsStatus(state, company),
+          googleDrive: {
+            ok: false,
+            reason: "company_folder_not_found",
+            message: `В корневой папке Google Drive не найдена подпапка компании "${company.name}". Создай папку с таким названием или переименуй компанию.`,
+            expectedFolderName: company.name,
+            syncedCount: 0,
+            readableCount: 0,
+            unsupported: []
+          }
+        };
+      }
+
+      const unsupported = [];
+      let syncedCount = 0;
+      let readableCount = 0;
+
+      state.companySources = state.companySources || [];
+
+      for (const file of files) {
+        const extracted = await this.googleDrive.readFileText(file);
+        const contentText = extracted.text || "";
+        const relatedLayers = detectConsultantLayersForText(`${file.name}\n${contentText}`);
+        const existing = findExistingDriveSource(state, company.id, file);
+        const common = {
+          externalId: `google_drive:${file.id}`,
+          type: "document",
+          title: file.name,
+          contentText,
+          fileUrl: file.webViewLink || "",
+          sourceOrigin: "google_drive",
+          aiSummary: buildDriveSourceSummary({ file, readable: extracted.readable, reason: extracted.reason }),
+          relatedLayers,
+          sourceMeta: {
+            googleDriveFileId: file.id,
+            googleDriveFolderId: companyFolder.id,
+            googleDriveFolderName: companyFolder.name || "",
+            mimeType: file.mimeType || "",
+            modifiedTime: file.modifiedTime || "",
+            readable: extracted.readable,
+            readReason: extracted.reason || ""
+          },
+          processingStatus: extracted.readable ? "processed" : "link_added"
+        };
+
+        if (existing) {
+          Object.assign(existing, common, {
+            processedAt: extracted.readable ? nowIso() : existing.processedAt || "",
+            updatedAt: nowIso()
+          });
+        } else {
+          state.companySources.push(createCompanySource({
+            companyId: company.id,
+            ...common
+          }));
+        }
+
+        syncedCount += 1;
+        if (extracted.readable) {
+          readableCount += 1;
+        } else {
+          unsupported.push(file.name);
+        }
+      }
+
+      company.updatedAt = nowIso();
+
+      return {
+        company: companySummary(state, company),
+        integrations: this.buildIntegrationsStatus(state, company),
+        googleDrive: {
+          ok: true,
+          folderName: companyFolder.name || "",
+          syncedCount,
+          readableCount,
+          unsupported
         }
       };
     });

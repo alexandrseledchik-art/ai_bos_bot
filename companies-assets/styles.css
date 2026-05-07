@@ -268,6 +268,10 @@ label {
   margin-bottom: 18px;
 }
 
+.compact-head {
+  margin-bottom: 12px;
+}
+
 .section-head h2,
 .section-head h3 {
   margin: 0;
@@ -287,6 +291,10 @@ label {
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.inline-actions {
+  justify-content: flex-start;
 }
 
 .grid-two {
@@ -319,6 +327,11 @@ label {
   border-radius: 8px;
   background: #fff;
   padding: 16px;
+}
+
+.integration-card {
+  display: grid;
+  gap: 12px;
 }
 
 .metric {
@@ -392,6 +405,22 @@ label {
   margin: 0;
   color: var(--muted);
   line-height: 1.45;
+}
+
+.code-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.code-list code {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: var(--panel-soft);
+  color: var(--teal-dark);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .layer-row {

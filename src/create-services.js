@@ -56,6 +56,7 @@ export function getServices() {
       mode: config.accessControlMode,
       adminTelegramUserIds: config.adminTelegramUserIds
     }),
+    googleDrive,
     conversationService: new ConversationService({
       store,
       reasoner,

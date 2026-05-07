@@ -278,6 +278,69 @@ function renderSources(detail) {
   `;
 }
 
+function renderIntegrations(detail) {
+  const integrations = detail.integrations || {};
+  const drive = integrations.googleDrive || {};
+  const apiConnectors = integrations.apiConnectors || [];
+  const driveReady = drive.status === "ready";
+
+  return `
+    <section class="content-section">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Подключения</p>
+          <h3>Интеграции и доступы</h3>
+        </div>
+      </div>
+      <div class="grid-two">
+        <article class="card integration-card">
+          <div class="section-head compact-head">
+            <div>
+              <h3>Google Drive</h3>
+              <p>Документы компании подтягиваются из папки с таким же названием, как компания.</p>
+            </div>
+            <span class="pill ${driveReady ? "green" : "orange"}">${driveReady ? "подключён" : "не настроен"}</span>
+          </div>
+          <div class="stack compact-stack">
+            <p><strong>Ожидаемая папка:</strong> ${escapeHtml(drive.expectedFolderName || detail.company?.name || "")}</p>
+            <p><strong>Источников из Drive:</strong> ${escapeHtml(drive.sourceCount || 0)} · прочитано текстом: ${escapeHtml(drive.readableCount || 0)}</p>
+            <p><strong>Последняя синхронизация:</strong> ${escapeHtml(formatDate(drive.lastSyncedAt))}</p>
+            ${driveReady ? `
+              <div class="actions inline-actions">
+                <button id="syncGoogleDriveButton" type="button">Синхронизировать Drive</button>
+              </div>
+            ` : `
+              <p>Чтобы включить, расшарь корневую папку с service account и добавь в Vercel env:</p>
+              <div class="code-list">
+                ${(drive.setupRequired || []).map((item) => `<code>${escapeHtml(item)}</code>`).join("")}
+              </div>
+            `}
+          </div>
+        </article>
+
+        <article class="card integration-card">
+          <div class="section-head compact-head">
+            <div>
+              <h3>API</h3>
+              <p>CRM, финансы и маркетинг подключаются отдельными backend-коннекторами. Секреты не вводим в браузере.</p>
+            </div>
+            <span class="pill">план</span>
+          </div>
+          <div class="stack compact-stack">
+            ${apiConnectors.map((connector) => `
+              <div class="mini-row">
+                <strong>${escapeHtml(connector.title)}</strong>
+                <span>${escapeHtml(connector.status || "planned")}</span>
+                <p>${escapeHtml(connector.description || "")}</p>
+              </div>
+            `).join("")}
+          </div>
+        </article>
+      </div>
+    </section>
+  `;
+}
+
 function renderDeepDiagnostic(detail) {
   const diagnostic = detail.analysis?.deepDiagnostic;
   if (!diagnostic) {
@@ -499,6 +562,7 @@ function renderDetail() {
   content.innerHTML = [
     renderOverview(detail),
     renderDeepDiagnostic(detail),
+    renderIntegrations(detail),
     renderSources(detail),
     renderLayers(detail),
     renderProblems(detail)
@@ -507,6 +571,7 @@ function renderDetail() {
   document.querySelector("#analyzeButton")?.addEventListener("click", analyzeSelectedCompany);
   document.querySelector("#editCompanyButton")?.addEventListener("click", () => openCompanyModal(detail.company));
   document.querySelector("#deleteCompanyButton")?.addEventListener("click", deleteSelectedCompany);
+  document.querySelector("#syncGoogleDriveButton")?.addEventListener("click", syncGoogleDrive);
   document.querySelector("#addSourceButton")?.addEventListener("click", openSourceModal);
   document.querySelector("#importDeepDiagnosticButton")?.addEventListener("click", importSelectedDeepDiagnostic);
 }
@@ -680,6 +745,29 @@ async function deleteSelectedCompany() {
     } else {
       renderEmpty();
     }
+  } catch (error) {
+    renderError(error);
+  }
+}
+
+async function syncGoogleDrive() {
+  if (!state.selectedCompanyId) {
+    return;
+  }
+
+  try {
+    renderLoading("Синхронизирую Google Drive");
+    const payload = await api(`/${encodeURIComponent(state.selectedCompanyId)}/integrations/google-drive/sync`, { method: "POST" });
+    await loadCompanies();
+    await openCompany(state.selectedCompanyId, { replaceRoute: true });
+
+    const result = payload.googleDrive || {};
+    if (!result.ok) {
+      alert(result.message || "Google Drive не синхронизирован.");
+      return;
+    }
+
+    alert(`Google Drive синхронизирован.\nСохранено источников: ${result.syncedCount || 0}\nПрочитано текстом: ${result.readableCount || 0}`);
   } catch (error) {
     renderError(error);
   }

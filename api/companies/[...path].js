@@ -39,8 +39,11 @@ function companiesPath(request) {
 }
 
 function createService() {
-  const { conversationService } = getServices();
-  return new ConsultantWebService({ store: conversationService.store });
+  const { conversationService, googleDrive } = getServices();
+  return new ConsultantWebService({
+    store: conversationService.store,
+    googleDrive
+  });
 }
 
 async function dispatch(request) {
@@ -83,6 +86,16 @@ async function dispatch(request) {
   if (sourceMatch && request.method === "POST") {
     const payload = await readAdminJsonBody(request);
     return json({ ok: true, ...(await service.addSource(decodeURIComponent(sourceMatch[1]), payload)) });
+  }
+
+  const integrationsMatch = path.match(/^([^/]+)\/integrations$/);
+  if (integrationsMatch && request.method === "GET") {
+    return json({ ok: true, ...(await service.getIntegrations(decodeURIComponent(integrationsMatch[1]))) });
+  }
+
+  const googleDriveSyncMatch = path.match(/^([^/]+)\/integrations\/google-drive\/sync$/);
+  if (googleDriveSyncMatch && request.method === "POST") {
+    return json({ ok: true, ...(await service.syncGoogleDrive(decodeURIComponent(googleDriveSyncMatch[1]))) });
   }
 
   const importDeepDiagnosticMatch = path.match(/^([^/]+)\/import\/deep-diagnostic$/);
