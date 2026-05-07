@@ -399,8 +399,8 @@ label {
   color: var(--ink);
 }
 
-.source-link-list a,
-.source-link-list span {
+.source-link-list > a,
+.source-link-list > span:not(.source-evidence) {
   display: inline-flex;
   align-items: center;
   min-height: 30px;
@@ -411,6 +411,10 @@ label {
   color: var(--teal-dark);
   font-weight: 800;
   text-decoration: none;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
 }
 
 .stack {
@@ -704,21 +708,46 @@ label {
 }
 
 .compact-source-list {
+  display: grid;
+  gap: 8px;
+  align-items: start;
   margin-top: 6px;
 }
 
 .source-evidence {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+}
+
+.source-evidence > a,
+.source-evidence > span {
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--teal-dark);
+  font-weight: 900;
+  line-height: 1.25;
+  text-decoration: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .source-evidence small {
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .layer-row h4,
