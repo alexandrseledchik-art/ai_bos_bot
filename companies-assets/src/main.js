@@ -136,48 +136,49 @@ function lookupTokens(value) {
     .filter((token) => token.length >= 4 && !stopWords.has(token));
 }
 
-function layerEvidenceText(layer, layerSources) {
-  return normalizeLookup([
-    ...(layer.facts || []),
-    ...Object.keys(layer.filledFields || {}),
-    ...Object.values(layer.filledFields || {}),
-    ...(layerSources || []).flatMap((source) => [
-      source.title,
-      source.aiSummary,
-      source.contentText,
-      source.fileUrl
-    ])
-  ].join(" "));
-}
+function domainsOverlap(left, right) {
+  const leftText = normalizeLookup(left);
+  const rightText = normalizeLookup(right);
+  if (!leftText || !rightText) {
+    return false;
+  }
 
-function sourceEvidenceText(source) {
-  return normalizeLookup([
-    source.contentText,
-    source.aiSummary,
-    source.title
-  ].join(" "));
-}
-
-function architectureItemHasSignal(item, evidenceText) {
-  const domainTokens = lookupTokens(item.domain);
-  if (domainTokens.some((token) => evidenceText.includes(token))) {
+  if (leftText.includes(rightText) || rightText.includes(leftText)) {
     return true;
   }
 
-  const hintTokens = lookupTokens(item.toolHints).slice(0, 8);
-  return hintTokens.some((token) => evidenceText.includes(token));
+  const leftTokens = new Set(lookupTokens(leftText));
+  return lookupTokens(rightText).some((token) => leftTokens.has(token));
 }
 
-function sourceHasLayerSignal(source, layer, architectureItems) {
-  const evidenceText = sourceEvidenceText(source);
-  const referenceTokens = lookupTokens([
-    layer.layerName,
-    ...Object.keys(layer.filledFields || {}),
-    ...(layer.missingFields || [])
-  ].join(" "));
+function sourceToolMatches(source) {
+  return Array.isArray(source?.sourceMeta?.toolMatches) ? source.sourceMeta.toolMatches : [];
+}
 
-  return referenceTokens.some((token) => evidenceText.includes(token)) ||
-    architectureItems.some((item) => architectureItemHasSignal(item, evidenceText));
+function sourceMatchesLayerByTool(source, layerCode) {
+  const matches = sourceToolMatches(source);
+  return matches.some((match) => match.layerId === layerCode);
+}
+
+function sourceMatchesArchitectureItem(source, item) {
+  return sourceToolMatches(source).some((match) => sourceMatchCoversArchitectureItem(match, item));
+}
+
+function sourceMatchCoversArchitectureItem(match, item) {
+  return match.layerId === item.layerCode && domainsOverlap(match.domain, item.domain);
+}
+
+function sourceArchitectureItemMatches(source, item) {
+  return sourceToolMatches(source).filter((match) => sourceMatchCoversArchitectureItem(match, item));
+}
+
+function architectureItemEvidenceSources(item, sources) {
+  return sources
+    .map((source) => ({
+      source,
+      matches: sourceArchitectureItemMatches(source, item)
+    }))
+    .filter((item) => item.matches.length);
 }
 
 function filledPercent(item) {
@@ -633,13 +634,17 @@ function renderLayers(detail) {
           ]
             .filter(Boolean)
             .filter((source, sourceIndex, sources) => sources.findIndex((item) => item.id === source.id) === sourceIndex)
-            .filter((source) => sourceHasLayerSignal(source, layer, architectureItems))
+            .filter((source) => sourceMatchesLayerByTool(source, layer.layerCode))
             .slice(0, 5);
-          const evidenceText = layerEvidenceText(layer, layerSources);
           const filledEntries = Object.entries(layer.filledFields || {});
           const missingFields = layer.missingFields || [];
-          const coveredArchitectureItems = architectureItems.filter((item) => architectureItemHasSignal(item, evidenceText));
-          const uncoveredArchitectureItems = architectureItems.filter((item) => !architectureItemHasSignal(item, evidenceText));
+          const architectureRows = architectureItems.map((item) => ({
+            ...item,
+            evidenceSources: architectureItemEvidenceSources(item, detail.sources || [])
+          }));
+          const coveredArchitectureItems = architectureRows.filter((item) => item.evidenceSources.length);
+          const uncoveredArchitectureItems = architectureRows.filter((item) => !item.evidenceSources.length);
+          const visibleFacts = layerSources.length ? (layer.facts || []) : [];
           return `
             <details class="layer-row layer-row-details" ${index === 0 ? "open" : ""}>
               <summary class="layer-summary">
@@ -653,7 +658,7 @@ function renderLayers(detail) {
                   <div class="layer-quick-stats">
                     <span>${escapeHtml(filledEntries.length)} собрано</span>
                     <span>${escapeHtml(missingFields.length)} не заполнено</span>
-                    <span>${escapeHtml(coveredArchitectureItems.length)} сигналов по архитектуре</span>
+                    <span>${escapeHtml(coveredArchitectureItems.length)} параметров закрыто артефактами</span>
                   </div>
                 </div>
                 <div>
@@ -691,14 +696,32 @@ function renderLayers(detail) {
                   </div>
                   <div class="layer-panel">
                     <h5>Параметры архитектуры</h5>
-                    <p>Более детальная карта доменов и поддоменов слоя. Она помогает понять, какие зоны уже проявились в данных, а какие ещё пустые.</p>
+                    <p>Каждая строка считается собранной только если есть артефакт или инструмент из карты, который относится к этому слою и домену.</p>
                     <div class="architecture-split">
                       <div>
-                        <strong>Есть сигналы</strong>
-                        <div class="pill-row">
+                        <strong>Собрано по артефактам</strong>
+                        <div class="architecture-list">
                           ${coveredArchitectureItems.length
-                            ? coveredArchitectureItems.slice(0, 18).map((item) => `<span class="pill green">${escapeHtml(item.domain)}</span>`).join("")
-                            : `<span class="hint-text">Пока не видно.</span>`}
+                            ? coveredArchitectureItems.map((item) => `
+                              <div class="architecture-item is-covered">
+                                <strong>${escapeHtml(item.domain)}</strong>
+                                <span>${escapeHtml(item.block || "Параметр")}</span>
+                                <p>${escapeHtml(item.description || "")}</p>
+                                <div class="source-link-list compact-source-list">
+                                  <strong>Основание:</strong>
+                                  ${item.evidenceSources.map(({ source, matches }) => `
+                                    <span class="source-evidence">
+                                      ${source.fileUrl
+                                        ? `<a href="${escapeHtml(source.fileUrl)}" target="_blank" rel="noreferrer">${escapeHtml(source.title || source.fileUrl)}</a>`
+                                        : `<span>${escapeHtml(source.title || "Источник")}</span>`}
+                                      <small>${escapeHtml(matches.map((match) => match.name || match.domain).filter(Boolean).join("; "))}</small>
+                                    </span>
+                                  `
+                                  ).join("")}
+                                </div>
+                              </div>
+                            `).join("")
+                            : `<span class="hint-text">По этому слою пока нет артефактов, которые совпали с картой инструментов.</span>`}
                         </div>
                       </div>
                       <div>
@@ -721,11 +744,11 @@ function renderLayers(detail) {
 
                 <div class="layer-panel">
                   <h5>Факты и артефакты</h5>
-                  ${(layer.facts || []).length ? `
+                  ${visibleFacts.length ? `
                     <ul class="split-list">
-                      ${(layer.facts || []).map((fact) => `<li>${escapeHtml(fact)}</li>`).join("")}
+                      ${visibleFacts.map((fact) => `<li>${escapeHtml(fact)}</li>`).join("")}
                     </ul>
-                  ` : `<p class="hint-text">Факты по слою пока не выделены.</p>`}
+                  ` : `<p class="hint-text">Факты по слою пока не подтверждены артефактами этого слоя.</p>`}
                   ${layerSources.length ? `
                     <div class="source-link-list">
                       <strong>Артефакты слоя:</strong>

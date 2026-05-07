@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 import { ConsultantWebService } from "../application/consultant-web-service.js";
-import { detectConsultantLayersForText } from "../application/company-analysis-core.js";
+import { classifyConsultantSource, detectConsultantLayersForText } from "../application/company-analysis-core.js";
 import { emptyState } from "../domain/entities.js";
 import { GoogleDriveClient } from "../infrastructure/google/google-drive-client.js";
 import { PublicGoogleLinkReader } from "../infrastructure/google/public-google-link-reader.js";
@@ -179,6 +179,25 @@ class FakeRootFolderGoogleDriveClient extends GoogleDriveClient {
 async function main() {
   assert.equal(detectConsultantLayersForText("Отрасль: Управленческий консалтинг").includes("governance"), false);
 
+  const customerJobs = classifyConsultantSource({
+    title: "Customer & Jobs Map — Александр Селедчик | Управленческий консалтинг"
+  });
+  assert.equal(customerJobs.relatedLayers.includes("governance"), false);
+  assert.equal(customerJobs.relatedLayers.includes("external_environment"), true);
+  assert.equal(customerJobs.relatedLayers.includes("product"), true);
+
+  const customerJourney = classifyConsultantSource({
+    title: "Customer Journey Map — Александр Селедчик | Управленческий консалтинг"
+  });
+  assert.equal(customerJourney.relatedLayers.includes("governance"), false);
+  assert.equal(customerJourney.relatedLayers.includes("external_environment"), true);
+
+  const ikigai = classifyConsultantSource({
+    title: "Ikigai для бизнеса. Мой консалтинг"
+  });
+  assert.deepEqual(ikigai.relatedLayers, ["owner_context"]);
+  assert.equal(ikigai.toolMatches.some((match) => String(match.domain || "").includes("Цели")), false);
+
   const store = new InMemoryStore();
   const service = new ConsultantWebService({
     store,
@@ -219,7 +238,7 @@ async function main() {
     contentText: "Видение собственника: построить консультационный продукт, где икигай соединяет ценность для рынка, сильные стороны и устойчивую стратегию роста."
   });
   assert.ok(visionSource.source.relatedLayers.includes("owner_context"));
-  assert.ok(visionSource.source.relatedLayers.includes("strategy"));
+  assert.equal(visionSource.source.relatedLayers.includes("governance"), false);
 
   const publicFolderSync = await service.syncPublicGoogleFolder(created.company.id, {
     folderUrl: "https://drive.google.com/drive/folders/public_folder_1"

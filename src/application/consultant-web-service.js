@@ -5,7 +5,7 @@ import {
 } from "../domain/entities.js";
 import { BUSINESS_ARCHITECTURE_ITEMS } from "../domain/business-architecture-knowledge.js";
 import { PublicGoogleLinkReader } from "../infrastructure/google/public-google-link-reader.js";
-import { CompanyAnalysisCore, detectConsultantLayersForText } from "./company-analysis-core.js";
+import { CompanyAnalysisCore, classifyConsultantSource } from "./company-analysis-core.js";
 import { importDeepDiagnosticXlsx } from "./deep-diagnostic-importer.js";
 
 const CONSULTANT_LAYER_ARCHITECTURE_ITEMS = BUSINESS_ARCHITECTURE_ITEMS
@@ -162,6 +162,31 @@ function buildPublicGoogleSummary({ title, readable, reason, text }) {
   return reason || "Google-ссылка сохранена, но текст пока не извлечён.";
 }
 
+function classifySourceInput({ title = "", contentText = "", fileUrl = "" }) {
+  return classifyConsultantSource({ title, contentText, fileUrl, aiSummary: "" });
+}
+
+function enrichSourceForRead(source) {
+  if (source?.type === "deep_diagnostic" || source?.sourceMeta?.deepDiagnostic) {
+    return source;
+  }
+
+  const existingToolMatches = source?.sourceMeta?.toolMatches || [];
+  if (existingToolMatches.length) {
+    return source;
+  }
+
+  const classification = classifySourceInput(source || {});
+  return {
+    ...source,
+    relatedLayers: classification.relatedLayers,
+    sourceMeta: {
+      ...(source?.sourceMeta || {}),
+      toolMatches: classification.toolMatches
+    }
+  };
+}
+
 function latestTimestamp(items = []) {
   return items
     .map((item) => item?.updatedAt || item?.processedAt || item?.createdAt || "")
@@ -228,6 +253,10 @@ export class ConsultantWebService {
 
       const comment = cleanText(payload.comment);
       if (comment) {
+        const classification = classifySourceInput({
+          title: "Комментарий при создании компании",
+          contentText: comment
+        });
         state.companySources = state.companySources || [];
         state.companySources.push(createCompanySource({
           companyId: company.id,
@@ -236,7 +265,10 @@ export class ConsultantWebService {
           contentText: comment,
           sourceOrigin: "web",
           aiSummary: comment,
-          relatedLayers: detectConsultantLayersForText(comment)
+          relatedLayers: classification.relatedLayers,
+          sourceMeta: {
+            toolMatches: classification.toolMatches
+          }
         }));
       }
 
@@ -253,6 +285,7 @@ export class ConsultantWebService {
       company: companySummary(state, company),
       sources: (state.companySources || [])
         .filter((source) => source.companyId === companyId)
+        .map(enrichSourceForRead)
         .sort((left, right) => String(right.updatedAt || right.createdAt || "").localeCompare(String(left.updatedAt || left.createdAt || ""))),
       layerAnalyses: (state.layerAnalyses || []).filter((item) => item.companyId === companyId),
       architectureItems: CONSULTANT_LAYER_ARCHITECTURE_ITEMS,
@@ -467,7 +500,11 @@ export class ConsultantWebService {
       for (const file of files) {
         const extracted = await this.googleDrive.readFileText(file);
         const contentText = extracted.text || "";
-        const relatedLayers = detectConsultantLayersForText(`${file.name}\n${contentText}`);
+        const classification = classifySourceInput({
+          title: file.name,
+          contentText,
+          fileUrl: file.webViewLink || ""
+        });
         const existing = findExistingDriveSource(state, company.id, file);
         const common = {
           externalId: `google_drive:${file.id}`,
@@ -477,8 +514,9 @@ export class ConsultantWebService {
           fileUrl: file.webViewLink || "",
           sourceOrigin: "google_drive",
           aiSummary: buildDriveSourceSummary({ file, readable: extracted.readable, reason: extracted.reason }),
-          relatedLayers,
+          relatedLayers: classification.relatedLayers,
           sourceMeta: {
+            toolMatches: classification.toolMatches,
             googleDriveFileId: file.id,
             googleDriveFolderId: companyFolder.id,
             googleDriveFolderName: companyFolder.name || "",
@@ -564,7 +602,7 @@ export class ConsultantWebService {
         const contentText = cleanText(file.text);
         const title = cleanText(file.title) || file.title || "Google Drive файл";
         const fileUrl = cleanText(file.url || file.inputUrl);
-        const relatedLayers = detectConsultantLayersForText(`${title}\n${contentText}\n${fileUrl}`);
+        const classification = classifySourceInput({ title, contentText, fileUrl });
         const existing = findExistingPublicFolderSource(state, company.id, folder.id, file);
         const common = {
           externalId: `google_public_folder:${folder.id}:${file.id || fileUrl}`,
@@ -579,8 +617,9 @@ export class ConsultantWebService {
             reason: file.reason,
             text: contentText
           }),
-          relatedLayers,
+          relatedLayers: classification.relatedLayers,
           sourceMeta: {
+            toolMatches: classification.toolMatches,
             publicGoogleFolder: {
               id: folder.id,
               url: folderUrl,
@@ -686,7 +725,7 @@ export class ConsultantWebService {
         }
       }
 
-      const relatedLayers = detectConsultantLayersForText(`${title}\n${contentText}\n${fileUrl}`);
+      const classification = classifySourceInput({ title, contentText, fileUrl });
       const source = createCompanySource({
         companyId,
         type: sourceType,
@@ -695,10 +734,14 @@ export class ConsultantWebService {
         fileUrl,
         sourceOrigin,
         aiSummary,
-        relatedLayers,
+        relatedLayers: classification.relatedLayers,
         sourceMeta,
         processingStatus
       });
+      source.sourceMeta = {
+        ...(source.sourceMeta || {}),
+        toolMatches: classification.toolMatches
+      };
       state.companySources = state.companySources || [];
       state.companySources.push(source);
       company.updatedAt = nowIso();

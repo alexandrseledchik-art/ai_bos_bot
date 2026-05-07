@@ -667,10 +667,33 @@ label {
   padding: 10px;
 }
 
+.architecture-item.is-covered {
+  border-color: #cfe6d5;
+  background: #f6fbf7;
+}
+
 .architecture-item span,
 .hint-text {
   color: var(--muted);
   font-size: 14px;
+}
+
+.compact-source-list {
+  margin-top: 6px;
+}
+
+.source-evidence {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.source-evidence small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .layer-row h4,

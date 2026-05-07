@@ -8,6 +8,7 @@ import {
   CONSULTANT_MVP_LAYERS,
   CONSULTANT_TOOL_TEMPLATES
 } from "../domain/consultant-mvp-schema.js";
+import { matchBusinessArchitectureToolsForSource } from "../domain/business-architecture-tool-matcher.js";
 import { analyzeDeepDiagnosticSources } from "./deep-diagnostic-analyzer.js";
 import { assessDiagnosticExcellence } from "./diagnostic-excellence-assessor.js";
 
@@ -160,6 +161,24 @@ function shouldPreserveRelatedLayers(source) {
   return source.type === "deep_diagnostic" || Boolean(source.sourceMeta?.deepDiagnostic);
 }
 
+function sourceToolMatches(source) {
+  return Array.isArray(source?.sourceMeta?.toolMatches) ? source.sourceMeta.toolMatches : [];
+}
+
+function classifySource(source) {
+  const toolMatches = matchBusinessArchitectureToolsForSource({
+    title: source.title,
+    fileUrl: source.fileUrl
+  });
+
+  return {
+    toolMatches,
+    relatedLayers: toolMatches.length
+      ? unique(toolMatches.map((match) => match.layerId), 11)
+      : detectLayersForText(sourceToText(source))
+  };
+}
+
 function buildCompanyContextSource(company) {
   const parts = [
     company.description ? `Описание: ${company.description}` : "",
@@ -214,10 +233,16 @@ function extractLayerFacts({ layer, sources }) {
   for (const source of sources) {
     const text = sourceToText(source);
     const normalized = normalizeText(text);
+    const toolMatches = sourceToolMatches(source);
+    const toolLayerHit = toolMatches.some((match) => match.layerId === layer.code);
     const explicitRelated = (source.relatedLayers || []).includes(layer.code);
-    const keywordHit = layer.keywords.some((keyword) => normalized.includes(keyword));
+    const keywordHit = !toolMatches.length && layer.keywords.some((keyword) => normalized.includes(keyword));
 
-    if (!explicitRelated && !keywordHit) {
+    if (toolMatches.length && !toolLayerHit) {
+      continue;
+    }
+
+    if (!toolMatches.length && !explicitRelated && !keywordHit) {
       continue;
     }
 
@@ -715,9 +740,16 @@ export class CompanyAnalysisCore {
     const sources = companyContextSource ? [companyContextSource, ...storedSources] : storedSources;
 
     for (const source of storedSources) {
-      source.relatedLayers = shouldPreserveRelatedLayers(source)
-        ? (source.relatedLayers || [])
-        : detectLayersForText(sourceToText(source));
+      if (shouldPreserveRelatedLayers(source)) {
+        source.relatedLayers = source.relatedLayers || [];
+      } else {
+        const classification = classifySource(source);
+        source.relatedLayers = classification.relatedLayers;
+        source.sourceMeta = {
+          ...(source.sourceMeta || {}),
+          toolMatches: classification.toolMatches
+        };
+      }
       source.aiSummary = source.aiSummary || compactSnippet(source.contentText, 260);
       source.processingStatus = source.processingStatus || "processed";
       source.processedAt = source.processedAt || nowIso();
@@ -842,4 +874,8 @@ export class CompanyAnalysisCore {
 
 export function detectConsultantLayersForText(text) {
   return detectLayersForText(text);
+}
+
+export function classifyConsultantSource(source) {
+  return classifySource(source);
 }
