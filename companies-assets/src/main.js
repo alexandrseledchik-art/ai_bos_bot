@@ -101,6 +101,65 @@ function layerLabel(layer) {
   return layer?.layerName || LAYER_LABELS[layer?.layerCode] || layer?.layerCode || "Слой";
 }
 
+function normalizeLookup(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replaceAll("ё", "е")
+    .replace(/[^а-яa-z0-9]+/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function lookupTokens(value) {
+  const stopWords = new Set([
+    "для",
+    "или",
+    "как",
+    "что",
+    "это",
+    "при",
+    "над",
+    "под",
+    "карта",
+    "канва",
+    "документ",
+    "матрица",
+    "шаблон",
+    "the",
+    "and",
+    "with",
+    "map",
+    "canvas"
+  ]);
+  return normalizeLookup(value)
+    .split(" ")
+    .filter((token) => token.length >= 4 && !stopWords.has(token));
+}
+
+function layerEvidenceText(layer, layerSources) {
+  return normalizeLookup([
+    ...(layer.facts || []),
+    ...Object.keys(layer.filledFields || {}),
+    ...Object.values(layer.filledFields || {}),
+    ...(layerSources || []).flatMap((source) => [
+      source.title,
+      source.aiSummary,
+      source.contentText,
+      source.fileUrl
+    ])
+  ].join(" "));
+}
+
+function architectureItemHasSignal(item, evidenceText) {
+  const domainTokens = lookupTokens(item.domain);
+  if (domainTokens.some((token) => evidenceText.includes(token))) {
+    return true;
+  }
+
+  const hintTokens = lookupTokens(item.toolHints).slice(0, 8);
+  return hintTokens.some((token) => evidenceText.includes(token));
+}
+
 function filledPercent(item) {
   const filled = Number(item.filledFieldsCount || Object.keys(item.filledFields || {}).length || 0);
   const missing = Number(item.missingFieldsCount || (item.missingFields || []).length || 0);
@@ -512,6 +571,15 @@ function renderDeepDiagnostic(detail) {
 function renderLayers(detail) {
   const rows = detail.layerAnalyses || [];
   const sourceById = new Map((detail.sources || []).map((source) => [source.id, source]));
+  const architectureItemsByLayer = (detail.architectureItems || []).reduce((map, item) => {
+    const key = item.layerCode || "";
+    if (!map.has(key)) {
+      map.set(key, []);
+    }
+    map.get(key).push(item);
+    return map;
+  }, new Map());
+
   return `
     <section class="content-section">
       <div class="section-head">
@@ -520,37 +588,117 @@ function renderLayers(detail) {
       <div class="stack">
         ${rows.length ? rows.map((layer, index) => {
           const percent = filledPercent(layer);
-          const layerSources = (layer.sourceIds || [])
-            .map((sourceId) => sourceById.get(sourceId))
+          const layerSources = [
+            ...(layer.sourceIds || []).map((sourceId) => sourceById.get(sourceId)),
+            ...(detail.sources || []).filter((source) => (source.relatedLayers || []).includes(layer.layerCode))
+          ]
             .filter(Boolean)
+            .filter((source, sourceIndex, sources) => sources.findIndex((item) => item.id === source.id) === sourceIndex)
             .slice(0, 5);
+          const architectureItems = architectureItemsByLayer.get(layer.layerCode) || [];
+          const evidenceText = layerEvidenceText(layer, layerSources);
+          const filledEntries = Object.entries(layer.filledFields || {});
+          const missingFields = layer.missingFields || [];
+          const coveredArchitectureItems = architectureItems.filter((item) => architectureItemHasSignal(item, evidenceText));
+          const uncoveredArchitectureItems = architectureItems.filter((item) => !architectureItemHasSignal(item, evidenceText));
           return `
-            <article class="layer-row">
-              <div>
-                <h4>${escapeHtml(layerLabel(layer))}</h4>
-                <span class="meta">Слой ${index + 1} из 11</span>
-                <span class="pill ${confidenceClass(layer.confidence)}">${escapeHtml(confidenceLabel(layer.confidence))}</span>
-              </div>
-              <div>
-                <p>${escapeHtml((layer.conclusions || [])[0] || "")}</p>
-                <ul class="split-list">
-                  ${(layer.facts || []).slice(0, 2).map((fact) => `<li>${escapeHtml(fact)}</li>`).join("")}
-                </ul>
-                ${layerSources.length ? `
-                  <div class="source-link-list">
-                    <strong>Артефакты слоя:</strong>
-                    ${layerSources.map((source) => source.fileUrl
-                      ? `<a href="${escapeHtml(source.fileUrl)}" target="_blank" rel="noreferrer">${escapeHtml(source.title || source.fileUrl)}</a>`
-                      : `<span>${escapeHtml(source.title || "Источник")}</span>`
-                    ).join("")}
+            <details class="layer-row layer-row-details" ${index === 0 ? "open" : ""}>
+              <summary class="layer-summary">
+                <div>
+                  <h4>${escapeHtml(layerLabel(layer))}</h4>
+                  <span class="meta">Слой ${index + 1} из 11</span>
+                  <span class="pill ${confidenceClass(layer.confidence)}">${escapeHtml(confidenceLabel(layer.confidence))}</span>
+                </div>
+                <div>
+                  <p>${escapeHtml((layer.conclusions || [])[0] || "")}</p>
+                  <div class="layer-quick-stats">
+                    <span>${escapeHtml(filledEntries.length)} собрано</span>
+                    <span>${escapeHtml(missingFields.length)} не заполнено</span>
+                    <span>${escapeHtml(coveredArchitectureItems.length)} сигналов по архитектуре</span>
                   </div>
-                ` : ""}
+                </div>
+                <div>
+                  <span class="meta">${percent}%</span>
+                  <div class="progress" aria-hidden="true"><span style="--value: ${percent}%"></span></div>
+                  <span class="layer-toggle"></span>
+                </div>
+              </summary>
+              <div class="layer-expand">
+                <div class="layer-expand-grid">
+                  <div class="layer-panel">
+                    <h5>Эталон слоя</h5>
+                    <p>Это минимальные параметры, с которыми AI-BOSS сравнивает реальность перед выводом по слою.</p>
+                    <div class="parameter-list">
+                      ${filledEntries.length ? filledEntries.map(([field, value]) => `
+                        <div class="parameter-row is-covered">
+                          <span class="parameter-status">✓</span>
+                          <div>
+                            <strong>${escapeHtml(field)}</strong>
+                            <p>${escapeHtml(value)}</p>
+                          </div>
+                        </div>
+                      `).join("") : ""}
+                      ${missingFields.length ? missingFields.map((field) => `
+                        <div class="parameter-row is-missing">
+                          <span class="parameter-status">!</span>
+                          <div>
+                            <strong>${escapeHtml(field)}</strong>
+                            <p>По этому параметру пока нет достаточного факта или документа.</p>
+                          </div>
+                        </div>
+                      `).join("") : ""}
+                      ${!filledEntries.length && !missingFields.length ? `<p class="hint-text">Эталон слоя ещё не собран. Запусти анализ или добавь источники.</p>` : ""}
+                    </div>
+                  </div>
+                  <div class="layer-panel">
+                    <h5>Параметры архитектуры</h5>
+                    <p>Более детальная карта доменов и поддоменов слоя. Она помогает понять, какие зоны уже проявились в данных, а какие ещё пустые.</p>
+                    <div class="architecture-split">
+                      <div>
+                        <strong>Есть сигналы</strong>
+                        <div class="pill-row">
+                          ${coveredArchitectureItems.length
+                            ? coveredArchitectureItems.slice(0, 18).map((item) => `<span class="pill green">${escapeHtml(item.domain)}</span>`).join("")
+                            : `<span class="hint-text">Пока не видно.</span>`}
+                        </div>
+                      </div>
+                      <div>
+                        <strong>Нужно добрать</strong>
+                        <div class="architecture-list">
+                          ${uncoveredArchitectureItems.length
+                            ? uncoveredArchitectureItems.map((item) => `
+                              <div class="architecture-item">
+                                <strong>${escapeHtml(item.domain)}</strong>
+                                <span>${escapeHtml(item.block || "Параметр")}</span>
+                                <p>${escapeHtml(item.description || "")}</p>
+                              </div>
+                            `).join("")
+                            : `<p class="hint-text">По всем параметрам слоя уже есть хотя бы первичные сигналы.</p>`}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="layer-panel">
+                  <h5>Факты и артефакты</h5>
+                  ${(layer.facts || []).length ? `
+                    <ul class="split-list">
+                      ${(layer.facts || []).map((fact) => `<li>${escapeHtml(fact)}</li>`).join("")}
+                    </ul>
+                  ` : `<p class="hint-text">Факты по слою пока не выделены.</p>`}
+                  ${layerSources.length ? `
+                    <div class="source-link-list">
+                      <strong>Артефакты слоя:</strong>
+                      ${layerSources.map((source) => source.fileUrl
+                        ? `<a href="${escapeHtml(source.fileUrl)}" target="_blank" rel="noreferrer">${escapeHtml(source.title || source.fileUrl)}</a>`
+                        : `<span>${escapeHtml(source.title || "Источник")}</span>`
+                      ).join("")}
+                    </div>
+                  ` : `<p class="hint-text">Привязанных артефактов пока нет.</p>`}
+                </div>
               </div>
-              <div>
-                <span class="meta">${percent}%</span>
-                <div class="progress" aria-hidden="true"><span style="--value: ${percent}%"></span></div>
-              </div>
-            </article>
+            </details>
           `;
         }).join("") : `<div class="empty-state"><h2>Слои не собраны</h2><p>Запусти анализ.</p></div>`}
       </div>

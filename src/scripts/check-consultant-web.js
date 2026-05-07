@@ -241,6 +241,7 @@ async function main() {
 
   const detail = await service.getCompany(created.company.id);
   assert.equal(detail.sources.length, 6);
+  assert.ok(detail.architectureItems.some((item) => item.layerCode === "owner_context" && item.domain === "Видение"));
   assert.ok(detail.analysis.probableConstraint.title);
 
   const list = await service.listCompanies();

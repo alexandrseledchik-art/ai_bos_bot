@@ -3,9 +3,24 @@ import {
   createCompanySource,
   nowIso
 } from "../domain/entities.js";
+import { BUSINESS_ARCHITECTURE_ITEMS } from "../domain/business-architecture-knowledge.js";
 import { PublicGoogleLinkReader } from "../infrastructure/google/public-google-link-reader.js";
 import { CompanyAnalysisCore, detectConsultantLayersForText } from "./company-analysis-core.js";
 import { importDeepDiagnosticXlsx } from "./deep-diagnostic-importer.js";
+
+const CONSULTANT_LAYER_ARCHITECTURE_ITEMS = BUSINESS_ARCHITECTURE_ITEMS
+  .filter((item) => item.block !== "Слой")
+  .map((item) => ({
+    number: item.number,
+    layerCode: item.layerId,
+    layerName: item.layer,
+    block: item.block,
+    domain: item.domain,
+    description: item.description,
+    action: item.action,
+    expectedResult: item.expectedResult,
+    toolHints: item.toolHints
+  }));
 
 function cleanText(value) {
   return String(value || "").trim();
@@ -240,6 +255,7 @@ export class ConsultantWebService {
         .filter((source) => source.companyId === companyId)
         .sort((left, right) => String(right.updatedAt || right.createdAt || "").localeCompare(String(left.updatedAt || left.createdAt || ""))),
       layerAnalyses: (state.layerAnalyses || []).filter((item) => item.companyId === companyId),
+      architectureItems: CONSULTANT_LAYER_ARCHITECTURE_ITEMS,
       toolResults: (state.toolResults || []).filter((item) => item.companyId === companyId),
       analysis,
       integrations: this.buildIntegrationsStatus(state, company),
