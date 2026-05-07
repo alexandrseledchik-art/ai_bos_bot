@@ -255,15 +255,25 @@ export class ConsultantWebService {
       source.companyId === company.id &&
       ["google_drive", "google_public_folder"].includes(source.sourceOrigin)
     );
+    const publicFolderSources = driveSources.filter((source) => source.sourceOrigin === "google_public_folder");
+    const serviceAccountSources = driveSources.filter((source) => source.sourceOrigin === "google_drive");
     const readableCount = driveSources.filter((source) => source.processingStatus === "processed" && cleanText(source.contentText)).length;
+    const serviceAccountReady = Boolean(this.googleDrive?.enabled);
+    const publicFolderConnected = publicFolderSources.length > 0;
 
     return {
       googleDrive: {
         type: "google_drive",
         title: "Google Drive",
-        configured: Boolean(this.googleDrive?.enabled),
-        status: this.googleDrive?.enabled ? "ready" : "not_configured",
+        configured: serviceAccountReady,
+        connected: serviceAccountReady || publicFolderConnected,
+        publicFolderConnected,
+        serviceAccountReady,
+        connectionMode: serviceAccountReady ? "service_account" : publicFolderConnected ? "public_folder_link" : "none",
+        status: serviceAccountReady ? "service_account_ready" : publicFolderConnected ? "public_folder_connected" : "not_connected",
         sourceCount: driveSources.length,
+        publicFolderSourceCount: publicFolderSources.length,
+        serviceAccountSourceCount: serviceAccountSources.length,
         readableCount,
         lastSyncedAt: latestTimestamp(driveSources),
         expectedFolderName: company.name,

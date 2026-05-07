@@ -334,7 +334,17 @@ function renderIntegrations(detail) {
   const integrations = detail.integrations || {};
   const drive = integrations.googleDrive || {};
   const apiConnectors = integrations.apiConnectors || [];
-  const driveReady = drive.status === "ready";
+  const driveServiceReady = Boolean(drive.configured || drive.status === "service_account_ready" || drive.status === "ready");
+  const drivePublicFolderConnected = Boolean(drive.publicFolderConnected || drive.status === "public_folder_connected" || Number(drive.publicFolderSourceCount || 0) > 0);
+  const driveConnected = Boolean(drive.connected || driveServiceReady || drivePublicFolderConnected);
+  const driveStatusLabel = driveServiceReady && drivePublicFolderConnected
+    ? "подключён"
+    : drivePublicFolderConnected
+      ? "папка подключена"
+      : driveServiceReady
+        ? "service account готов"
+        : "папка не подключена";
+  const publicFolderActionLabel = drivePublicFolderConnected ? "Обновить папку по ссылке" : "Подключить папку по ссылке";
 
   return `
     <section class="content-section">
@@ -349,27 +359,33 @@ function renderIntegrations(detail) {
           <div class="section-head compact-head">
             <div>
               <h3>Google Drive</h3>
-              <p>Массовая синхронизация читает папку компании через service account. Быстрый вариант без интеграции — вставить публичную ссылку на отдельный Google Doc или Sheet в источники.</p>
+              <p>Основной быстрый способ сейчас — подключить папку по публичной ссылке. AI-BOSS добавит файлы как источники компании и прочитает текст из Google Docs, Sheets и Slides, где это возможно.</p>
             </div>
-            <span class="pill ${driveReady ? "green" : "orange"}">${driveReady ? "подключён" : "не настроен"}</span>
+            <span class="pill ${driveConnected ? "green" : "orange"}">${driveStatusLabel}</span>
           </div>
           <div class="stack compact-stack">
-            <p><strong>Ожидаемая папка:</strong> ${escapeHtml(drive.expectedFolderName || detail.company?.name || "")}</p>
-            <p><strong>Источников из Drive:</strong> ${escapeHtml(drive.sourceCount || 0)} · прочитано текстом: ${escapeHtml(drive.readableCount || 0)}</p>
+            <p><strong>Рабочая папка:</strong> ${escapeHtml(drive.expectedFolderName || detail.company?.name || "")}</p>
+            <p><strong>Подключение по ссылке:</strong> ${drivePublicFolderConnected ? "подключено" : "не подключено"}</p>
+            <p><strong>Источников из Drive:</strong> ${escapeHtml(drive.sourceCount || 0)} · из папки по ссылке: ${escapeHtml(drive.publicFolderSourceCount || 0)} · прочитано текстом: ${escapeHtml(drive.readableCount || 0)}</p>
             <p><strong>Последняя синхронизация:</strong> ${escapeHtml(formatDate(drive.lastSyncedAt))}</p>
             <div class="actions inline-actions">
-              <button class="secondary" id="syncPublicGoogleFolderButton" type="button">Подключить папку по ссылке</button>
+              <button class="secondary" id="syncPublicGoogleFolderButton" type="button">${publicFolderActionLabel}</button>
             </div>
-            ${driveReady ? `
+            ${driveServiceReady ? `
               <div class="actions inline-actions">
                 <button id="syncGoogleDriveButton" type="button">Синхронизировать Drive</button>
               </div>
             ` : `
-              <p><strong>Важно:</strong> доступ по ссылке или расшаривание папки само по себе не подключает интеграцию. Приложению нужен service account: его email, private key и id корневой папки в Vercel env.</p>
-              <p>Если нужно быстро добавить файлы без service account, нажми «Подключить папку по ссылке» или добавь отдельный Google Doc / Sheet как источник.</p>
-              <div class="code-list">
-                ${(drive.setupRequired || []).map((item) => `<code>${escapeHtml(item)}</code>`).join("")}
-              </div>
+              <p><strong>${drivePublicFolderConnected ? "Важно:" : "Как подключить:"}</strong> ${drivePublicFolderConnected
+                ? "папка по ссылке уже подключена, её файлы учитываются в источниках и следующем анализе. Закрытая интеграция через service account не обязательна для этого сценария."
+                : "открой доступ к папке «Все, у кого есть ссылка, могут просматривать» и нажми «Подключить папку по ссылке»."}</p>
+              <details>
+                <summary>Закрытая интеграция через service account</summary>
+                <p>Этот вариант нужен позже, если нужно читать закрытую корневую папку без публичных ссылок. Тогда в Vercel env понадобятся:</p>
+                <div class="code-list">
+                  ${(drive.setupRequired || []).map((item) => `<code>${escapeHtml(item)}</code>`).join("")}
+                </div>
+              </details>
             `}
           </div>
         </article>
