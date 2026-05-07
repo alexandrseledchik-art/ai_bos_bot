@@ -1,4 +1,4 @@
-import { BUSINESS_ARCHITECTURE_TOOLS } from "./business-architecture-knowledge.js";
+import { BUSINESS_ARCHITECTURE_ITEMS, BUSINESS_ARCHITECTURE_TOOLS } from "./business-architecture-knowledge.js";
 
 function normalizeText(value) {
   return String(value || "")
@@ -30,6 +30,23 @@ function tokens(value) {
     "управленческий",
     "собственник",
     "собственника",
+    "клиент",
+    "клиенты",
+    "клиента",
+    "клиентов",
+    "клиентский",
+    "клиентская",
+    "клиентские",
+    "решение",
+    "решения",
+    "варианты",
+    "поиск",
+    "продукт",
+    "продукта",
+    "продуктом",
+    "компетенции",
+    "компетенций",
+    "компетенция",
     "цели",
     "цель",
     "инструмент",
@@ -41,6 +58,10 @@ function tokens(value) {
     "шаблон",
     "the",
     "and",
+    "customer",
+    "customers",
+    "client",
+    "clients",
     "with",
     "for",
     "map",
@@ -107,6 +128,83 @@ function scoreTool(tool, sourceText) {
   }
 
   return score;
+}
+
+function contentForSource({ contentText = "", aiSummary = "" } = {}) {
+  return normalizeText([contentText, aiSummary].filter(Boolean).join(" "));
+}
+
+function scoreArchitectureItem(item, sourceContent) {
+  if (!sourceContent) {
+    return 0;
+  }
+
+  const domain = normalizeText(item.domain || "");
+  const domainTokens = tokens(item.domain || "");
+  const toolHintTokens = tokens(item.toolHints || "");
+  const referenceTokens = tokens([
+    item.domain,
+    item.description,
+    item.action,
+    item.expectedResult,
+    item.toolHints
+  ].filter(Boolean).join(" "));
+
+  let score = 0;
+  const domainExact = domain.length >= 7 && sourceContent.includes(domain);
+  const matchedDomain = domainTokens.filter((token) => sourceContent.includes(token)).length;
+  const matchedTools = toolHintTokens.filter((token) => sourceContent.includes(token)).length;
+  const matchedReference = referenceTokens.filter((token) => sourceContent.includes(token)).length;
+  const requiredDomain = domainTokens.length <= 1 ? 1 : Math.min(2, domainTokens.length);
+
+  if (domainExact) {
+    score += 8;
+  }
+
+  if (matchedDomain >= requiredDomain) {
+    score += 5 + matchedDomain;
+  }
+
+  if (matchedTools >= 2) {
+    score += 4;
+  }
+
+  score += Math.min(6, matchedReference);
+
+  const enoughDomainEvidence = matchedDomain >= requiredDomain && matchedReference >= 3;
+  const enoughToolEvidence = matchedTools >= 2 && matchedReference >= 3;
+  const enoughExactEvidence = domainExact && matchedReference >= 2;
+
+  return enoughDomainEvidence || enoughToolEvidence || enoughExactEvidence ? score : 0;
+}
+
+export function matchBusinessArchitectureContentForSource(source = {}, { limit = 20, threshold = 12 } = {}) {
+  const sourceContent = contentForSource(source);
+  if (!sourceContent) {
+    return [];
+  }
+
+  return BUSINESS_ARCHITECTURE_ITEMS
+    .map((item) => ({
+      item,
+      score: scoreArchitectureItem(item, sourceContent)
+    }))
+    .filter((entry) => entry.score >= threshold)
+    .sort((left, right) =>
+      right.score - left.score ||
+      Number(left.item.number || 0) - Number(right.item.number || 0)
+    )
+    .slice(0, limit)
+    .map(({ item, score }) => ({
+      layerId: item.layerId,
+      layer: item.layer,
+      block: item.block,
+      domain: item.domain,
+      description: item.description,
+      toolHints: item.toolHints,
+      sourceRow: item.number,
+      score
+    }));
 }
 
 export function matchBusinessArchitectureToolsForSource({ title = "", fileUrl = "" } = {}, { limit = 8 } = {}) {

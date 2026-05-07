@@ -155,13 +155,17 @@ function sourceToolMatches(source) {
   return Array.isArray(source?.sourceMeta?.toolMatches) ? source.sourceMeta.toolMatches : [];
 }
 
+function sourceContentMatches(source) {
+  return Array.isArray(source?.sourceMeta?.contentMatches) ? source.sourceMeta.contentMatches : [];
+}
+
 function sourceMatchesLayerByTool(source, layerCode) {
   const matches = sourceToolMatches(source);
   return matches.some((match) => match.layerId === layerCode);
 }
 
-function sourceMatchesArchitectureItem(source, item) {
-  return sourceToolMatches(source).some((match) => sourceMatchCoversArchitectureItem(match, item));
+function sourceMatchesLayerByContent(source, layerCode) {
+  return sourceContentMatches(source).some((match) => match.layerId === layerCode);
 }
 
 function sourceMatchCoversArchitectureItem(match, item) {
@@ -172,13 +176,58 @@ function sourceArchitectureItemMatches(source, item) {
   return sourceToolMatches(source).filter((match) => sourceMatchCoversArchitectureItem(match, item));
 }
 
-function architectureItemEvidenceSources(item, sources) {
-  return sources
+function sourceArchitectureContentMatches(source, item) {
+  return sourceContentMatches(source).filter((match) => sourceMatchCoversArchitectureItem(match, item));
+}
+
+function sourceHasReadableContent(source) {
+  return normalizeLookup([source.contentText, source.aiSummary].filter(Boolean).join(" ")).length >= 40;
+}
+
+function architectureItemEvidence(item, sources) {
+  const directArtifacts = sources
     .map((source) => ({
       source,
-      matches: sourceArchitectureItemMatches(source, item)
+      matches: sourceArchitectureItemMatches(source, item),
+      contentMatches: sourceArchitectureContentMatches(source, item)
     }))
-    .filter((item) => item.matches.length);
+    .filter((entry) => entry.matches.length);
+  const confirmedArtifacts = directArtifacts.filter((entry) =>
+    entry.contentMatches.length || sourceHasReadableContent(entry.source)
+  );
+  const incompleteArtifacts = directArtifacts.filter((entry) => !sourceHasReadableContent(entry.source));
+  const draftSources = sources
+    .map((source) => ({
+      source,
+      contentMatches: sourceArchitectureContentMatches(source, item)
+    }))
+    .filter((entry) => entry.contentMatches.length && !sourceArchitectureItemMatches(entry.source, item).length);
+
+  return {
+    confirmedArtifacts,
+    incompleteArtifacts,
+    draftSources
+  };
+}
+
+function layerHasEvidence(source, layerCode) {
+  return sourceMatchesLayerByTool(source, layerCode) || sourceMatchesLayerByContent(source, layerCode);
+}
+
+function renderEvidenceEntry({ source, matches = [], contentMatches = [] }) {
+  const matchLabels = [
+    ...matches.map((match) => match.name || match.domain),
+    ...contentMatches.map((match) => match.domain || match.description)
+  ].filter(Boolean);
+
+  return `
+    <span class="source-evidence">
+      ${source.fileUrl
+        ? `<a href="${escapeHtml(source.fileUrl)}" target="_blank" rel="noreferrer">${escapeHtml(source.title || source.fileUrl)}</a>`
+        : `<span>${escapeHtml(source.title || "Источник")}</span>`}
+      ${matchLabels.length ? `<small>${escapeHtml(matchLabels.join("; "))}</small>` : ""}
+    </span>
+  `;
 }
 
 function filledPercent(item) {
@@ -634,16 +683,26 @@ function renderLayers(detail) {
           ]
             .filter(Boolean)
             .filter((source, sourceIndex, sources) => sources.findIndex((item) => item.id === source.id) === sourceIndex)
-            .filter((source) => sourceMatchesLayerByTool(source, layer.layerCode))
+            .filter((source) => layerHasEvidence(source, layer.layerCode))
             .slice(0, 5);
           const filledEntries = Object.entries(layer.filledFields || {});
           const missingFields = layer.missingFields || [];
           const architectureRows = architectureItems.map((item) => ({
             ...item,
-            evidenceSources: architectureItemEvidenceSources(item, detail.sources || [])
+            evidence: architectureItemEvidence(item, detail.sources || [])
           }));
-          const coveredArchitectureItems = architectureRows.filter((item) => item.evidenceSources.length);
-          const uncoveredArchitectureItems = architectureRows.filter((item) => !item.evidenceSources.length);
+          const confirmedArchitectureItems = architectureRows.filter((item) => item.evidence.confirmedArtifacts.length);
+          const draftArchitectureItems = architectureRows.filter((item) =>
+            !item.evidence.confirmedArtifacts.length && item.evidence.draftSources.length
+          );
+          const needsReviewArchitectureItems = architectureRows.filter((item) =>
+            !item.evidence.confirmedArtifacts.length && !item.evidence.draftSources.length && item.evidence.incompleteArtifacts.length
+          );
+          const missingArchitectureItems = architectureRows.filter((item) =>
+            !item.evidence.confirmedArtifacts.length &&
+            !item.evidence.draftSources.length &&
+            !item.evidence.incompleteArtifacts.length
+          );
           const visibleFacts = layerSources.length ? (layer.facts || []) : [];
           return `
             <details class="layer-row layer-row-details" ${index === 0 ? "open" : ""}>
@@ -658,7 +717,8 @@ function renderLayers(detail) {
                   <div class="layer-quick-stats">
                     <span>${escapeHtml(filledEntries.length)} собрано</span>
                     <span>${escapeHtml(missingFields.length)} не заполнено</span>
-                    <span>${escapeHtml(coveredArchitectureItems.length)} параметров закрыто артефактами</span>
+                    <span>${escapeHtml(confirmedArchitectureItems.length)} подтверждено</span>
+                    <span>${escapeHtml(draftArchitectureItems.length)} можно собрать</span>
                   </div>
                 </div>
                 <div>
@@ -696,46 +756,71 @@ function renderLayers(detail) {
                   </div>
                   <div class="layer-panel">
                     <h5>Параметры архитектуры</h5>
-                    <p>Каждая строка считается собранной только если есть артефакт или инструмент из карты, который относится к этому слою и домену.</p>
+                    <p>Название файла само по себе не закрывает строку. AI-BOSS проверяет наполнение: если данные есть, но отдельного артефакта нет, строка попадает в «можно собрать артефакт».</p>
                     <div class="architecture-split">
                       <div>
-                        <strong>Собрано по артефактам</strong>
+                        <strong>Подтверждено артефактом</strong>
                         <div class="architecture-list">
-                          ${coveredArchitectureItems.length
-                            ? coveredArchitectureItems.map((item) => `
+                          ${confirmedArchitectureItems.length
+                            ? confirmedArchitectureItems.map((item) => `
                               <div class="architecture-item is-covered">
                                 <strong>${escapeHtml(item.domain)}</strong>
                                 <span>${escapeHtml(item.block || "Параметр")}</span>
                                 <p>${escapeHtml(item.description || "")}</p>
                                 <div class="source-link-list compact-source-list">
                                   <strong>Основание:</strong>
-                                  ${item.evidenceSources.map(({ source, matches }) => `
-                                    <span class="source-evidence">
-                                      ${source.fileUrl
-                                        ? `<a href="${escapeHtml(source.fileUrl)}" target="_blank" rel="noreferrer">${escapeHtml(source.title || source.fileUrl)}</a>`
-                                        : `<span>${escapeHtml(source.title || "Источник")}</span>`}
-                                      <small>${escapeHtml(matches.map((match) => match.name || match.domain).filter(Boolean).join("; "))}</small>
-                                    </span>
-                                  `
-                                  ).join("")}
+                                  ${item.evidence.confirmedArtifacts.map(renderEvidenceEntry).join("")}
                                 </div>
                               </div>
                             `).join("")
-                            : `<span class="hint-text">По этому слою пока нет артефактов, которые совпали с картой инструментов.</span>`}
+                            : `<span class="hint-text">Пока нет строки, где совпали и артефакт, и его содержание.</span>`}
                         </div>
+                        ${draftArchitectureItems.length ? `
+                          <strong class="subsection-title">Можно собрать артефакт</strong>
+                          <div class="architecture-list">
+                            ${draftArchitectureItems.map((item) => `
+                              <div class="architecture-item is-draftable">
+                                <strong>${escapeHtml(item.domain)}</strong>
+                                <span>${escapeHtml(item.block || "Параметр")}</span>
+                                <p>Данные уже есть в источниках, но отдельный артефакт по этой строке ещё не найден.</p>
+                                ${item.toolHints ? `<p><b>Что собрать:</b> ${escapeHtml(item.toolHints)}</p>` : ""}
+                                <div class="source-link-list compact-source-list">
+                                  <strong>Данные найдены:</strong>
+                                  ${item.evidence.draftSources.map(renderEvidenceEntry).join("")}
+                                </div>
+                              </div>
+                            `).join("")}
+                          </div>
+                        ` : ""}
+                        ${needsReviewArchitectureItems.length ? `
+                          <strong class="subsection-title">Артефакт есть, надо проверить наполнение</strong>
+                          <div class="architecture-list">
+                            ${needsReviewArchitectureItems.map((item) => `
+                              <div class="architecture-item is-review">
+                                <strong>${escapeHtml(item.domain)}</strong>
+                                <span>${escapeHtml(item.block || "Параметр")}</span>
+                                <p>Файл похож на нужный артефакт, но в прочитанном тексте пока не видно нужных данных по этой строке.</p>
+                                <div class="source-link-list compact-source-list">
+                                  <strong>Проверить:</strong>
+                                  ${item.evidence.incompleteArtifacts.map(renderEvidenceEntry).join("")}
+                                </div>
+                              </div>
+                            `).join("")}
+                          </div>
+                        ` : ""}
                       </div>
                       <div>
                         <strong>Нужно добрать</strong>
                         <div class="architecture-list">
-                          ${uncoveredArchitectureItems.length
-                            ? uncoveredArchitectureItems.map((item) => `
+                          ${missingArchitectureItems.length
+                            ? missingArchitectureItems.map((item) => `
                               <div class="architecture-item">
                                 <strong>${escapeHtml(item.domain)}</strong>
                                 <span>${escapeHtml(item.block || "Параметр")}</span>
                                 <p>${escapeHtml(item.description || "")}</p>
                               </div>
                             `).join("")
-                            : `<p class="hint-text">По всем параметрам слоя уже есть хотя бы первичные сигналы.</p>`}
+                            : `<p class="hint-text">По всем параметрам слоя есть артефакт, данные или кандидат на сборку.</p>`}
                         </div>
                       </div>
                     </div>
@@ -748,10 +833,10 @@ function renderLayers(detail) {
                     <ul class="split-list">
                       ${visibleFacts.map((fact) => `<li>${escapeHtml(fact)}</li>`).join("")}
                     </ul>
-                  ` : `<p class="hint-text">Факты по слою пока не подтверждены артефактами этого слоя.</p>`}
+                  ` : `<p class="hint-text">Факты по слою пока не подтверждены содержанием источников.</p>`}
                   ${layerSources.length ? `
                     <div class="source-link-list">
-                      <strong>Артефакты слоя:</strong>
+                      <strong>Источники слоя:</strong>
                       ${layerSources.map((source) => source.fileUrl
                         ? `<a href="${escapeHtml(source.fileUrl)}" target="_blank" rel="noreferrer">${escapeHtml(source.title || source.fileUrl)}</a>`
                         : `<span>${escapeHtml(source.title || "Источник")}</span>`

@@ -172,7 +172,8 @@ function enrichSourceForRead(source) {
   }
 
   const existingToolMatches = source?.sourceMeta?.toolMatches || [];
-  if (existingToolMatches.length) {
+  const existingContentMatches = source?.sourceMeta?.contentMatches || [];
+  if (existingToolMatches.length && existingContentMatches.length) {
     return source;
   }
 
@@ -182,7 +183,8 @@ function enrichSourceForRead(source) {
     relatedLayers: classification.relatedLayers,
     sourceMeta: {
       ...(source?.sourceMeta || {}),
-      toolMatches: classification.toolMatches
+      toolMatches: classification.toolMatches,
+      contentMatches: classification.contentMatches
     }
   };
 }
@@ -267,7 +269,8 @@ export class ConsultantWebService {
           aiSummary: comment,
           relatedLayers: classification.relatedLayers,
           sourceMeta: {
-            toolMatches: classification.toolMatches
+            toolMatches: classification.toolMatches,
+            contentMatches: classification.contentMatches
           }
         }));
       }
@@ -517,6 +520,7 @@ export class ConsultantWebService {
           relatedLayers: classification.relatedLayers,
           sourceMeta: {
             toolMatches: classification.toolMatches,
+            contentMatches: classification.contentMatches,
             googleDriveFileId: file.id,
             googleDriveFolderId: companyFolder.id,
             googleDriveFolderName: companyFolder.name || "",
@@ -620,6 +624,7 @@ export class ConsultantWebService {
           relatedLayers: classification.relatedLayers,
           sourceMeta: {
             toolMatches: classification.toolMatches,
+            contentMatches: classification.contentMatches,
             publicGoogleFolder: {
               id: folder.id,
               url: folderUrl,
@@ -740,7 +745,8 @@ export class ConsultantWebService {
       });
       source.sourceMeta = {
         ...(source.sourceMeta || {}),
-        toolMatches: classification.toolMatches
+        toolMatches: classification.toolMatches,
+        contentMatches: classification.contentMatches
       };
       state.companySources = state.companySources || [];
       state.companySources.push(source);

@@ -186,6 +186,13 @@ async function main() {
   assert.equal(customerJobs.relatedLayers.includes("external_environment"), true);
   assert.equal(customerJobs.relatedLayers.includes("product"), true);
 
+  const customerJobsWithContent = classifyConsultantSource({
+    title: "Customer & Jobs Map — Александр Селедчик | Управленческий консалтинг",
+    contentText: "Клиент ищет варианты решения. Customer & Jobs Map помогает понять, кто клиенты, какие задачи они решают с помощью продукта и насколько текущие решения их удовлетворяют."
+  });
+  assert.equal(customerJobsWithContent.relatedLayers.includes("governance"), false);
+  assert.equal(customerJobsWithContent.contentMatches.some((match) => match.layerId === "product"), true);
+
   const customerJourney = classifyConsultantSource({
     title: "Customer Journey Map — Александр Селедчик | Управленческий консалтинг"
   });
@@ -197,6 +204,13 @@ async function main() {
   });
   assert.deepEqual(ikigai.relatedLayers, ["owner_context"]);
   assert.equal(ikigai.toolMatches.some((match) => String(match.domain || "").includes("Цели")), false);
+
+  const teamDraftSource = classifyConsultantSource({
+    title: "Заметка о команде",
+    contentText: "Нет отдельного документа, но в заметке описаны роли, зоны ответственности, нагрузка и компетенции команды."
+  });
+  assert.equal(teamDraftSource.toolMatches.length, 0);
+  assert.equal(teamDraftSource.contentMatches.some((match) => match.layerId === "team" && match.domain === "Роли и зоны влияния"), true);
 
   const store = new InMemoryStore();
   const service = new ConsultantWebService({

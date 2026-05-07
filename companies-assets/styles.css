@@ -672,6 +672,21 @@ label {
   background: #f6fbf7;
 }
 
+.architecture-item.is-draftable {
+  border-color: #e4d4bf;
+  background: #fff9ef;
+}
+
+.architecture-item.is-review {
+  border-color: #d4dee0;
+  background: #f7faf9;
+}
+
+.subsection-title {
+  display: block;
+  margin-top: 18px;
+}
+
 .architecture-item span,
 .hint-text {
   color: var(--muted);

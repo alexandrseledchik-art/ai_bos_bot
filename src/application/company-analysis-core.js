@@ -8,7 +8,10 @@ import {
   CONSULTANT_MVP_LAYERS,
   CONSULTANT_TOOL_TEMPLATES
 } from "../domain/consultant-mvp-schema.js";
-import { matchBusinessArchitectureToolsForSource } from "../domain/business-architecture-tool-matcher.js";
+import {
+  matchBusinessArchitectureContentForSource,
+  matchBusinessArchitectureToolsForSource
+} from "../domain/business-architecture-tool-matcher.js";
 import { analyzeDeepDiagnosticSources } from "./deep-diagnostic-analyzer.js";
 import { assessDiagnosticExcellence } from "./diagnostic-excellence-assessor.js";
 
@@ -157,6 +160,13 @@ function sourceToText(source) {
   ].filter(Boolean).join("\n");
 }
 
+function sourceEvidenceText(source) {
+  return [
+    source.aiSummary,
+    source.contentText
+  ].filter(Boolean).join("\n");
+}
+
 function shouldPreserveRelatedLayers(source) {
   return source.type === "deep_diagnostic" || Boolean(source.sourceMeta?.deepDiagnostic);
 }
@@ -165,17 +175,28 @@ function sourceToolMatches(source) {
   return Array.isArray(source?.sourceMeta?.toolMatches) ? source.sourceMeta.toolMatches : [];
 }
 
+function sourceContentMatches(source) {
+  return Array.isArray(source?.sourceMeta?.contentMatches) ? source.sourceMeta.contentMatches : [];
+}
+
 function classifySource(source) {
   const toolMatches = matchBusinessArchitectureToolsForSource({
     title: source.title,
     fileUrl: source.fileUrl
   });
+  const contentMatches = matchBusinessArchitectureContentForSource({
+    contentText: source.contentText,
+    aiSummary: source.aiSummary
+  });
+  const relatedLayers = unique([
+    ...toolMatches.map((match) => match.layerId),
+    ...contentMatches.map((match) => match.layerId)
+  ], 11);
 
   return {
     toolMatches,
-    relatedLayers: toolMatches.length
-      ? unique(toolMatches.map((match) => match.layerId), 11)
-      : detectLayersForText(sourceToText(source))
+    contentMatches,
+    relatedLayers: relatedLayers.length ? relatedLayers : detectLayersForText(sourceToText(source))
   };
 }
 
@@ -231,25 +252,30 @@ function extractLayerFacts({ layer, sources }) {
   const sourceIds = new Set();
 
   for (const source of sources) {
-    const text = sourceToText(source);
-    const normalized = normalizeText(text);
+    const evidenceText = sourceEvidenceText(source);
+    const normalized = normalizeText(evidenceText);
     const toolMatches = sourceToolMatches(source);
-    const toolLayerHit = toolMatches.some((match) => match.layerId === layer.code);
+    const contentMatches = sourceContentMatches(source);
+    const contentLayerHit = contentMatches.some((match) => match.layerId === layer.code);
     const explicitRelated = (source.relatedLayers || []).includes(layer.code);
-    const keywordHit = !toolMatches.length && layer.keywords.some((keyword) => normalized.includes(keyword));
+    const keywordHit = !toolMatches.length && !contentMatches.length && layer.keywords.some((keyword) => normalized.includes(keyword));
 
-    if (toolMatches.length && !toolLayerHit) {
+    if (!evidenceText.trim()) {
       continue;
     }
 
-    if (!toolMatches.length && !explicitRelated && !keywordHit) {
+    if (toolMatches.length && !contentLayerHit) {
       continue;
     }
 
-    const sentence = splitSentences(text).find((item) => {
+    if (!toolMatches.length && !contentLayerHit && !explicitRelated && !keywordHit) {
+      continue;
+    }
+
+    const sentence = splitSentences(evidenceText).find((item) => {
       const normalizedSentence = normalizeText(item);
       return layer.keywords.some((keyword) => normalizedSentence.includes(keyword));
-    }) || text;
+    }) || evidenceText;
 
     facts.push(compactSnippet(sentence));
     sourceIds.add(source.id);
@@ -747,7 +773,8 @@ export class CompanyAnalysisCore {
         source.relatedLayers = classification.relatedLayers;
         source.sourceMeta = {
           ...(source.sourceMeta || {}),
-          toolMatches: classification.toolMatches
+          toolMatches: classification.toolMatches,
+          contentMatches: classification.contentMatches
         };
       }
       source.aiSummary = source.aiSummary || compactSnippet(source.contentText, 260);
