@@ -266,6 +266,9 @@ async function main() {
   assert.equal(analyzed.layerAnalyses.length, 11);
   assert.equal(analyzed.toolResults.length, 11);
   assert.ok(analyzed.analysis.nextStep.title);
+  assert.ok(analyzed.analysis.nextStep.basis?.length);
+  assert.ok(analyzed.analysis.probableConstraint.selectionBasis?.length);
+  assert.ok(analyzed.analysis.probableConstraint.evidence?.length);
   assert.ok(analyzed.analysis.diagnosticQuality?.score10 >= 8);
   assert.ok(
     analyzed.layerAnalyses.some((layer) =>

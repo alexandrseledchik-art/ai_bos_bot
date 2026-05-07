@@ -315,6 +315,16 @@ label {
   gap: 14px;
 }
 
+.evidence-grid {
+  margin-top: 14px;
+}
+
+.evidence-grid .card {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -748,6 +758,10 @@ label {
   margin: 10px 0 0;
   padding-left: 18px;
   color: var(--muted);
+}
+
+.compact-list {
+  margin-top: 0;
 }
 
 .modal-backdrop {

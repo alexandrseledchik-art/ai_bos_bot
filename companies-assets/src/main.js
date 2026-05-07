@@ -97,6 +97,56 @@ function diagnosticQualityLabel(score) {
   return `диагностическая логика: ${score}/10`;
 }
 
+function asArray(value) {
+  return Array.isArray(value) ? value.filter(Boolean) : [];
+}
+
+function renderSmallList(items, emptyText = "Пока нет данных.") {
+  const rows = asArray(items).filter((item) => String(item || "").trim());
+  if (!rows.length) {
+    return `<p class="hint-text">${escapeHtml(emptyText)}</p>`;
+  }
+
+  return `
+    <ul class="split-list compact-list">
+      ${rows.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+    </ul>
+  `;
+}
+
+function renderLayerEvidenceRows(layers = []) {
+  const rows = asArray(layers).slice(0, 5);
+  if (!rows.length) {
+    return `<p class="hint-text">Цепочка слоёв пока не собрана.</p>`;
+  }
+
+  return `
+    <div class="stack compact-stack">
+      ${rows.map((layer) => `
+        <div class="mini-row evidence-row">
+          <strong>${escapeHtml(layer.layerName || layer.layer || "Слой")}</strong>
+          <span>${escapeHtml(confidenceLabel(layer.confidence))}</span>
+          ${asArray(layer.facts).length ? `<p><b>Факты:</b> ${escapeHtml(asArray(layer.facts).slice(0, 2).join("; "))}</p>` : ""}
+          ${asArray(layer.missingFields).length ? `<p><b>Не хватает:</b> ${escapeHtml(asArray(layer.missingFields).slice(0, 3).join(", "))}</p>` : ""}
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderRejectedRows(rejected = []) {
+  const rows = asArray(rejected).slice(0, 4);
+  if (!rows.length) {
+    return `<p class="hint-text">Альтернативы пока не выделены.</p>`;
+  }
+
+  return `
+    <ul class="split-list compact-list">
+      ${rows.map((item) => `<li><strong>${escapeHtml(item.layerName || item.layer || "Версия")}</strong> — ${escapeHtml(item.reason || "объясняет запрос слабее основной версии")}</li>`).join("")}
+    </ul>
+  `;
+}
+
 function layerLabel(layer) {
   return layer?.layerName || LAYER_LABELS[layer?.layerCode] || layer?.layerCode || "Слой";
 }
@@ -339,6 +389,14 @@ function renderOverview(detail) {
   const nextStep = analysis?.nextStep || company.nextStep || {};
   const parallelActions = analysis?.parallelActions || constraint.parallelActions || [];
   const diagnosticQuality = analysis?.diagnosticQuality || {};
+  const rejectedHypotheses = analysis?.rejectedHypotheses || constraint.rejectedAlternatives || [];
+  const diagnosticChain = analysis?.diagnosticChain || constraint.relatedLayers || [];
+  const evidence = asArray(constraint.evidence).length
+    ? asArray(constraint.evidence)
+    : asArray(analysis?.keyProblemAreas).flatMap((item) => asArray(item.evidence)).slice(0, 4);
+  const selectionBasis = asArray(constraint.selectionBasis);
+  const missingForHigh = asArray(constraint.missingForHigh);
+  const nextStepBasis = asArray(nextStep.basis);
   const layerSummary = analysis?.layerSummary || [];
   const avgFilled = layerSummary.length
     ? Math.round(layerSummary.reduce((sum, item) => sum + filledPercent(item), 0) / layerSummary.length)
@@ -410,6 +468,36 @@ function renderOverview(detail) {
           ${nextStep.why ? `<p><strong>Зачем:</strong> ${escapeHtml(nextStep.why)}</p>` : ""}
         </article>
       </div>
+      ${analysis ? `
+        <div class="grid-two evidence-grid">
+          <article class="card">
+            <h3>Почему такой вывод</h3>
+            ${selectionBasis.length ? `
+              <p><strong>Логика выбора:</strong></p>
+              ${renderSmallList(selectionBasis)}
+            ` : ""}
+            <p><strong>Факты и сигналы:</strong></p>
+            ${renderSmallList(evidence, "Пока нет явных фактов в выводе. Нужно открыть слои и источники.")}
+            <p><strong>Слои, которые участвовали в версии:</strong></p>
+            ${renderLayerEvidenceRows(diagnosticChain)}
+            <p><strong>Что пока не считаю главным ограничением:</strong></p>
+            ${renderRejectedRows(rejectedHypotheses)}
+          </article>
+          <article class="card">
+            <h3>Почему именно этот следующий шаг</h3>
+            ${nextStepBasis.length ? renderSmallList(nextStepBasis) : renderSmallList([
+              nextStep.why || "Шаг выбран как минимальная проверка текущей версии.",
+              "Он должен снизить неопределённость, а не сразу запустить большой проект изменений."
+            ])}
+            ${nextStep.expectedResult ? `<p><strong>Что должно получиться:</strong> ${escapeHtml(nextStep.expectedResult)}</p>` : ""}
+            ${nextStep.successCriteria ? `<p><strong>Критерий результата:</strong> ${escapeHtml(nextStep.successCriteria)}</p>` : ""}
+            ${missingForHigh.length ? `
+              <p><strong>Что нужно для высокой уверенности:</strong></p>
+              ${renderSmallList(missingForHigh.slice(0, 4))}
+            ` : ""}
+          </article>
+        </div>
+      ` : ""}
       ${diagnosticQuality.missing?.length ? `
         <article class="card">
           <h3>Что мешает диагностике быть 10/10</h3>
