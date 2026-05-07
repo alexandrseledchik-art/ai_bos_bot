@@ -48,6 +48,18 @@ Each reviewed object must include:
 - `improvementProposalIds`;
 - `outcome`.
 
+The review source should also expose links back to the original conversation:
+
+```json
+{
+  "conversationId": "",
+  "messageId": "",
+  "snapshotId": ""
+}
+```
+
+These fields can live in review metadata if they are not already present in the stored decision object. The goal is simple: an admin must be able to open the original message, answer and snapshot without guessing where the reviewed decision came from.
+
 ## 3. Review Status Lifecycle
 
 Allowed values:
@@ -168,6 +180,8 @@ The admin should see:
 - `executionContainer`;
 - evidence summary;
 - current `reviewStatus`;
+- `reviewerNotes`;
+- `autoReviewFindings`;
 - linked improvement proposals;
 - outcome status.
 
@@ -268,6 +282,18 @@ Examples:
 
 An improvement proposal is a structured suggestion created from review.
 
+Important distinction:
+
+- `severity` means how dangerous the error is;
+- `priority` means how fast the team should work on it.
+
+Examples:
+
+- `owner_authority_error` is usually high or critical severity;
+- `communication_error` is usually low or medium severity;
+- a low-severity issue can still have high priority if it affects many users;
+- a high-severity issue can have medium priority if it happened once and has a clear manual guard.
+
 Minimum fields:
 
 ```json
@@ -275,12 +301,21 @@ Minimum fields:
   "id": "...",
   "createdAt": "ISO_DATE",
   "sourceDecisionObjectId": "...",
+  "conversationId": "",
+  "messageId": "",
+  "snapshotId": "",
   "status": "proposed",
   "errorTypes": ["diagnostic_error"],
+  "severity": "low | medium | high | critical",
   "summary": "...",
   "recommendedChange": "...",
   "targetArea": "prompt | orchestrator | eval | ui | data | execution",
   "priority": "low | medium | high | critical",
+  "reviewerNotes": "",
+  "positivePattern": {
+    "isBenchmarkCandidate": false,
+    "why": ""
+  },
   "ownerDecisionRequired": false,
   "acceptedBy": "",
   "rejectedReason": "",
@@ -307,6 +342,21 @@ Alexander should accept or reject improvement proposals that affect:
 - business logic;
 - product direction;
 - paid consulting workflow.
+
+Alexander or another reviewer should be able to add `reviewerNotes` before accepting or rejecting a proposal.
+
+For accepted positive cases, the reviewer should be able to mark:
+
+```json
+{
+  "positivePattern": {
+    "isBenchmarkCandidate": true,
+    "why": "The answer separated symptom and cause, kept uncertainty visible and gave one executable next move."
+  }
+}
+```
+
+This allows strong answers to become benchmarks, not just approved records.
 
 The system can auto-accept only low-risk mechanical improvements:
 
@@ -404,7 +454,37 @@ If all structural checks pass:
 If checks fail:
 
 - set `reviewStatus = needs_improvement`;
-- create an improvement proposal with `targetArea = eval` or `orchestrator`.
+- add `autoReviewFindings`.
+
+Automatic review should create an improvement proposal only for critical structural violations.
+
+For ordinary structural issues, it should not flood the admin with proposals. It should:
+
+- mark `needs_improvement`;
+- store `autoReviewFindings`;
+- let a human decide whether a proposal is needed.
+
+Example:
+
+```json
+{
+  "autoReviewFindings": [
+    {
+      "code": "missing_owner_decision_type",
+      "severity": "medium",
+      "message": "ownerDecisionRequired is true, but ownerDecisionType is empty."
+    }
+  ]
+}
+```
+
+Proposal auto-creation is allowed only when:
+
+- schema is unreadable;
+- owner authority fields are missing on a high-risk decision;
+- execution transition has no execution container;
+- source linkage is absent and the object cannot be reviewed;
+- the answer creates a critical safety, legal, financial or reputational risk.
 
 ## 13. Manual Review Questions
 
@@ -438,6 +518,16 @@ MVP should include:
 - outcome editor;
 - basic automatic structural review.
 
+MVP review metadata should include:
+
+- `conversationId`;
+- `messageId`;
+- `snapshotId`;
+- `reviewerNotes`;
+- `autoReviewFindings`;
+- `severity`;
+- `positivePattern`.
+
 Do not build yet:
 
 - complex scoring dashboards;
@@ -446,7 +536,17 @@ Do not build yet:
 - full task management;
 - model fine-tuning workflow.
 
-## 15. Final Principle
+## 15. Implementation Prompt
+
+When this spec is handed to implementation, the prompt should be:
+
+> Implement Admin Review Loop on top of existing decisionObject records in snapshots.
+> Do not change the diagnostic engine.
+> Do not change the Supabase schema if review metadata can be stored inside snapshot / decisionObject JSON.
+> Build the MVP: list, filters, detail card, statuses, proposal creation, outcome editor and automatic structural review.
+> Auto-review should create proposals only for critical structural violations; otherwise it should store autoReviewFindings and mark the object needs_improvement.
+
+## 16. Final Principle
 
 Admin Review Loop exists to improve behavior without making the user experience heavier.
 
