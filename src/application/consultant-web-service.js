@@ -8,19 +8,35 @@ import { PublicGoogleLinkReader } from "../infrastructure/google/public-google-l
 import { CompanyAnalysisCore, classifyConsultantSource } from "./company-analysis-core.js";
 import { importDeepDiagnosticXlsx } from "./deep-diagnostic-importer.js";
 
-const CONSULTANT_LAYER_ARCHITECTURE_ITEMS = BUSINESS_ARCHITECTURE_ITEMS
-  .filter((item) => item.block !== "Слой")
-  .map((item) => ({
-    number: item.number,
-    layerCode: item.layerId,
-    layerName: item.layer,
-    block: item.block,
-    domain: item.domain,
-    description: item.description,
-    action: item.action,
-    expectedResult: item.expectedResult,
-    toolHints: item.toolHints
-  }));
+function buildConsultantArchitectureItems(items = []) {
+  const currentDomainByLayer = new Map();
+  return items.flatMap((item) => {
+    if (item.block === "Домен") {
+      currentDomainByLayer.set(item.layerId, item.domain);
+      return [];
+    }
+
+    if (item.block !== "Поддомен") {
+      return [];
+    }
+
+    return {
+      number: item.number,
+      layerCode: item.layerId,
+      layerName: item.layer,
+      block: item.block,
+      parentDomain: currentDomainByLayer.get(item.layerId) || "",
+      subdomain: item.domain,
+      domain: item.domain,
+      description: item.description,
+      action: item.action,
+      expectedResult: item.expectedResult,
+      toolHints: item.toolHints
+    };
+  });
+}
+
+const CONSULTANT_LAYER_ARCHITECTURE_ITEMS = buildConsultantArchitectureItems(BUSINESS_ARCHITECTURE_ITEMS);
 
 function cleanText(value) {
   return String(value || "").trim();
@@ -174,7 +190,10 @@ function enrichSourceForRead(source) {
   const existingToolMatches = source?.sourceMeta?.toolMatches || [];
   const existingContentMatches = source?.sourceMeta?.contentMatches || [];
   const contentMatchesHaveQuality = existingContentMatches.every((match) => match.contentQuality);
-  if (existingToolMatches.length && existingContentMatches.length && contentMatchesHaveQuality) {
+  const contentMatchesAreSubdomains = existingContentMatches.every((match) =>
+    match.block === "Поддомен" && (match.subdomain || match.domain)
+  );
+  if (existingToolMatches.length && existingContentMatches.length && contentMatchesHaveQuality && contentMatchesAreSubdomains) {
     return source;
   }
 

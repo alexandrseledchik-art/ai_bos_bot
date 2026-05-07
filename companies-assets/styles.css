@@ -673,12 +673,81 @@ label {
   gap: 14px;
 }
 
+.domain-coverage-list {
+  display: grid;
+  gap: 10px;
+}
+
+.domain-group {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.domain-group summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 170px);
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.domain-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.domain-group summary:hover {
+  background: var(--panel-soft);
+}
+
+.domain-group summary strong {
+  display: block;
+  color: var(--ink);
+}
+
+.domain-group summary span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.domain-group .architecture-list {
+  border-top: 1px solid var(--line);
+  padding: 12px;
+  background: #fbfcfb;
+}
+
+.domain-meter {
+  display: grid;
+  gap: 6px;
+}
+
+.domain-meter > span {
+  text-align: right;
+  color: var(--ink);
+  font-weight: 900;
+}
+
 .architecture-item {
   display: grid;
   gap: 4px;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px;
+}
+
+.architecture-item-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.architecture-item-head em {
+  align-self: start;
 }
 
 .architecture-item.is-covered {
@@ -896,6 +965,15 @@ label {
   .layer-summary,
   .layer-expand-grid {
     grid-template-columns: 1fr;
+  }
+
+  .domain-group summary,
+  .architecture-item-head {
+    grid-template-columns: 1fr;
+  }
+
+  .domain-meter > span {
+    text-align: left;
   }
 
   .data-drawer summary {

@@ -153,6 +153,26 @@ function businessDetailScore(sourceContent) {
   return detailSignals.reduce((count, pattern) => count + Number(pattern.test(sourceContent)), 0);
 }
 
+function businessArchitectureSubdomainItems() {
+  const currentDomainByLayer = new Map();
+  return BUSINESS_ARCHITECTURE_ITEMS.flatMap((item) => {
+    if (item.block === "Домен") {
+      currentDomainByLayer.set(item.layerId, item.domain);
+      return [];
+    }
+
+    if (item.block !== "Поддомен") {
+      return [];
+    }
+
+    return {
+      ...item,
+      parentDomain: currentDomainByLayer.get(item.layerId) || "",
+      subdomain: item.domain
+    };
+  });
+}
+
 export function assessArchitectureItemContent(item, source = {}) {
   const sourceContent = contentForSource(source);
   if (!sourceContent) {
@@ -262,7 +282,7 @@ export function matchBusinessArchitectureContentForSource(source = {}, { limit =
     return [];
   }
 
-  return BUSINESS_ARCHITECTURE_ITEMS
+  return businessArchitectureSubdomainItems()
     .map((item) => {
       const assessment = assessArchitectureItemContent(item, source);
       return {
@@ -281,6 +301,8 @@ export function matchBusinessArchitectureContentForSource(source = {}, { limit =
       layerId: item.layerId,
       layer: item.layer,
       block: item.block,
+      parentDomain: item.parentDomain,
+      subdomain: item.subdomain,
       domain: item.domain,
       description: item.description,
       toolHints: item.toolHints,

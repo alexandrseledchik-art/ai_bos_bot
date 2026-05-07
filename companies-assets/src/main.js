@@ -304,8 +304,16 @@ function sourceMatchesLayerByContent(source, layerCode) {
   return sourceContentMatches(source).some((match) => match.layerId === layerCode);
 }
 
+function itemSubdomain(item) {
+  return item?.subdomain || item?.domain || "";
+}
+
+function itemParentDomain(item) {
+  return item?.parentDomain || "Без домена";
+}
+
 function sourceMatchCoversArchitectureItem(match, item) {
-  return match.layerId === item.layerCode && domainsOverlap(match.domain, item.domain);
+  return match.layerId === item.layerCode && domainsOverlap(match.subdomain || match.domain, itemSubdomain(item));
 }
 
 function sourceArchitectureItemMatches(source, item) {
@@ -457,7 +465,7 @@ function layerHasEvidence(source, layerCode) {
 function renderEvidenceEntry({ source, matches = [], contentMatches = [], quality = null }) {
   const matchLabels = [
     ...matches.map((match) => match.name || match.domain),
-    ...contentMatches.map((match) => match.domain || match.description)
+    ...contentMatches.map((match) => match.subdomain || match.domain || match.description)
   ].filter(Boolean);
 
   return `
@@ -478,6 +486,73 @@ function filledPercent(item) {
   const missing = Number(item.missingFieldsCount || (item.missingFields || []).length || 0);
   const total = filled + missing;
   return total ? Math.round((filled / total) * 100) : 0;
+}
+
+function architectureItemStatus(item) {
+  if (item.evidence.confirmedArtifacts.length) {
+    return {
+      code: "covered",
+      label: "Артефакт заполнен",
+      percent: 100,
+      className: "is-covered"
+    };
+  }
+
+  if (item.evidence.incompleteArtifacts.length) {
+    const hasPartial = item.evidence.incompleteArtifacts.some((entry) => entry.quality.status === "partial");
+    return {
+      code: "review",
+      label: hasPartial ? "Нужно дополнить" : "Проверить содержание",
+      percent: hasPartial ? 55 : 25,
+      className: "is-review"
+    };
+  }
+
+  if (item.evidence.draftSources.length) {
+    return {
+      code: "draft",
+      label: "Есть данные, артефакт не собран",
+      percent: 35,
+      className: "is-draftable"
+    };
+  }
+
+  return {
+    code: "missing",
+    label: "Нет данных",
+    percent: 0,
+    className: ""
+  };
+}
+
+function coveragePercent(items = []) {
+  if (!items.length) {
+    return 0;
+  }
+
+  const total = items.reduce((sum, item) => sum + architectureItemStatus(item).percent, 0);
+  return Math.round(total / items.length);
+}
+
+function groupArchitectureRowsByDomain(items = []) {
+  const groups = new Map();
+  for (const item of items) {
+    const domain = itemParentDomain(item);
+    if (!groups.has(domain)) {
+      groups.set(domain, []);
+    }
+    groups.get(domain).push(item);
+  }
+
+  return [...groups.entries()].map(([domain, rows]) => ({
+    domain,
+    rows,
+    percent: coveragePercent(rows),
+    confirmedCount: rows.filter((item) => architectureItemStatus(item).code === "covered").length,
+    draftCount: rows.filter((item) => architectureItemStatus(item).code === "draft").length,
+    reviewCount: rows.filter((item) => architectureItemStatus(item).code === "review").length,
+    missingCount: rows.filter((item) => architectureItemStatus(item).code === "missing").length
+  }));
 }
 
 function formatScore(value) {
@@ -956,7 +1031,6 @@ function renderLayers(detail) {
       </div>
       <div class="stack">
         ${rows.length ? rows.map((layer, index) => {
-          const percent = filledPercent(layer);
           const architectureItems = architectureItemsByLayer.get(layer.layerCode) || [];
           const layerSources = [
             ...(layer.sourceIds || []).map((sourceId) => sourceById.get(sourceId)),
@@ -972,6 +1046,8 @@ function renderLayers(detail) {
             ...item,
             evidence: architectureItemEvidence(item, detail.sources || [])
           }));
+          const percent = architectureRows.length ? coveragePercent(architectureRows) : filledPercent(layer);
+          const domainGroups = groupArchitectureRowsByDomain(architectureRows);
           const confirmedArchitectureItems = architectureRows.filter((item) => item.evidence.confirmedArtifacts.length);
           const draftArchitectureItems = architectureRows.filter((item) =>
             !item.evidence.confirmedArtifacts.length && item.evidence.draftSources.length
@@ -998,8 +1074,10 @@ function renderLayers(detail) {
                   <div class="layer-quick-stats">
                     <span>${escapeHtml(filledEntries.length)} собрано</span>
                     <span>${escapeHtml(missingFields.length)} не заполнено</span>
-                    <span>${escapeHtml(confirmedArchitectureItems.length)} подтверждено</span>
+                    <span>${escapeHtml(confirmedArchitectureItems.length)} поддоменов подтверждено</span>
+                    <span>${escapeHtml(needsReviewArchitectureItems.length)} проверить</span>
                     <span>${escapeHtml(draftArchitectureItems.length)} можно собрать</span>
+                    <span>${escapeHtml(missingArchitectureItems.length)} без данных</span>
                   </div>
                 </div>
                 <div>
@@ -1036,74 +1114,65 @@ function renderLayers(detail) {
                     </div>
                   </div>
                   <div class="layer-panel">
-                    <h5>Параметры архитектуры</h5>
-                    <p>Строку закрывает только свой артефакт из карты инструментов и его содержание. Данные из чужих инструментов могут быть связанной опорой, но не заменяют отсутствующий артефакт.</p>
-                    <div class="architecture-split">
-                      <div>
-                        <strong>Проверено: артефакт заполнен</strong>
-                        <div class="architecture-list">
-                          ${confirmedArchitectureItems.length
-                            ? confirmedArchitectureItems.map((item) => `
-                              <div class="architecture-item is-covered">
-                                <strong>${escapeHtml(item.domain)}</strong>
-                                <span>${escapeHtml(item.block || "Параметр")}</span>
-                                <p>${escapeHtml(item.description || "")}</p>
-                                <div class="source-link-list compact-source-list">
-                                  <strong>Основание:</strong>
-                                  ${item.evidence.confirmedArtifacts.map(renderEvidenceEntry).join("")}
-                                </div>
-                              </div>
-                            `).join("")
-                            : `<span class="hint-text">Пока нет строки, где совпали и артефакт, и его содержание.</span>`}
-                        </div>
-                        ${draftArchitectureItems.length ? `
-                          <strong class="subsection-title">Можно собрать артефакт</strong>
+                    <h5>Домены и поддомены</h5>
+                    <p>Слой и домен показывают общую заполненность. Рабочая единица ниже — поддомен: именно по нему проверяется свой артефакт, его содержание и недостающие данные.</p>
+                    <div class="domain-coverage-list">
+                      ${domainGroups.length ? domainGroups.map((group) => `
+                        <details class="domain-group" ${group.percent < 100 ? "open" : ""}>
+                          <summary>
+                            <div>
+                              <strong>${escapeHtml(group.domain)}</strong>
+                              <span>${escapeHtml(group.confirmedCount)} подтверждено · ${escapeHtml(group.reviewCount)} проверить · ${escapeHtml(group.draftCount)} можно собрать · ${escapeHtml(group.missingCount)} пусто · ${escapeHtml(group.rows.length)} поддоменов</span>
+                            </div>
+                            <div class="domain-meter">
+                              <span>${escapeHtml(group.percent)}%</span>
+                              <div class="progress" aria-hidden="true"><span style="--value: ${group.percent}%"></span></div>
+                            </div>
+                          </summary>
                           <div class="architecture-list">
-                            ${draftArchitectureItems.map((item) => `
-                              <div class="architecture-item is-draftable">
-                                <strong>${escapeHtml(item.domain)}</strong>
-                                <span>${escapeHtml(item.block || "Параметр")}</span>
-                                <p>Данные уже есть в неразмеченных источниках, но отдельный артефакт по этой строке ещё не найден.</p>
-                                ${item.toolHints ? `<p><b>Что собрать:</b> ${escapeHtml(item.toolHints)}</p>` : ""}
-                                <div class="source-link-list compact-source-list">
-                                  <strong>Данные найдены:</strong>
-                                  ${item.evidence.draftSources.map(renderEvidenceEntry).join("")}
+                            ${group.rows.map((item) => {
+                              const status = architectureItemStatus(item);
+                              return `
+                                <div class="architecture-item ${escapeHtml(status.className)}">
+                                  <div class="architecture-item-head">
+                                    <div>
+                                      <strong>${escapeHtml(itemSubdomain(item))}</strong>
+                                      <span>Поддомен · ${escapeHtml(itemParentDomain(item))}</span>
+                                    </div>
+                                    <em class="source-quality source-quality-${escapeHtml(status.code === "covered" ? "sufficient" : status.code === "review" ? "partial" : status.code === "draft" ? "partial" : "insufficient")}">${escapeHtml(status.label)} · ${escapeHtml(status.percent)}%</em>
+                                  </div>
+                                  <p>${escapeHtml(item.description || "")}</p>
+                                  ${status.code === "covered" ? `
+                                    <div class="source-link-list compact-source-list">
+                                      <strong>Основание:</strong>
+                                      ${item.evidence.confirmedArtifacts.map(renderEvidenceEntry).join("")}
+                                    </div>
+                                  ` : ""}
+                                  ${status.code === "review" ? `
+                                    <p>Артефакт найден, но его содержание ещё не закрывает поддомен уверенно.</p>
+                                    <div class="source-link-list compact-source-list">
+                                      <strong>Проверить:</strong>
+                                      ${item.evidence.incompleteArtifacts.map(renderEvidenceEntry).join("")}
+                                    </div>
+                                  ` : ""}
+                                  ${status.code === "draft" ? `
+                                    <p>Полезные данные есть в других источниках. Их можно использовать как опору, но нужно собрать отдельный артефакт по этому поддомену.</p>
+                                    ${item.toolHints ? `<p><b>Что собрать:</b> ${escapeHtml(item.toolHints)}</p>` : ""}
+                                    <div class="source-link-list compact-source-list">
+                                      <strong>Данные найдены:</strong>
+                                      ${item.evidence.draftSources.map(renderEvidenceEntry).join("")}
+                                    </div>
+                                  ` : ""}
+                                  ${status.code === "missing" ? `
+                                    ${item.toolHints ? `<p><b>Что собрать:</b> ${escapeHtml(item.toolHints)}</p>` : ""}
+                                    <p>Пока нет ни подтверждённого артефакта, ни достаточных данных по этому поддомену.</p>
+                                  ` : ""}
                                 </div>
-                              </div>
-                            `).join("")}
+                              `;
+                            }).join("")}
                           </div>
-                        ` : ""}
-                        ${needsReviewArchitectureItems.length ? `
-                          <strong class="subsection-title">Артефакт есть, но заполнение требует контроля</strong>
-                          <div class="architecture-list">
-                            ${needsReviewArchitectureItems.map((item) => `
-                              <div class="architecture-item is-review">
-                                <strong>${escapeHtml(item.domain)}</strong>
-                                <span>${escapeHtml(item.block || "Параметр")}</span>
-                                <p>Файл похож на нужный артефакт, но AI-BOSS не считает строку закрытой, пока внутри не видно нужного содержания.</p>
-                                <div class="source-link-list compact-source-list">
-                                  <strong>Проверить:</strong>
-                                  ${item.evidence.incompleteArtifacts.map(renderEvidenceEntry).join("")}
-                                </div>
-                              </div>
-                            `).join("")}
-                          </div>
-                        ` : ""}
-                      </div>
-                      <div>
-                        <strong>Нужно добрать</strong>
-                        <div class="architecture-list">
-                          ${missingArchitectureItems.length
-                            ? missingArchitectureItems.map((item) => `
-                              <div class="architecture-item">
-                                <strong>${escapeHtml(item.domain)}</strong>
-                                <span>${escapeHtml(item.block || "Параметр")}</span>
-                                <p>${escapeHtml(item.description || "")}</p>
-                              </div>
-                            `).join("")
-                            : `<p class="hint-text">По всем параметрам слоя есть артефакт, данные или кандидат на сборку.</p>`}
-                        </div>
-                      </div>
+                        </details>
+                      `).join("") : `<p class="hint-text">Поддомены слоя ещё не загружены из карты инструментов.</p>`}
                     </div>
                   </div>
                 </div>

@@ -229,6 +229,8 @@ async function main() {
   });
   assert.deepEqual(ikigaiWithMarketContext.relatedLayers, ["owner_context"]);
   assert.equal(ikigaiWithMarketContext.toolMatches.some((match) => match.layerId === "owner_context"), true);
+  assert.equal(ikigaiWithMarketContext.contentMatches.every((match) => match.block === "Поддомен"), true);
+  assert.equal(ikigaiWithMarketContext.contentMatches.some((match) => match.block === "Домен"), false);
 
   const teamDraftSource = classifyConsultantSource({
     title: "Заметка о команде",
@@ -306,6 +308,9 @@ async function main() {
   const detail = await service.getCompany(created.company.id);
   assert.equal(detail.sources.length, 6);
   assert.ok(detail.architectureItems.some((item) => item.layerCode === "owner_context" && item.domain === "Видение"));
+  assert.equal(detail.architectureItems.every((item) => item.block === "Поддомен"), true);
+  assert.equal(detail.architectureItems.some((item) => item.parentDomain === "Видение и амбиция" && item.subdomain === "Видение"), true);
+  assert.equal(detail.architectureItems.some((item) => item.block === "Домен"), false);
   assert.ok(detail.analysis.probableConstraint.title);
 
   const list = await service.listCompanies();

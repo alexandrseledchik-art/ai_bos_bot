@@ -24502,7 +24502,7 @@ export function selectBusinessArchitectureGuidance(context = {}, { situationLimi
     : BUSINESS_ARCHITECTURE_LAYERS;
 
   const scopedItems = BUSINESS_ARCHITECTURE_ITEMS.filter((item) =>
-    relevantLayerIds.length ? relevantLayerIds.includes(item.layerId) : item.block === "Слой"
+    item.block === "Поддомен" && (relevantLayerIds.length ? relevantLayerIds.includes(item.layerId) : true)
   );
   const architectureItems = metaQuestion ? [] : selectTop(
     scopedItems,
@@ -24601,7 +24601,7 @@ export function renderBusinessArchitectureGuidanceForPrompt(context = {}) {
     "Контекстные ориентиры из бизнес-архитектуры:",
     guidance.relevantLayerNames.length ? `Вероятные слои проверки: ${guidance.relevantLayerNames.join(", ")}` : "Вероятные слои проверки: пока не сужены.",
     situations ? `\nПохожие типовые ситуации:\n${situations}` : "",
-    architectureItems ? `\nРелевантные домены/поддомены:\n${architectureItems}` : "",
+    architectureItems ? `\nРелевантные поддомены для диагностики:\n${architectureItems}` : "",
     tools ? `\nВозможные инструменты как ориентиры, не как готовая рекомендация:\n${tools}` : "",
     maturity ? `\nЭффекты зрелости, если нужно объяснить ценность движения:\n${maturity}` : ""
   ].filter(Boolean).join("\n");
