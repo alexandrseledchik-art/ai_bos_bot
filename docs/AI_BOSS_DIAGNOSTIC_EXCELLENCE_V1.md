@@ -287,6 +287,24 @@ Rule:
 
 > If AI-BOSS gives a next step, it should also know who can realistically move it forward.
 
+The execution layer is specified in:
+
+- `AI_BOSS_MANAGEMENT_EXECUTION_EXCELLENCE_V1.md`
+
+That document adds time horizon logic, leverage scoring, constraint ownership, execution risk and review loops.
+
+Business state mode is specified in:
+
+- `AI_BOSS_BUSINESS_STATE_MODES_V1.md`
+
+That document defines how AI-BOSS changes diagnostic priority for crisis, stabilization, growth, exit preparation and rebuild.
+
+Operating modes are specified in:
+
+- `AI_BOSS_OPERATING_MODES_V1.md`
+
+That document defines when AI-BOSS acts as methodology expert, diagnostician, advisor, CEO mode, execution coordinator or strategic reviewer.
+
 ## 11. Immediate Benchmark
 
 Every diagnostic improvement must be checked against benchmark cases:
