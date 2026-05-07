@@ -39,6 +39,8 @@ function checkMode(text, expectedMode) {
     expectedMode,
     `businessStateMode expected=${expectedMode} actual=${result.businessStateMode} text=${text}`
   );
+  assert.ok(result.businessStateReasonCodes?.length, `businessStateReasonCodes missing for ${text}`);
+  assert.ok(result.reasonCodes?.length, `reasonCodes missing for ${text}`);
 }
 
 checkMode("Кассовый разрыв через 2 недели, денег может не хватить на обязательства.", "crisis");

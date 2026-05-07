@@ -21,6 +21,10 @@ function confidenceToDataLevel(value) {
   return "low";
 }
 
+function uniqueNonEmpty(values = []) {
+  return [...new Set(values.map((value) => normalizeText(value)).filter(Boolean))];
+}
+
 function collectContextText(context = {}, decision = {}) {
   const entryState = decision.entryState || context.entryState || {};
   return lowerText([
@@ -62,7 +66,12 @@ function inferBusinessStateMode(context = {}, decision = {}) {
     return {
       mode: "crisis",
       confidence: "HIGH",
-      reason: "Есть срочный риск денег, обязательств или управляемости; приоритет — сохранить время и варианты решений."
+      reason: "Есть срочный риск денег, обязательств или управляемости; приоритет — сохранить время и варианты решений.",
+      reasonCodes: uniqueNonEmpty([
+        "urgent_problem_signal",
+        "cash_or_obligation_risk",
+        "cost_of_delay_high"
+      ])
     };
   }
 
@@ -79,7 +88,12 @@ function inferBusinessStateMode(context = {}, decision = {}) {
     return {
       mode: "exit_preparation",
       confidence: "HIGH",
-      reason: "Запрос связан с продажей, выходом собственника или повышением переносимости бизнеса."
+      reason: "Запрос связан с продажей, выходом собственника или повышением переносимости бизнеса.",
+      reasonCodes: uniqueNonEmpty([
+        "exit_or_owner_independence_request",
+        "transferability_required",
+        "strategic_horizon"
+      ])
     };
   }
 
@@ -98,7 +112,12 @@ function inferBusinessStateMode(context = {}, decision = {}) {
     return {
       mode: "rebuild",
       confidence: "MEDIUM",
-      reason: "Запрос похож на выбор или пересборку игры: сначала проверяется верхняя рамка, рынок и стратегический выбор."
+      reason: "Запрос похож на выбор или пересборку игры: сначала проверяется верхняя рамка, рынок и стратегический выбор.",
+      reasonCodes: uniqueNonEmpty([
+        "strategic_intent_or_new_market",
+        "upper_frame_required",
+        "business_model_rebuild"
+      ])
     };
   }
 
@@ -116,7 +135,12 @@ function inferBusinessStateMode(context = {}, decision = {}) {
     return {
       mode: "growth",
       confidence: "MEDIUM",
-      reason: "Есть сигнал роста или потока, который начинает упираться в качество, мощность, экономику или управляемость."
+      reason: "Есть сигнал роста или потока, который начинает упираться в качество, мощность, экономику или управляемость.",
+      reasonCodes: uniqueNonEmpty([
+        "growth_or_high_flow_signal",
+        "scaling_constraint_possible",
+        "capacity_or_quality_risk"
+      ])
     };
   }
 
@@ -134,14 +158,23 @@ function inferBusinessStateMode(context = {}, decision = {}) {
     return {
       mode: "stabilization",
       confidence: "MEDIUM",
-      reason: "Сигнал похож на восстановление контроля: роли, процесс, данные, управленческий ритм или передача ответственности."
+      reason: "Сигнал похож на восстановление контроля: роли, процесс, данные, управленческий ритм или передача ответственности.",
+      reasonCodes: uniqueNonEmpty([
+        "control_gap_signal",
+        "process_or_role_or_data_inconsistency",
+        "no_immediate_cash_crisis"
+      ])
     };
   }
 
   return {
     mode: "unknown",
     confidence: "LOW",
-    reason: "Бизнес-состояние пока не различено; нужен один факт о цели, срочности или текущем режиме компании."
+    reason: "Бизнес-состояние пока не различено; нужен один факт о цели, срочности или текущем режиме компании.",
+    reasonCodes: uniqueNonEmpty([
+      "insufficient_context",
+      "business_state_not_detected"
+    ])
   };
 }
 
@@ -168,7 +201,11 @@ function inferOperatingMode(context = {}, decision = {}) {
   ) {
     return {
       mode: "methodology_expert",
-      reason: "Пользователь спрашивает о смысле, роли, методологии или понятии."
+      reason: "Пользователь спрашивает о смысле, роли, методологии или понятии.",
+      reasonCodes: uniqueNonEmpty([
+        "methodology_or_role_question",
+        "no_live_case_required"
+      ])
     };
   }
 
@@ -185,7 +222,11 @@ function inferOperatingMode(context = {}, decision = {}) {
   ) {
     return {
       mode: "execution_coordinator",
-      reason: "Запрос относится к исполнению, владельцу действия, статусу или контролю результата."
+      reason: "Запрос относится к исполнению, владельцу действия, статусу или контролю результата.",
+      reasonCodes: uniqueNonEmpty([
+        "execution_status_or_owner_question",
+        "management_follow_up"
+      ])
     };
   }
 
@@ -204,7 +245,11 @@ function inferOperatingMode(context = {}, decision = {}) {
   ) {
     return {
       mode: "strategic_reviewer",
-      reason: "Запрос требует проверки верхней рамки, направления, игры или переносимости бизнеса."
+      reason: "Запрос требует проверки верхней рамки, направления, игры или переносимости бизнеса.",
+      reasonCodes: uniqueNonEmpty([
+        "strategic_frame_review_required",
+        "upper_layer_decision"
+      ])
     };
   }
 
@@ -222,14 +267,23 @@ function inferOperatingMode(context = {}, decision = {}) {
   ) {
     return {
       mode: "ceo_mode",
-      reason: "Нужна управленческая развилка, оценка риска, приоритет или собственническое решение."
+      reason: "Нужна управленческая развилка, оценка риска, приоритет или собственническое решение.",
+      reasonCodes: uniqueNonEmpty([
+        "management_fork_or_risk_decision",
+        "owner_authority_likely_required"
+      ])
     };
   }
 
   if (routeType === "free_text_problem" || action === "diagnose" || action === "clarify") {
     return {
       mode: "diagnostician",
-      reason: "Пользователь принёс бизнес-сигнал; нужно отделить симптом от причины и выбрать следующий диагностический ход."
+      reason: "Пользователь принёс бизнес-сигнал; нужно отделить симптом от причины и выбрать следующий диагностический ход.",
+      reasonCodes: uniqueNonEmpty([
+        "live_business_signal",
+        "cause_effect_separation_required",
+        "one_next_diagnostic_move"
+      ])
     };
   }
 
@@ -241,13 +295,21 @@ function inferOperatingMode(context = {}, decision = {}) {
   ) {
     return {
       mode: "advisor",
-      reason: "Можно дать практичную рекомендацию, объяснение инструмента или один следующий ход без тяжёлого цикла."
+      reason: "Можно дать практичную рекомендацию, объяснение инструмента или один следующий ход без тяжёлого цикла.",
+      reasonCodes: uniqueNonEmpty([
+        "light_task_or_tool_request",
+        "low_bureaucracy_mode"
+      ])
     };
   }
 
   return {
     mode: "methodology_expert",
-    reason: "По умолчанию безопаснее объяснить рамку и не запускать тяжёлый цикл без сигнала."
+    reason: "По умолчанию безопаснее объяснить рамку и не запускать тяжёлый цикл без сигнала.",
+    reasonCodes: uniqueNonEmpty([
+      "default_safe_mode",
+      "insufficient_live_business_signal"
+    ])
   };
 }
 
@@ -383,7 +445,11 @@ function inferDecisionRights({ context = {}, businessStateMode = "unknown", oper
     return {
       autonomyLevel: "HIGH_CONFIRMATION_REQUIRED",
       requiresOwnerConfirmation: true,
-      reason: "Решение может затронуть риск, деньги, людей, публичность, стратегический выбор или необратимое действие."
+      reason: "Решение может затронуть риск, деньги, людей, публичность, стратегический выбор или необратимое действие.",
+      reasonCodes: uniqueNonEmpty([
+        "owner_authority_required",
+        "risk_or_irreversibility_possible"
+      ])
     };
   }
 
@@ -391,15 +457,87 @@ function inferDecisionRights({ context = {}, businessStateMode = "unknown", oper
     return {
       autonomyLevel: "MEDIUM",
       requiresOwnerConfirmation: false,
-      reason: "Можно рекомендовать следующий шаг, инструмент или безопасную параллельную работу без необратимого действия."
+      reason: "Можно рекомендовать следующий шаг, инструмент или безопасную параллельную работу без необратимого действия.",
+      reasonCodes: uniqueNonEmpty([
+        "safe_recommendation_allowed",
+        "no_irreversible_action_detected"
+      ])
     };
   }
 
   return {
     autonomyLevel: "LOW",
     requiresOwnerConfirmation: false,
-    reason: "Бот может строить гипотезы, отделять сигналы и предлагать проверку, но не должен сам менять систему."
+    reason: "Бот может строить гипотезы, отделять сигналы и предлагать проверку, но не должен сам менять систему.",
+    reasonCodes: uniqueNonEmpty([
+      "diagnostic_autonomy_only",
+      "no_system_change_without_owner"
+    ])
   };
+}
+
+function inferOwnerDecisionType({ context = {}, businessStateMode = "unknown", text = "" }) {
+  const integrityType = context.intentIntegrity?.integrityType || "";
+
+  if (/цен[ауы]|прайс|тариф|скидк|марж|pricing/.test(text)) {
+    return "pricing";
+  }
+  if (/сегмент|ниша|рынок|icp|позиционир|кому\s+прода[её]м/.test(text) || integrityType === "strategic_intent") {
+    return "segment";
+  }
+  if (businessStateMode === "crisis" || /риск|кассов|обязательств|кредит|долг|необратим/.test(text)) {
+    return "risk";
+  }
+  if (/публичн|обещан|гаранти|оффер|заявлени|репутац/.test(text)) {
+    return "public_promise";
+  }
+  if (/процесс|регламент|роль|ответствен|операц|crm|автоматиз|интеграц|назначить/.test(text)) {
+    return "process_change";
+  }
+
+  return "none";
+}
+
+function buildModeSwitch({ context = {}, orchestration = {} }) {
+  const from = context.orchestration?.operatingMode || orchestration.operatingMode || "";
+  const to = orchestration.operatingMode || from;
+  const occurred = Boolean(from && to && from !== to);
+
+  return {
+    occurred,
+    from,
+    to,
+    reason: occurred
+      ? "После ответа и guardrails изменился тип управленческой задачи."
+      : ""
+  };
+}
+
+function buildUserFacingSummary({ decision = {}, workingHypothesis = "", nextMove = "", orchestration = {} }) {
+  if (orchestration.shouldAskOneQuestion) {
+    return "Сейчас нужен один уточняющий факт, чтобы не принять инструмент или симптом за причину.";
+  }
+
+  if (workingHypothesis && nextMove) {
+    return `Рабочая версия: ${workingHypothesis}. Следующий ход: ${nextMove}`;
+  }
+
+  return normalizeText(
+    decision.response?.whatIUnderstood ||
+    decision.response?.nextStep ||
+    decision.response?.responseText ||
+    "AI-BOSS зафиксировал управленческий ход и готовит следующий проверочный шаг."
+  );
+}
+
+function buildInternalReasoningSummary({ orchestration = {}, workingHypothesis = "" }) {
+  return [
+    `business_state=${orchestration.businessStateMode || "unknown"}`,
+    `operating_mode=${orchestration.operatingMode || "unknown"}`,
+    `data_confidence=${orchestration.dataConfidence || "low"}`,
+    `transition=${orchestration.transition || "unknown"}`,
+    workingHypothesis ? `primary_hypothesis=${workingHypothesis}` : ""
+  ].filter(Boolean).join("; ");
 }
 
 export class AIBossModeOrchestrator {
@@ -418,6 +556,11 @@ export class AIBossModeOrchestrator {
       context,
       businessStateMode: businessState.mode,
       operatingMode: operating.mode,
+      text
+    });
+    const ownerDecisionType = inferOwnerDecisionType({
+      context,
+      businessStateMode: businessState.mode,
       text
     });
     const shouldAskOneQuestion = Boolean(
@@ -444,8 +587,10 @@ export class AIBossModeOrchestrator {
       businessStateMode: businessState.mode,
       businessStateConfidence: businessState.confidence,
       businessStateReason: businessState.reason,
+      businessStateReasonCodes: businessState.reasonCodes || [],
       operatingMode: operating.mode,
       operatingModeReason: operating.reason,
+      operatingModeReasonCodes: operating.reasonCodes || [],
       dataConfidence,
       diagnosticQuality: diagnosticQuality?.score10 ?? decision?.diagnosticQuality?.score10 ?? null,
       timeHorizon,
@@ -454,6 +599,13 @@ export class AIBossModeOrchestrator {
       needsDiagnosis,
       needsExecutionContainer,
       decisionRights,
+      ownerDecisionRequired: Boolean(decisionRights.requiresOwnerConfirmation || ownerDecisionType !== "none"),
+      ownerDecisionType,
+      reasonCodes: uniqueNonEmpty([
+        ...(businessState.reasonCodes || []),
+        ...(operating.reasonCodes || []),
+        ...(decisionRights.reasonCodes || [])
+      ]),
       transition: needsExecutionContainer
         ? "diagnosis_to_execution"
         : shouldAskOneQuestion
@@ -509,27 +661,56 @@ export class AIBossModeOrchestrator {
           reviewMoment: ""
         };
 
+    const workingHypothesis = normalizeText(
+      entryState.selectedConstraint ||
+      decision.memory?.constraint ||
+      entryState.candidateConstraints?.[0]?.label ||
+      decision.response?.hypotheses?.[0] ||
+      ""
+    );
+
     return {
+      schemaVersion: "decision_object_v1",
       companyId: company?.id || context.company?.id || "",
       caseId: activeCase?.id || context.activeCase?.id || "",
       businessStateMode: orchestration.businessStateMode,
       businessStateConfidence: orchestration.businessStateConfidence,
+      businessStateReason: orchestration.businessStateReason,
       operatingMode: orchestration.operatingMode,
+      operatingModeReason: orchestration.operatingModeReason,
       dataConfidence: orchestration.dataConfidence,
       diagnosticQuality: decision.diagnosticQuality?.score10 ?? orchestration.diagnosticQuality ?? null,
+      hiddenEvaluation: {
+        diagnosticQuality: decision.diagnosticQuality?.score10 ?? orchestration.diagnosticQuality ?? null,
+        dataConfidence: orchestration.dataConfidence,
+        businessStateConfidence: orchestration.businessStateConfidence
+      },
+      reasonCodes: orchestration.reasonCodes || [],
+      reasonCodesByLayer: {
+        businessState: orchestration.businessStateReasonCodes || [],
+        operatingMode: orchestration.operatingModeReasonCodes || [],
+        decisionRights: orchestration.decisionRights?.reasonCodes || []
+      },
       decisionRights: orchestration.decisionRights,
+      ownerDecisionRequired: Boolean(orchestration.ownerDecisionRequired),
+      ownerDecisionType: orchestration.ownerDecisionType || "none",
+      modeSwitch: buildModeSwitch({ context, orchestration }),
       transition: orchestration.transition,
       shouldAskOneQuestion: orchestration.shouldAskOneQuestion,
       needsExecutionContainer: orchestration.needsExecutionContainer,
-      workingHypothesis: normalizeText(
-        entryState.selectedConstraint ||
-        decision.memory?.constraint ||
-        entryState.candidateConstraints?.[0]?.label ||
-        decision.response?.hypotheses?.[0] ||
-        ""
-      ),
+      workingHypothesis,
       nextMove,
       executionContainer,
+      userFacingSummary: buildUserFacingSummary({
+        decision,
+        workingHypothesis,
+        nextMove,
+        orchestration
+      }),
+      internalReasoningSummary: buildInternalReasoningSummary({
+        orchestration,
+        workingHypothesis
+      }),
       evidence: {
         knownFacts: decision.guardrails?.knownFacts || [],
         observations: decision.guardrails?.observations || [],

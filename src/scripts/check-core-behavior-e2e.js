@@ -74,6 +74,13 @@ assert.ok(profit.decision?.diagnosticQuality?.score10 >= 10);
 assert.equal(profit.decision?.decisionObject?.businessStateMode, "stabilization");
 assert.equal(profit.decision?.decisionObject?.operatingMode, "diagnostician");
 assert.equal(profit.decision?.decisionObject?.transition, "diagnosis_to_execution");
+assert.equal(profit.decision?.decisionObject?.schemaVersion, "decision_object_v1");
+assert.ok(profit.decision?.decisionObject?.reasonCodes?.length, "decision reasonCodes are missing");
+assert.ok(profit.decision?.decisionObject?.userFacingSummary, "userFacingSummary is missing");
+assert.ok(profit.decision?.decisionObject?.internalReasoningSummary, "internalReasoningSummary is missing");
+assert.equal(typeof profit.decision?.decisionObject?.ownerDecisionRequired, "boolean");
+assert.ok(profit.decision?.decisionObject?.ownerDecisionType, "ownerDecisionType is missing");
+assert.ok(profit.decision?.decisionObject?.modeSwitch, "modeSwitch is missing");
 assert.ok(profit.decision?.decisionObject?.workingHypothesis, "working hypothesis is missing");
 assert.ok(profit.decision?.decisionObject?.nextMove, "next move is missing");
 assert.ok(profit.decision?.decisionObject?.executionContainer?.owner, "execution owner is missing");
@@ -86,5 +93,6 @@ assert.ok(latestSnapshot?.decisionObject, "snapshot should persist decisionObjec
 const projected = projectStateToRelationalRows(state);
 const projectedSnapshot = projected.snapshots[projected.snapshots.length - 1];
 assert.ok(projectedSnapshot?.graph_snapshot?.decisionObject, "projected snapshot should preserve decisionObject in graph_snapshot");
+assert.equal(projectedSnapshot.graph_snapshot.decisionObject.schemaVersion, "decision_object_v1");
 
 console.log("Core behavior end-to-end checks passed.");

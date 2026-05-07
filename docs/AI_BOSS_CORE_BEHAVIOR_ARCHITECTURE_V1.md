@@ -135,7 +135,8 @@ Responsibilities:
 6. Detect whether answer can be given now.
 7. Detect whether diagnosis should transition to execution.
 8. Detect decision rights and owner-confirmation requirement.
-9. Build a decision object after the response is formed.
+9. Attach reason codes for debugging and admin review.
+10. Build a versioned decision object after the response is formed.
 
 ## 4. Orchestration Flow
 
@@ -251,10 +252,29 @@ Example:
 
 ```json
 {
+  "schemaVersion": "decision_object_v1",
   "businessStateMode": "stabilization",
   "operatingMode": "diagnostician",
   "dataConfidence": "low",
   "diagnosticQuality": 8,
+  "reasonCodes": [
+    "control_gap_signal",
+    "live_business_signal",
+    "diagnostic_autonomy_only"
+  ],
+  "userFacingSummary": "...",
+  "internalReasoningSummary": "...",
+  "hiddenEvaluation": {
+    "diagnosticQuality": 8
+  },
+  "ownerDecisionRequired": false,
+  "ownerDecisionType": "none",
+  "modeSwitch": {
+    "occurred": false,
+    "from": "diagnostician",
+    "to": "diagnostician",
+    "reason": ""
+  },
   "workingHypothesis": "...",
   "nextMove": "...",
   "executionContainer": {
@@ -279,22 +299,43 @@ Purpose:
 
 Required fields:
 
+- schemaVersion;
 - companyId;
 - caseId;
 - businessStateMode;
 - businessStateConfidence;
+- businessStateReason;
 - operatingMode;
+- operatingModeReason;
 - dataConfidence;
 - diagnosticQuality;
+- hiddenEvaluation;
+- reasonCodes;
+- reasonCodesByLayer;
 - decisionRights;
+- ownerDecisionRequired;
+- ownerDecisionType;
+- modeSwitch;
 - transition;
 - shouldAskOneQuestion;
 - needsExecutionContainer;
 - workingHypothesis;
 - nextMove;
 - executionContainer;
+- userFacingSummary;
+- internalReasoningSummary;
 - evidence;
 - reviewPolicy.
+
+Important:
+
+- `schemaVersion` protects old snapshots from future field changes;
+- `reasonCodes` explain why the orchestrator selected a mode without exposing chain-of-thought;
+- `userFacingSummary` is safe to show in admin review;
+- `internalReasoningSummary` is a short operational explanation, not hidden chain-of-thought;
+- `hiddenEvaluation` stores quality signals for internal review;
+- `ownerDecisionRequired` and `ownerDecisionType` protect owner authority;
+- `modeSwitch` records when the bot moved from one operating mode to another during the turn.
 
 ## 9. Execution Container
 
@@ -394,7 +435,35 @@ Command:
 
 - `npm run core-behavior:e2e:check`
 
-## 13. Final Principle
+## 13. Next Layer: Admin Review Loop
+
+The next product layer should not be another prompt rewrite.
+
+It should be an admin review loop over decision objects:
+
+```
+decision objects
+→ answer quality review
+→ mode selection errors
+→ diagnostic errors
+→ execution errors
+→ improvement proposals
+→ accept / reject improvements
+```
+
+The review loop should inspect:
+
+- whether the business state mode was correct;
+- whether the operating mode was correct;
+- whether the bot asked too early instead of collecting data itself;
+- whether it moved to execution too early or too late;
+- whether owner authority was protected;
+- whether the answer had one clear next move;
+- whether the decision object contains enough context for future learning.
+
+This turns AI-BOSS from a prompt-driven bot into a governable management system.
+
+## 14. Final Principle
 
 AI-BOSS should not become heavier.
 

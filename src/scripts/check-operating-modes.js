@@ -42,6 +42,8 @@ function checkMode(text, expectedMode, decision = null) {
     expectedMode,
     `operatingMode expected=${expectedMode} actual=${result.operatingMode} text=${text}`
   );
+  assert.ok(result.operatingModeReasonCodes?.length, `operatingModeReasonCodes missing for ${text}`);
+  assert.ok(result.reasonCodes?.length, `reasonCodes missing for ${text}`);
 }
 
 checkMode("Что такое ICP и зачем он нужен?", "methodology_expert");

@@ -57,9 +57,19 @@ const result = await service.handleUserMessage({
 
 const decisionObject = result.decision?.decisionObject;
 assert.ok(decisionObject, "decisionObject should be created for a serious diagnostic answer");
+assert.equal(decisionObject.schemaVersion, "decision_object_v1");
 assert.equal(decisionObject.transition, "diagnosis_to_execution");
 assert.equal(decisionObject.needsExecutionContainer, true);
 assert.equal(decisionObject.operatingMode, "diagnostician");
+assert.ok(decisionObject.reasonCodes?.length, "decision reasonCodes are missing");
+assert.ok(decisionObject.reasonCodesByLayer?.businessState?.length, "business state reason codes are missing");
+assert.ok(decisionObject.reasonCodesByLayer?.operatingMode?.length, "operating mode reason codes are missing");
+assert.equal(typeof decisionObject.ownerDecisionRequired, "boolean");
+assert.ok(decisionObject.ownerDecisionType, "ownerDecisionType is missing");
+assert.ok(decisionObject.modeSwitch, "modeSwitch object is missing");
+assert.ok(decisionObject.userFacingSummary, "userFacingSummary is missing");
+assert.ok(decisionObject.internalReasoningSummary, "internalReasoningSummary is missing");
+assert.equal(typeof decisionObject.hiddenEvaluation?.diagnosticQuality, "number");
 assert.ok(decisionObject.executionContainer?.owner, "execution owner is missing");
 assert.ok(decisionObject.executionContainer?.executor, "execution executor is missing");
 assert.ok(decisionObject.executionContainer?.timeHorizon, "execution time horizon is missing");
