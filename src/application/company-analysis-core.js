@@ -188,10 +188,9 @@ function classifySource(source) {
     contentText: source.contentText,
     aiSummary: source.aiSummary
   });
-  const relatedLayers = unique([
-    ...toolMatches.map((match) => match.layerId),
-    ...contentMatches.map((match) => match.layerId)
-  ], 11);
+  const relatedLayers = toolMatches.length
+    ? unique(toolMatches.map((match) => match.layerId), 11)
+    : unique(contentMatches.map((match) => match.layerId), 11);
 
   return {
     toolMatches,
@@ -256,6 +255,7 @@ function extractLayerFacts({ layer, sources }) {
     const normalized = normalizeText(evidenceText);
     const toolMatches = sourceToolMatches(source);
     const contentMatches = sourceContentMatches(source);
+    const toolLayerHit = toolMatches.some((match) => match.layerId === layer.code);
     const contentLayerHit = contentMatches.some((match) => match.layerId === layer.code);
     const explicitRelated = (source.relatedLayers || []).includes(layer.code);
     const keywordHit = !toolMatches.length && !contentMatches.length && layer.keywords.some((keyword) => normalized.includes(keyword));
@@ -264,7 +264,7 @@ function extractLayerFacts({ layer, sources }) {
       continue;
     }
 
-    if (toolMatches.length && !contentLayerHit) {
+    if (toolMatches.length && (!toolLayerHit || !contentLayerHit)) {
       continue;
     }
 

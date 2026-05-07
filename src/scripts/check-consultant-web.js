@@ -205,6 +205,13 @@ async function main() {
   assert.deepEqual(ikigai.relatedLayers, ["owner_context"]);
   assert.equal(ikigai.toolMatches.some((match) => String(match.domain || "").includes("Цели")), false);
 
+  const ikigaiWithMarketContext = classifyConsultantSource({
+    title: "Ikigai для бизнеса. Мой консалтинг",
+    contentText: "Внутри икигай упоминаются рынок, клиенты, конкуренты, сильные стороны и стратегическая модель."
+  });
+  assert.deepEqual(ikigaiWithMarketContext.relatedLayers, ["owner_context"]);
+  assert.equal(ikigaiWithMarketContext.toolMatches.some((match) => match.layerId === "owner_context"), true);
+
   const teamDraftSource = classifyConsultantSource({
     title: "Заметка о команде",
     contentText: "Нет отдельного документа, но в заметке описаны роли, зоны ответственности, нагрузка и компетенции команды."

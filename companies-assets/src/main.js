@@ -230,10 +230,6 @@ function sourceArchitectureContentMatches(source, item) {
   return sourceContentMatches(source).filter((match) => sourceMatchCoversArchitectureItem(match, item));
 }
 
-function sourceHasReadableContent(source) {
-  return normalizeLookup([source.contentText, source.aiSummary].filter(Boolean).join(" ")).length >= 40;
-}
-
 function architectureItemEvidence(item, sources) {
   const directArtifacts = sources
     .map((source) => ({
@@ -242,16 +238,18 @@ function architectureItemEvidence(item, sources) {
       contentMatches: sourceArchitectureContentMatches(source, item)
     }))
     .filter((entry) => entry.matches.length);
-  const confirmedArtifacts = directArtifacts.filter((entry) =>
-    entry.contentMatches.length || sourceHasReadableContent(entry.source)
-  );
-  const incompleteArtifacts = directArtifacts.filter((entry) => !sourceHasReadableContent(entry.source));
+  const confirmedArtifacts = directArtifacts.filter((entry) => entry.contentMatches.length);
+  const incompleteArtifacts = directArtifacts.filter((entry) => !entry.contentMatches.length);
   const draftSources = sources
     .map((source) => ({
       source,
       contentMatches: sourceArchitectureContentMatches(source, item)
     }))
-    .filter((entry) => entry.contentMatches.length && !sourceArchitectureItemMatches(entry.source, item).length);
+    .filter((entry) =>
+      entry.contentMatches.length &&
+      !sourceToolMatches(entry.source).length &&
+      !sourceArchitectureItemMatches(entry.source, item).length
+    );
 
   return {
     confirmedArtifacts,
@@ -261,7 +259,12 @@ function architectureItemEvidence(item, sources) {
 }
 
 function layerHasEvidence(source, layerCode) {
-  return sourceMatchesLayerByTool(source, layerCode) || sourceMatchesLayerByContent(source, layerCode);
+  const toolMatches = sourceToolMatches(source);
+  if (toolMatches.length) {
+    return sourceMatchesLayerByTool(source, layerCode);
+  }
+
+  return sourceMatchesLayerByContent(source, layerCode);
 }
 
 function renderEvidenceEntry({ source, matches = [], contentMatches = [] }) {
@@ -844,7 +847,7 @@ function renderLayers(detail) {
                   </div>
                   <div class="layer-panel">
                     <h5>Параметры архитектуры</h5>
-                    <p>Название файла само по себе не закрывает строку. AI-BOSS проверяет наполнение: если данные есть, но отдельного артефакта нет, строка попадает в «можно собрать артефакт».</p>
+                    <p>Строку закрывает только свой артефакт из карты инструментов и его содержание. Данные из чужих инструментов могут быть связанной опорой, но не заменяют отсутствующий артефакт.</p>
                     <div class="architecture-split">
                       <div>
                         <strong>Подтверждено артефактом</strong>
@@ -870,7 +873,7 @@ function renderLayers(detail) {
                               <div class="architecture-item is-draftable">
                                 <strong>${escapeHtml(item.domain)}</strong>
                                 <span>${escapeHtml(item.block || "Параметр")}</span>
-                                <p>Данные уже есть в источниках, но отдельный артефакт по этой строке ещё не найден.</p>
+                                <p>Данные уже есть в неразмеченных источниках, но отдельный артефакт по этой строке ещё не найден.</p>
                                 ${item.toolHints ? `<p><b>Что собрать:</b> ${escapeHtml(item.toolHints)}</p>` : ""}
                                 <div class="source-link-list compact-source-list">
                                   <strong>Данные найдены:</strong>
