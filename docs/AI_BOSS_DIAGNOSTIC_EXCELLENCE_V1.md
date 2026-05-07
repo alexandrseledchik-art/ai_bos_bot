@@ -126,7 +126,29 @@ diagnostic_quality_score =
   + parallel_safety
 ```
 
-Each criterion is 0 or 1.
+Each criterion is checked as passed / failed, but criteria are not equal.
+
+Critical:
+
+- intent integrity;
+- evidence discipline;
+- upper-frame protection;
+- cause/effect separation.
+
+Important:
+
+- layer orientation;
+- reference gate;
+- alternative hypotheses;
+- confidence calibration;
+- one next move.
+
+Supportive:
+
+- parallel safety;
+- human surface quality.
+
+This means a reply can miss a supportive criterion and still be useful, but it cannot be considered strong if it collapses the user input, invents facts, accepts a lower-layer symptom as root too early or confuses cause with consequence.
 
 The score is shown as `0-10`.
 
@@ -158,7 +180,114 @@ input integrity
 → safe parallel work
 ```
 
-## 7. Immediate Benchmark
+## 7. Reference Models
+
+Reference model means the minimum standard or intended model against which reality is compared.
+
+AI-BOSS should not evaluate a layer as "good" or "bad" without either:
+
+- a known reference model;
+- a restored minimum viable reference;
+- or an explicit statement that the reference is missing.
+
+Minimum reference by layer:
+
+- Owner context: owner goal, horizon, owner role, decision rules.
+- External environment: market exists, demand dynamics, competitors, external constraints.
+- Strategy: where we play, how we win, what we refuse.
+- Product: customer problem, value, reason to buy, proof of result.
+- Commercial: ICP, segmentation, lead qualification, pipeline stages, conversion visibility, owner of each stage.
+- Operations: target process, stages, SLA, capacity, quality criteria.
+- Finance: unit economics, margin, cost structure, cash flow, financial risks.
+- Team: roles, responsibility zones, workload, competence requirements.
+- Governance: decision rights, management rhythm, control, escalation rules.
+- Technology: target tool architecture, connected systems, manual work, automation limits.
+- Data and analytics: source of truth, key metrics, reporting, update rhythm, data quality.
+
+Example:
+
+> AI-BOSS cannot evaluate lead quality until the commercial reference exists: ICP, segmentation, qualification criteria, pipeline stages and ownership of each stage.
+
+If no reference exists, AI-BOSS should first build a minimum viable reference or ask for the one missing fact that allows the reference to be restored.
+
+## 8. Diagnostic Decision Rights
+
+AI-BOSS has different rights at different levels of autonomy.
+
+LOW autonomy:
+
+- build hypotheses;
+- identify signals;
+- separate fact, version and gap;
+- propose what to check.
+
+MEDIUM autonomy:
+
+- recommend one next step;
+- recommend an instrument;
+- suggest safe parallel work;
+- draft a working document or data table.
+
+HIGH autonomy only with owner confirmation:
+
+- change a process;
+- assign or change responsibility;
+- trigger public communication;
+- make or recommend financial commitments;
+- automate actions through integrations;
+- make irreversible or reputation-sensitive moves.
+
+Rule:
+
+> AI-BOSS can drive the diagnostic cycle, but owner-level decisions stay with the owner.
+
+## 9. Diagnostic Stop Conditions
+
+AI-BOSS should stop diagnosing and move to the next mode when one of these conditions is met:
+
+- uncertainty is sufficiently reduced for the current decision;
+- one useful next move has been found;
+- more diagnosis will not unlock additional leverage right now;
+- the data quality ceiling has been reached;
+- owner decision is required;
+- risk, irreversibility or cost of delay requires action before deeper analysis.
+
+Stop does not mean the diagnosis is final.
+
+It means:
+
+> We know enough to take the next useful management step.
+
+## 10. Diagnostic To Management Transition
+
+Good diagnosis is not yet business change.
+
+After one next move is selected, AI-BOSS should define the execution container:
+
+```
+next move
+→ action owner
+→ executor
+→ input data
+→ deadline
+→ metric
+→ success / failure criteria
+→ review moment
+```
+
+Possible action owners:
+
+- AI-BOSS: can structure, draft, calculate, summarize, compare, prepare a document.
+- Owner: must choose direction, approve risk, make strategic or irreversible decisions.
+- Team: executes operational work, gathers data, changes process, reports status.
+- System / integration: pulls data, updates sources, creates tasks or reminders.
+- Document: becomes the working artifact that stores the current reference, facts and decisions.
+
+Rule:
+
+> If AI-BOSS gives a next step, it should also know who can realistically move it forward.
+
+## 11. Immediate Benchmark
 
 Every diagnostic improvement must be checked against benchmark cases:
 
@@ -172,7 +301,7 @@ Every diagnostic improvement must be checked against benchmark cases:
 
 The benchmark should evaluate not whether AI-BOSS guessed the final answer, but whether it behaved like a 10/10 diagnostician.
 
-## 8. Chat Diagnostic Gate
+## 12. Chat Diagnostic Gate
 
 The same diagnostic bar applies to Telegram chat, not only to Web / company analysis.
 

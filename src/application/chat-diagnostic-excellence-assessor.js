@@ -14,12 +14,29 @@ function unique(items = []) {
   return [...new Set(items.map((item) => normalizeText(item)).filter(Boolean))];
 }
 
+const CRITERION_PRIORITY = {
+  intent_integrity: { priority: "critical", weight: 3 },
+  evidence_discipline: { priority: "critical", weight: 3 },
+  upper_frame_protection: { priority: "critical", weight: 3 },
+  cause_effect_separation: { priority: "critical", weight: 3 },
+  layer_orientation: { priority: "important", weight: 2 },
+  reference_gate: { priority: "important", weight: 2 },
+  alternative_hypotheses: { priority: "important", weight: 2 },
+  confidence_calibration: { priority: "important", weight: 2 },
+  one_next_move: { priority: "important", weight: 2 },
+  parallel_safety: { priority: "supportive", weight: 1 },
+  human_surface: { priority: "supportive", weight: 1 }
+};
+
 function addCriterion(criteria, key, title, passed, explanation) {
+  const meta = CRITERION_PRIORITY[key] || { priority: "important", weight: 2 };
   criteria.push({
     key,
     title,
+    priority: meta.priority,
+    weight: meta.weight,
     passed: Boolean(passed),
-    score: passed ? 1 : 0,
+    score: passed ? meta.weight : 0,
     explanation
   });
 }
@@ -261,13 +278,25 @@ export function assessChatDiagnosticExcellence({ decision = {}, context = {} }) 
     "Даже сильная логика должна быть понятна владельцу или консультанту в живом диалоге."
   );
 
-  const passedCount = criteria.reduce((sum, item) => sum + item.score, 0);
-  const score10 = Math.round((passedCount / criteria.length) * 10);
+  const earnedWeight = criteria.reduce((sum, item) => sum + item.score, 0);
+  const totalWeight = criteria.reduce((sum, item) => sum + item.weight, 0);
+  const score10 = Math.round((earnedWeight / totalWeight) * 10);
   const missing = criteria.filter((item) => !item.passed).map((item) => item.title);
+  const criticalMissing = criteria
+    .filter((item) => !item.passed && item.priority === "critical")
+    .map((item) => item.title);
+  const importantMissing = criteria
+    .filter((item) => !item.passed && item.priority === "important")
+    .map((item) => item.title);
+  const supportiveMissing = criteria
+    .filter((item) => !item.passed && item.priority === "supportive")
+    .map((item) => item.title);
 
   return {
     score10,
     targetScore10: 10,
+    earnedWeight,
+    totalWeight,
     level: score10 >= 10
       ? "10/10 chat diagnostic behavior"
       : score10 >= 9
@@ -277,6 +306,9 @@ export function assessChatDiagnosticExcellence({ decision = {}, context = {} }) 
       : "needs chat diagnostic strengthening",
     criteria,
     missing,
+    criticalMissing,
+    importantMissing,
+    supportiveMissing,
     principle: "Low data reduces certainty, not diagnostic discipline."
   };
 }
