@@ -281,6 +281,12 @@ async function main() {
   assert.ok(visionSource.source.relatedLayers.includes("owner_context"));
   assert.equal(visionSource.source.relatedLayers.includes("governance"), false);
 
+  await service.addSource(created.company.id, {
+    type: "table",
+    title: "Заголовок сегментной таблицы",
+    contentText: "Сегмент,Профиль,Выручка компании,Роль клиента,Ключевой запрос,Продукт"
+  });
+
   const publicFolderSync = await service.syncPublicGoogleFolder(created.company.id, {
     folderUrl: "https://drive.google.com/drive/folders/public_folder_1"
   });
@@ -297,6 +303,9 @@ async function main() {
   assert.ok(analyzed.analysis.probableConstraint.selectionBasis?.length);
   assert.ok(analyzed.analysis.probableConstraint.evidence?.length);
   assert.ok(analyzed.analysis.diagnosticQuality?.score10 >= 8);
+  const financeLayer = analyzed.layerAnalyses.find((layer) => layer.layerCode === "finance");
+  assert.equal(Object.prototype.hasOwnProperty.call(financeLayer.filledFields, "выручка"), false);
+  assert.equal(financeLayer.missingFields.includes("выручка"), true);
   assert.ok(
     analyzed.layerAnalyses.some((layer) =>
       layer.layerCode === "owner_context" &&
@@ -306,7 +315,7 @@ async function main() {
   );
 
   const detail = await service.getCompany(created.company.id);
-  assert.equal(detail.sources.length, 6);
+  assert.equal(detail.sources.length, 7);
   assert.ok(detail.architectureItems.some((item) => item.layerCode === "owner_context" && item.domain === "Видение"));
   assert.equal(detail.architectureItems.every((item) => item.block === "Поддомен"), true);
   assert.equal(detail.architectureItems.some((item) => item.parentDomain === "Видение и амбиция" && item.subdomain === "Видение"), true);

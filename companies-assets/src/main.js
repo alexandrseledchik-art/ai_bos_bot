@@ -1080,14 +1080,14 @@ function renderLayers(detail) {
                 <div class="layer-expand-grid">
                   <div class="layer-panel">
                     <h5>С чем сравниваем реальность</h5>
-                    <p>Это минимальные параметры, без которых нельзя честно сказать, хорошо или плохо работает эта область.</p>
+                    <p>Это не оценка и не готовый вывод. Это базовые вопросы слоя. Галочка появляется только тогда, когда в источниках есть конкретный фрагмент, который отвечает на этот вопрос.</p>
                     <div class="parameter-list">
                       ${filledEntries.length ? filledEntries.map(([field, value]) => `
                         <div class="parameter-row is-covered">
                           <span class="parameter-status">✓</span>
                           <div>
                             <strong>${escapeHtml(field)}</strong>
-                            <p>${escapeHtml(value)}</p>
+                            <p><b>Найдено в данных:</b> ${escapeHtml(humanizeEvidenceItem(value))}</p>
                           </div>
                         </div>
                       `).join("") : ""}
