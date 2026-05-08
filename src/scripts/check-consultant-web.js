@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { ConsultantWebService } from "../application/consultant-web-service.js";
 import { classifyConsultantSource, detectConsultantLayersForText } from "../application/company-analysis-core.js";
 import { BUSINESS_ARCHITECTURE_ITEMS } from "../domain/business-architecture-knowledge.js";
-import { assessArchitectureItemContent } from "../domain/business-architecture-tool-matcher.js";
+import {
+  assessArchitectureItemContent,
+  isBusinessArchitectureReferenceSource
+} from "../domain/business-architecture-tool-matcher.js";
 import { emptyState } from "../domain/entities.js";
 import { GoogleDriveClient } from "../infrastructure/google/google-drive-client.js";
 import { PublicGoogleLinkReader } from "../infrastructure/google/public-google-link-reader.js";
@@ -238,6 +241,21 @@ async function main() {
   });
   assert.equal(teamDraftSource.toolMatches.length, 0);
   assert.equal(teamDraftSource.contentMatches.some((match) => match.layerId === "team" && match.domain === "Роли и зоны влияния"), true);
+
+  const toolCatalogSource = {
+    title: "Сводная таблица инструментов",
+    contentText: "Слой, Домен/поддомен, Инструмент / Методология, Статус, Описание, Применять, Результат, Ссылка на инструмент. Ресурсные ограничения."
+  };
+  const catalogClassification = classifyConsultantSource(toolCatalogSource);
+  assert.equal(isBusinessArchitectureReferenceSource(toolCatalogSource), true);
+  assert.deepEqual(catalogClassification.relatedLayers, []);
+  assert.equal(catalogClassification.toolMatches.length, 0);
+  assert.equal(catalogClassification.contentMatches.length, 0);
+  const resourceConstraintItem = BUSINESS_ARCHITECTURE_ITEMS.find((item) => item.domain === "Ресурсные ограничения");
+  assert.equal(
+    assessArchitectureItemContent(resourceConstraintItem, toolCatalogSource).contentQuality,
+    "reference_catalog"
+  );
 
   const store = new InMemoryStore();
   const service = new ConsultantWebService({

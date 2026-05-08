@@ -291,10 +291,18 @@ function domainsOverlap(left, right) {
 }
 
 function sourceToolMatches(source) {
+  if (isReferenceCatalogSource(source)) {
+    return [];
+  }
+
   return Array.isArray(source?.sourceMeta?.toolMatches) ? source.sourceMeta.toolMatches : [];
 }
 
 function sourceContentMatches(source) {
+  if (isReferenceCatalogSource(source)) {
+    return [];
+  }
+
   return Array.isArray(source?.sourceMeta?.contentMatches) ? source.sourceMeta.contentMatches : [];
 }
 
@@ -329,6 +337,38 @@ function sourceArchitectureContentMatches(source, item) {
 
 function sourceReadableContent(source) {
   return [source?.contentText, source?.aiSummary].filter(Boolean).join(" ");
+}
+
+function isReferenceCatalogSource(source) {
+  const title = normalizeLookup(source?.title || "");
+  const fileUrl = normalizeLookup(source?.fileUrl || "");
+  const content = normalizeLookup(sourceReadableContent(source));
+  const joined = [title, fileUrl, content].filter(Boolean).join(" ");
+
+  const titleSignals = [
+    "сводная таблица инструментов",
+    "карта инструментов",
+    "business architecture tools map",
+    "business_architecture_tools_map",
+    "архитектурная карта инструментов"
+  ];
+
+  if (titleSignals.some((signal) => joined.includes(normalizeLookup(signal)))) {
+    return true;
+  }
+
+  const markers = [
+    "инструмент методология",
+    "домен поддомен",
+    "ссылка на инструмент",
+    "когда применять",
+    "применять",
+    "статус",
+    "результат",
+    "слой"
+  ];
+
+  return markers.reduce((count, marker) => count + Number(content.includes(normalizeLookup(marker))), 0) >= 5;
 }
 
 function sourceWordCount(source) {
@@ -465,11 +505,34 @@ function layerHasEvidence(source, layerCode) {
   return sourceMatchesLayerByContent(source, layerCode);
 }
 
+function evidenceSnippetForSource(source, labels = []) {
+  const text = cleanHumanText(sourceReadableContent(source));
+  if (!text) {
+    return "";
+  }
+
+  const labelTokens = labels
+    .flatMap((label) => lookupTokens(normalizeLookup(label)))
+    .filter((token) => token.length >= 4);
+  const chunks = text
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((chunk) => cleanHumanText(chunk))
+    .filter(Boolean);
+  const matchedChunk = chunks.find((chunk) => {
+    const normalized = normalizeLookup(chunk);
+    return labelTokens.some((token) => normalized.includes(token));
+  });
+  const snippet = matchedChunk || chunks[0] || text;
+
+  return snippet.length > 260 ? `${snippet.slice(0, 259).trim()}…` : snippet;
+}
+
 function renderEvidenceEntry({ source, matches = [], contentMatches = [], quality = null }) {
   const matchLabels = [
     ...matches.map((match) => match.name || match.domain),
     ...contentMatches.map((match) => match.subdomain || match.domain || match.description)
   ].filter(Boolean);
+  const snippet = evidenceSnippetForSource(source, matchLabels);
 
   return `
     <span class="source-evidence">
@@ -478,6 +541,7 @@ function renderEvidenceEntry({ source, matches = [], contentMatches = [], qualit
         : `<span>${escapeHtml(source.title || "Источник")}</span>`}
       ${quality ? `<em class="source-quality source-quality-${escapeHtml(quality.status)}">${escapeHtml(quality.label)}</em>` : ""}
       ${matchLabels.length ? `<small>${escapeHtml(matchLabels.join("; "))}</small>` : ""}
+      ${snippet ? `<small><b>Фрагмент:</b> ${escapeHtml(snippet)}</small>` : ""}
       ${quality?.summary ? `<small>${escapeHtml(quality.summary)}</small>` : ""}
       ${quality?.missing?.length ? `<small><b>Что проверить:</b> ${escapeHtml(quality.missing.slice(0, 2).join("; "))}</small>` : ""}
     </span>

@@ -134,6 +134,39 @@ function contentForSource({ contentText = "", aiSummary = "" } = {}) {
   return normalizeText([contentText, aiSummary].filter(Boolean).join(" "));
 }
 
+export function isBusinessArchitectureReferenceSource(source = {}) {
+  const title = normalizeText(source.title || "");
+  const fileUrl = normalizeText(source.fileUrl || "");
+  const content = contentForSource(source);
+  const joined = [title, fileUrl, content].filter(Boolean).join(" ");
+
+  const titleSignals = [
+    "сводная таблица инструментов",
+    "карта инструментов",
+    "business architecture tools map",
+    "business_architecture_tools_map",
+    "архитектурная карта инструментов"
+  ];
+
+  if (titleSignals.some((signal) => joined.includes(normalizeText(signal)))) {
+    return true;
+  }
+
+  const catalogMarkers = [
+    "инструмент методология",
+    "домен поддомен",
+    "ссылка на инструмент",
+    "когда применять",
+    "применять",
+    "статус",
+    "результат",
+    "слой"
+  ];
+  const markerCount = catalogMarkers.reduce((count, marker) => count + Number(content.includes(normalizeText(marker))), 0);
+
+  return markerCount >= 5;
+}
+
 function sourceWordCount(sourceContent) {
   return sourceContent.split(" ").filter((token) => token.length >= 3).length;
 }
@@ -174,6 +207,22 @@ function businessArchitectureSubdomainItems() {
 }
 
 export function assessArchitectureItemContent(item, source = {}) {
+  if (isBusinessArchitectureReferenceSource(source)) {
+    return {
+      contentQuality: "reference_catalog",
+      score: 0,
+      reasons: [],
+      missing: ["это справочник инструментов, а не заполненный артефакт компании"],
+      checks: {
+        domain: false,
+        instruction: false,
+        expectedResult: false,
+        businessDetails: false
+      },
+      wordCount: sourceWordCount(contentForSource(source))
+    };
+  }
+
   const sourceContent = contentForSource(source);
   if (!sourceContent) {
     return {
@@ -277,6 +326,10 @@ export function assessArchitectureItemContent(item, source = {}) {
 }
 
 export function matchBusinessArchitectureContentForSource(source = {}, { limit = 20, threshold = 12 } = {}) {
+  if (isBusinessArchitectureReferenceSource(source)) {
+    return [];
+  }
+
   const sourceContent = contentForSource(source);
   if (!sourceContent) {
     return [];
@@ -316,6 +369,10 @@ export function matchBusinessArchitectureContentForSource(source = {}, { limit =
 }
 
 export function matchBusinessArchitectureToolsForSource({ title = "", fileUrl = "" } = {}, { limit = 8 } = {}) {
+  if (isBusinessArchitectureReferenceSource({ title, fileUrl })) {
+    return [];
+  }
+
   const sourceText = normalizeText([title, fileUrl].filter(Boolean).join(" "));
   if (!sourceText) {
     return [];

@@ -9,6 +9,7 @@ import {
   CONSULTANT_TOOL_TEMPLATES
 } from "../domain/consultant-mvp-schema.js";
 import {
+  isBusinessArchitectureReferenceSource,
   matchBusinessArchitectureContentForSource,
   matchBusinessArchitectureToolsForSource
 } from "../domain/business-architecture-tool-matcher.js";
@@ -220,6 +221,14 @@ function sourceContentMatches(source) {
 }
 
 function classifySource(source) {
+  if (isBusinessArchitectureReferenceSource(source)) {
+    return {
+      toolMatches: [],
+      contentMatches: [],
+      relatedLayers: []
+    };
+  }
+
   const toolMatches = matchBusinessArchitectureToolsForSource({
     title: source.title,
     fileUrl: source.fileUrl

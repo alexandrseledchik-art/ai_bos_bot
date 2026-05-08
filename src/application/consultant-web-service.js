@@ -4,6 +4,7 @@ import {
   nowIso
 } from "../domain/entities.js";
 import { BUSINESS_ARCHITECTURE_ITEMS } from "../domain/business-architecture-knowledge.js";
+import { isBusinessArchitectureReferenceSource } from "../domain/business-architecture-tool-matcher.js";
 import { PublicGoogleLinkReader } from "../infrastructure/google/public-google-link-reader.js";
 import { CompanyAnalysisCore, classifyConsultantSource } from "./company-analysis-core.js";
 import { importDeepDiagnosticXlsx } from "./deep-diagnostic-importer.js";
@@ -185,6 +186,19 @@ function classifySourceInput({ title = "", contentText = "", fileUrl = "" }) {
 function enrichSourceForRead(source) {
   if (source?.type === "deep_diagnostic" || source?.sourceMeta?.deepDiagnostic) {
     return source;
+  }
+
+  if (isBusinessArchitectureReferenceSource(source)) {
+    return {
+      ...source,
+      relatedLayers: [],
+      sourceMeta: {
+        ...(source?.sourceMeta || {}),
+        toolMatches: [],
+        contentMatches: [],
+        referenceCatalog: true
+      }
+    };
   }
 
   const existingToolMatches = source?.sourceMeta?.toolMatches || [];
