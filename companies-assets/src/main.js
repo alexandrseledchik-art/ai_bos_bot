@@ -117,7 +117,7 @@ function diagnosticQualityLabel(score) {
     return "";
   }
 
-  return `качество разбора: ${score}/10`;
+  return `логика разбора: ${score}/10`;
 }
 
 function asArray(value) {
@@ -220,26 +220,6 @@ function renderSmallList(items, emptyText = "Пока нет данных.", for
     <ul class="split-list compact-list">
       ${rows.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
     </ul>
-  `;
-}
-
-function renderLayerEvidenceRows(layers = []) {
-  const rows = asArray(layers).slice(0, 5);
-  if (!rows.length) {
-    return `<p class="hint-text">Пока не видно, какие области реально объясняют ситуацию.</p>`;
-  }
-
-  return `
-    <div class="stack compact-stack">
-      ${rows.map((layer) => `
-        <div class="mini-row evidence-row">
-          <strong>${escapeHtml(layer.layerName || layer.layer || "Слой")}</strong>
-          <span>${escapeHtml(confidenceLabel(layer.confidence))}</span>
-          ${asArray(layer.facts).length ? `<p><b>Что уже видно:</b> ${escapeHtml(asArray(layer.facts).slice(0, 2).map(humanizeEvidenceItem).filter(Boolean).join(" "))}</p>` : ""}
-          ${asArray(layer.missingFields).length ? `<p><b>Чего не хватает:</b> ${escapeHtml(asArray(layer.missingFields).slice(0, 3).map(humanizeMissingField).filter(Boolean).join(", "))}</p>` : ""}
-        </div>
-      `).join("")}
-    </div>
   `;
 }
 
@@ -678,10 +658,8 @@ function renderOverview(detail) {
   const { company, analysis } = detail;
   const constraint = analysis?.probableConstraint || company.probableConstraint || {};
   const nextStep = analysis?.nextStep || company.nextStep || {};
-  const parallelActions = analysis?.parallelActions || constraint.parallelActions || [];
   const diagnosticQuality = analysis?.diagnosticQuality || {};
   const rejectedHypotheses = analysis?.rejectedHypotheses || constraint.rejectedAlternatives || [];
-  const diagnosticChain = analysis?.diagnosticChain || constraint.relatedLayers || [];
   const evidence = asArray(constraint.evidence).length
     ? asArray(constraint.evidence)
     : asArray(analysis?.keyProblemAreas).flatMap((item) => asArray(item.evidence)).slice(0, 4);
@@ -741,12 +719,12 @@ function renderOverview(detail) {
         <h3>Вывод AI-BOSS</h3>
         <div class="pill-row">
           <span class="pill ${confidenceClass(analysis?.confidence)}" title="Насколько фактов хватает, чтобы опираться на текущий вывод.">${escapeHtml(conclusionConfidenceLabel(analysis?.confidence))}</span>
-          ${diagnosticQuality.score10 != null ? `<span class="pill green" title="Оценивает не результат бизнеса, а качество рассуждения AI-BOSS: отделяет факты от гипотез, не путает причину и следствие, выбирает один следующий шаг.">${escapeHtml(diagnosticQualityLabel(diagnosticQuality.score10))}</span>` : ""}
+          ${diagnosticQuality.score10 != null ? `<span class="pill green" title="Оценивает не результат бизнеса, а дисциплину рассуждения: отделены факты, версии и следующий шаг.">${escapeHtml(diagnosticQualityLabel(diagnosticQuality.score10))}</span>` : ""}
           <span class="pill">${escapeHtml(formatDate(analysis?.createdAt || company.lastAnalysisAt))}</span>
         </div>
       </div>
       ${analysis ? `
-        <p class="section-note">Уверенность показывает, насколько вывод подтверждён данными. Качество разбора показывает, аккуратно ли AI-BOSS отделил факты, версии и следующий шаг.</p>
+        <p class="section-note">Уверенность показывает, насколько вывод подтверждён данными. Логика разбора показывает, аккуратно ли AI-BOSS отделил факты, версии и следующий шаг.</p>
       ` : ""}
       <div class="grid-two">
         <article class="card">
@@ -765,12 +743,10 @@ function renderOverview(detail) {
             <h3>Как AI-BOSS пришёл к выводу</h3>
             ${selectionBasis.length ? `
               <p><strong>Почему выбрана эта версия:</strong></p>
-              ${renderSmallList(selectionBasis)}
+              ${renderSmallList(selectionBasis.slice(0, 3))}
             ` : ""}
             <p><strong>На что опираюсь:</strong></p>
-            ${renderSmallList(evidence, "Пока нет понятных опор в данных. Нужно открыть области и источники.", humanizeEvidenceItem)}
-            <p><strong>Какие области проверил:</strong></p>
-            ${renderLayerEvidenceRows(diagnosticChain)}
+            ${renderSmallList(evidence.slice(0, 3), "Пока нет понятных опор в данных. Нужно открыть области и источники.", humanizeEvidenceItem)}
             <p><strong>Что важно, но пока не похоже на главную причину:</strong></p>
             ${renderRejectedRows(rejectedHypotheses)}
           </article>
@@ -794,15 +770,6 @@ function renderOverview(detail) {
           <h3>Что мешает диагностике быть 10/10</h3>
           <ul class="split-list">
             ${diagnosticQuality.missing.slice(0, 4).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
-          </ul>
-        </article>
-      ` : ""}
-      ${parallelActions.length ? `
-        <article class="card">
-          <h3>Что можно делать параллельно</h3>
-          <p>Это не заменяет главный фокус. Такие шаги можно делать уже сейчас: они дают факты и не заставляют преждевременно перестраивать весь бизнес.</p>
-          <ul class="split-list">
-            ${parallelActions.slice(0, 3).map((action) => `<li><strong>${escapeHtml(action.title)}</strong>${action.why ? ` — ${escapeHtml(action.why)}` : ""}</li>`).join("")}
           </ul>
         </article>
       ` : ""}
@@ -1231,7 +1198,6 @@ function renderProblems(detail) {
   const problems = analysis.keyProblemAreas || [];
   const missing = analysis.missingData || [];
   const constraint = analysis.probableConstraint || {};
-  const rejected = analysis.rejectedHypotheses || constraint.rejectedAlternatives || [];
   const parallelActions = analysis.parallelActions || constraint.parallelActions || [];
 
   return `
@@ -1239,6 +1205,7 @@ function renderProblems(detail) {
       <div class="section-head">
         <h3>Проблематики</h3>
       </div>
+      <p class="section-note">Здесь не повторяется главный вывод. Это отдельные зоны напряжения, которые помогают понять, где нужны факты и где могут быть следствия.</p>
       <div class="stack">
         ${problems.length ? problems.map((problem) => `
           <article class="problem-row">
@@ -1251,21 +1218,6 @@ function renderProblems(detail) {
           </article>
         `).join("") : `<div class="empty-state"><h2>Нет проблематик</h2><p>Нужны данные или анализ.</p></div>`}
       </div>
-    </section>
-
-    <section class="content-section">
-      <div class="section-head">
-        <h3>Вероятное ограничение</h3>
-        <span class="pill ${confidenceClass(constraint.confidence)}">${escapeHtml(conclusionConfidenceLabel(constraint.confidence))}</span>
-      </div>
-      <article class="card">
-        <h3>${escapeHtml(constraint.title || "Пока не выбрано")}</h3>
-        <p>${escapeHtml(constraint.explanation || "Запусти анализ после добавления данных.")}</p>
-        ${constraint.cause ? `<p><strong>Причина:</strong> ${escapeHtml(constraint.cause)}</p>` : ""}
-        ${rejected.length ? `
-          <p><strong>Почему не они:</strong> ${escapeHtml(rejected.slice(0, 3).map((item) => item.layerName || item.layer).join(", "))} важны, но сейчас больше похожи на следствие или источник фактов, а не на главную причину.</p>
-        ` : ""}
-      </article>
     </section>
 
     ${parallelActions.length ? `
@@ -1292,6 +1244,7 @@ function renderProblems(detail) {
       <div class="section-head">
         <h3>Пробелы</h3>
       </div>
+      <p class="section-note">Это не список всех пустых мест. Здесь только ближайшие данные, которые сильнее всего влияют на текущий вывод и следующий шаг.</p>
       <div class="stack">
         ${missing.length ? missing.slice(0, 8).map((item) => `
           <article class="problem-row">

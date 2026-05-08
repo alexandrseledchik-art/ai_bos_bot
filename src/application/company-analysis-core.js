@@ -595,6 +595,39 @@ function buildGeneralRelatedLayers(primary, alternatives = []) {
   }));
 }
 
+const PROBLEM_TITLES_BY_LAYER = {
+  owner_context: "Не до конца зафиксирована рамка собственника",
+  external_environment: "Не до конца понятна рыночная реальность",
+  strategy: "Не выбран стратегический фокус",
+  product: "Не до конца ясно, какую ценность и для кого упаковываем",
+  commercial: "Не доказан подходящий клиентский поток",
+  operations: "Не описан путь заявки или заказа до результата",
+  finance: "Нет достаточной управленческой картины по деньгам",
+  team: "Не ясны роли, нагрузка и зоны ответственности",
+  governance: "Не закреплены правила решений и контроля",
+  technology: "Не ясно, какие инструменты должны поддерживать поток",
+  data_analytics: "Нет единой версии правды по ключевым цифрам"
+};
+
+function problemTitleForLayer(layerAnalysis) {
+  return PROBLEM_TITLES_BY_LAYER[layerAnalysis.layerCode] || `Есть напряжение в области "${layerAnalysis.layerName}"`;
+}
+
+function problemWhyForLayer(layerAnalysis) {
+  const missing = layerAnalysis.missingFields || [];
+  const hasFacts = (layerAnalysis.facts || []).length > 0;
+
+  if (!hasFacts) {
+    return `Пока не хватает фактов по этой области. Без них нельзя честно понять, является ли она причиной проблемы или просто фоном.`;
+  }
+
+  if (missing.length) {
+    return `Есть сигналы, но не хватает точки сравнения: ${missing.slice(0, 3).join(", ")}. Поэтому вывод по этой области пока рабочий, а не окончательный.`;
+  }
+
+  return "По этой области уже есть опоры в данных. Её стоит держать в поле зрения при выборе главного ограничения.";
+}
+
 function buildUpperFrameConstraint({ companyText, layerAnalyses }) {
   const upperLayers = layersByCode(layerAnalyses, UPPER_FRAME_LAYER_CODES);
   const parallelActions = buildParallelActions({ layerAnalyses, companyText });
@@ -649,18 +682,67 @@ function buildKeyProblemAreas(layerAnalyses) {
   return layerAnalyses
     .filter((item) => item.facts.length || item.missingFields.length >= 4)
     .map((item) => ({
-      title: item.facts.length
-        ? `Есть напряжение в области "${item.layerName}"`
-        : `Не хватает данных по области "${item.layerName}"`,
+      title: problemTitleForLayer(item),
       layer: item.layerCode,
       layerName: item.layerName,
-      whyImportant: item.facts.length
-        ? `Эта область уже связана с текущими фактами компании, поэтому может объяснять часть проблемы.`
-        : `Без данных и понятной точки сравнения по этой области нельзя понять, это причина или просто фон.`,
+      whyImportant: problemWhyForLayer(item),
       evidence: item.facts.slice(0, 2),
       confidence: item.confidence
     }))
     .slice(0, 5);
+}
+
+function missingWhyForLayer(layerAnalysis) {
+  const labels = {
+    owner_context: "Эти данные нужны, чтобы понять, ради чего собственник строит бизнес и какие решения можно принимать ниже.",
+    external_environment: "Эти данные нужны, чтобы не строить стратегию на ощущениях о рынке, спросе и конкурентах.",
+    strategy: "Эти данные нужны, чтобы понять, где компания играет, за счёт чего выигрывает и от чего сознательно отказывается.",
+    product: "Эти данные нужны, чтобы проверить, есть ли у клиента понятная причина купить именно этот продукт.",
+    commercial: "Эти данные нужны, чтобы отличить проблему спроса, сегмента, канала и обработки заявок.",
+    operations: "Эти данные нужны, чтобы увидеть, где поток задач или заказов реально застревает.",
+    finance: "Эти данные нужны, чтобы понять, какой рост выгоден, безопасен и не создаёт кассовый риск.",
+    team: "Эти данные нужны, чтобы увидеть, на ком держится система и где возникает перегруз.",
+    governance: "Эти данные нужны, чтобы понять, кто принимает решения, кто отвечает за результат и где теряется контроль.",
+    technology: "Эти данные нужны, чтобы понять, помогают ли инструменты потоку или просто автоматизируют хаос.",
+    data_analytics: "Эти данные нужны, чтобы решения принимались по одной версии правды, а не по разным таблицам и ощущениям."
+  };
+
+  return labels[layerAnalysis.layerCode] || `Эти данные нужны, чтобы сравнить реальность со слоем "${layerAnalysis.layerName}" и не перепутать причину со следствием.`;
+}
+
+function buildPrioritizedMissingData({ layerAnalyses, probableConstraint }) {
+  const priorityCodes = new Set();
+
+  if (probableConstraint.mode === "upper_frame") {
+    UPPER_FRAME_LAYER_CODES.forEach((code) => priorityCodes.add(code));
+  } else if (probableConstraint.layer) {
+    priorityCodes.add(probableConstraint.layer);
+  }
+
+  for (const item of probableConstraint.relatedLayers || []) {
+    if (item.layer) {
+      priorityCodes.add(item.layer);
+    }
+  }
+
+  const prioritized = layerAnalyses
+    .filter((item) => item.missingFields.length)
+    .map((item) => ({
+      item,
+      score:
+        (priorityCodes.has(item.layerCode) ? 10 : 0) +
+        (item.facts || []).length * 2 +
+        Math.min(item.missingFields.length, 6)
+    }))
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 6);
+
+  return prioritized.map(({ item }) => ({
+    layer: item.layerCode,
+    layerName: item.layerName,
+    missingFields: item.missingFields.slice(0, 6),
+    whyNeeded: missingWhyForLayer(item)
+  }));
 }
 
 function selectConstraint({ company, sources, layerAnalyses }) {
@@ -894,14 +976,7 @@ export class CompanyAnalysisCore {
     const parallelActions = probableConstraint.parallelActions || [];
     const rejectedHypotheses = probableConstraint.rejectedAlternatives || [];
     const diagnosticChain = probableConstraint.relatedLayers || [];
-    const missingData = layerAnalyses
-      .filter((item) => item.missingFields.length)
-      .map((item) => ({
-        layer: item.layerCode,
-        layerName: item.layerName,
-        missingFields: item.missingFields,
-        whyNeeded: `Эти данные нужны, чтобы сравнить реальность со слоем "${item.layerName}" и не перепутать причину со следствием.`
-      }));
+    const missingData = buildPrioritizedMissingData({ layerAnalyses, probableConstraint });
 
     const summary = probableConstraint.mode === "upper_frame"
       ? "Главная версия сейчас такая: не собрана общая рамка, которая связывает цель собственника, рынок и стратегию."
