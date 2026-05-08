@@ -1261,31 +1261,11 @@ function renderLayers(detail) {
 
 function renderProblems(detail) {
   const analysis = detail.analysis || {};
-  const problems = analysis.keyProblemAreas || [];
   const missing = analysis.missingData || [];
   const constraint = analysis.probableConstraint || {};
   const parallelActions = analysis.parallelActions || constraint.parallelActions || [];
 
   return `
-    <section class="content-section">
-      <div class="section-head">
-        <h3>Проблематики</h3>
-      </div>
-      <p class="section-note">Здесь не повторяется главный вывод. Это отдельные зоны напряжения, которые помогают понять, где нужны факты и где могут быть следствия.</p>
-      <div class="stack">
-        ${problems.length ? problems.map((problem) => `
-          <article class="problem-row">
-            <h4>${escapeHtml(problem.title)}</h4>
-            <p>${escapeHtml(problem.whyImportant)}</p>
-            <div class="pill-row">
-              <span class="pill orange">${escapeHtml(problem.layerName || problem.layer)}</span>
-              <span class="pill ${confidenceClass(problem.confidence)}">${escapeHtml(confidenceLabel(problem.confidence))}</span>
-            </div>
-          </article>
-        `).join("") : `<div class="empty-state"><h2>Нет проблематик</h2><p>Нужны данные или анализ.</p></div>`}
-      </div>
-    </section>
-
     ${parallelActions.length ? `
       <section class="content-section">
         <div class="section-head">
