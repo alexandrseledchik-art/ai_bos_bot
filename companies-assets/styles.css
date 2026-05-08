@@ -736,7 +736,8 @@ label {
   gap: 4px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 10px;
+  padding: 0;
+  overflow: hidden;
 }
 
 .architecture-item-head {
@@ -744,10 +745,29 @@ label {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
   align-items: start;
+  padding: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.architecture-item-head::-webkit-details-marker {
+  display: none;
+}
+
+.architecture-item-head:hover {
+  background: rgba(255, 255, 255, 0.48);
 }
 
 .architecture-item-head em {
   align-self: start;
+}
+
+.architecture-item-body {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.56);
 }
 
 .architecture-item.is-covered {

@@ -1116,7 +1116,7 @@ function renderLayers(detail) {
           );
           const visibleFacts = layerSources.length ? (layer.facts || []) : [];
           return `
-	            <details class="layer-row layer-row-details" ${index === 0 ? "open" : ""}>
+	            <details class="layer-row layer-row-details">
 	              <summary class="layer-summary">
 	                <div>
 	                  <h4>${escapeHtml(layerLabel(layer))}</h4>
@@ -1172,7 +1172,7 @@ function renderLayers(detail) {
                     <p>Слой и домен показывают общую заполненность. Рабочая единица ниже — поддомен: именно по нему проверяется свой артефакт, его содержание и недостающие данные.</p>
                     <div class="domain-coverage-list">
                       ${domainGroups.length ? domainGroups.map((group) => `
-                        <details class="domain-group" ${group.percent < 100 ? "open" : ""}>
+                        <details class="domain-group">
                           <summary>
                             <div>
                               <strong>${escapeHtml(group.domain)}</strong>
@@ -1187,41 +1187,43 @@ function renderLayers(detail) {
                             ${group.rows.map((item) => {
                               const status = architectureItemStatus(item);
                               return `
-                                <div class="architecture-item ${escapeHtml(status.className)}">
-                                  <div class="architecture-item-head">
+                                <details class="architecture-item ${escapeHtml(status.className)}">
+                                  <summary class="architecture-item-head">
                                     <div>
                                       <strong>${escapeHtml(itemSubdomain(item))}</strong>
                                       <span>Поддомен · ${escapeHtml(itemParentDomain(item))}</span>
                                     </div>
                                     <em class="source-quality source-quality-${escapeHtml(status.code === "covered" ? "sufficient" : status.code === "review" ? "partial" : status.code === "draft" ? "partial" : "insufficient")}">${escapeHtml(status.label)} · ${escapeHtml(status.percent)}%</em>
+                                  </summary>
+                                  <div class="architecture-item-body">
+                                    <p>${escapeHtml(item.description || "")}</p>
+                                    ${status.code === "covered" ? `
+                                      <div class="source-link-list compact-source-list">
+                                        <strong>Основание:</strong>
+                                        ${item.evidence.confirmedArtifacts.map(renderEvidenceEntry).join("")}
+                                      </div>
+                                    ` : ""}
+                                    ${status.code === "review" ? `
+                                      <p>Артефакт найден, но его содержание ещё не закрывает поддомен уверенно.</p>
+                                      <div class="source-link-list compact-source-list">
+                                        <strong>Проверить:</strong>
+                                        ${item.evidence.incompleteArtifacts.map(renderEvidenceEntry).join("")}
+                                      </div>
+                                    ` : ""}
+                                    ${status.code === "draft" ? `
+                                      <p>Полезные данные есть в других источниках. Их можно использовать как опору, но нужно собрать отдельный артефакт по этому поддомену.</p>
+                                      ${item.toolHints ? `<p><b>Что собрать:</b> ${escapeHtml(item.toolHints)}</p>` : ""}
+                                      <div class="source-link-list compact-source-list">
+                                        <strong>Данные найдены:</strong>
+                                        ${item.evidence.draftSources.map(renderEvidenceEntry).join("")}
+                                      </div>
+                                    ` : ""}
+                                    ${status.code === "missing" ? `
+                                      ${item.toolHints ? `<p><b>Что собрать:</b> ${escapeHtml(item.toolHints)}</p>` : ""}
+                                      <p>Пока нет ни подтверждённого артефакта, ни достаточных данных по этому поддомену.</p>
+                                    ` : ""}
                                   </div>
-                                  <p>${escapeHtml(item.description || "")}</p>
-                                  ${status.code === "covered" ? `
-                                    <div class="source-link-list compact-source-list">
-                                      <strong>Основание:</strong>
-                                      ${item.evidence.confirmedArtifacts.map(renderEvidenceEntry).join("")}
-                                    </div>
-                                  ` : ""}
-                                  ${status.code === "review" ? `
-                                    <p>Артефакт найден, но его содержание ещё не закрывает поддомен уверенно.</p>
-                                    <div class="source-link-list compact-source-list">
-                                      <strong>Проверить:</strong>
-                                      ${item.evidence.incompleteArtifacts.map(renderEvidenceEntry).join("")}
-                                    </div>
-                                  ` : ""}
-                                  ${status.code === "draft" ? `
-                                    <p>Полезные данные есть в других источниках. Их можно использовать как опору, но нужно собрать отдельный артефакт по этому поддомену.</p>
-                                    ${item.toolHints ? `<p><b>Что собрать:</b> ${escapeHtml(item.toolHints)}</p>` : ""}
-                                    <div class="source-link-list compact-source-list">
-                                      <strong>Данные найдены:</strong>
-                                      ${item.evidence.draftSources.map(renderEvidenceEntry).join("")}
-                                    </div>
-                                  ` : ""}
-                                  ${status.code === "missing" ? `
-                                    ${item.toolHints ? `<p><b>Что собрать:</b> ${escapeHtml(item.toolHints)}</p>` : ""}
-                                    <p>Пока нет ни подтверждённого артефакта, ни достаточных данных по этому поддомену.</p>
-                                  ` : ""}
-                                </div>
+                                </details>
                               `;
                             }).join("")}
                           </div>
