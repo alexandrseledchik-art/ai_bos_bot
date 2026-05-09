@@ -1679,6 +1679,16 @@ function buildWebsiteDecision(context, linkedProblem = false) {
 function detectRequestedTool(text) {
   const normalized = normalizeText(text).toLowerCase();
 
+  if (
+    /\bbhag\b|\bбхаг\b|big\s+hairy\s+audacious\s+goal|больш[а-яё\s-]+амбициозн[а-яё\s-]+цел|дерзк[а-яё\s-]+цел/.test(
+      normalized
+    )
+  ) {
+    return {
+      name: "BHAG",
+      explanation: "большая дерзкая амбициозная цель: сильный ориентир на несколько лет, который тянет всю систему в одну сторону"
+    };
+  }
   if (/\braci\b|рас[иi]|матриц[ау]\s+ответственност|кто\s+.*чем\s+.*занима|роли?\s+и\s+ответственност|кто\s+за\s+что\s+отвеча/.test(normalized)) {
     return {
       name: "RACI",
@@ -1770,7 +1780,152 @@ function detectToolZoneFromContext(context) {
   return "";
 }
 
+function isBhagTool(tool) {
+  return normalizeText(tool?.name).toLowerCase() === "bhag";
+}
+
+function detectBhagContourFromContext(context) {
+  const sources = [
+    context.userText,
+    context.entryState?.claimedProblem,
+    ...((context.history || []).filter((item) => item.role === "user").map((item) => item.text))
+  ];
+  const normalized = normalizeText(sources.join(" ")).toLowerCase();
+
+  if (/backwood\.store|backwood|бэквуд/.test(normalized)) {
+    return "backwood.store";
+  }
+  if (/упаковк[а-яё\s-]+консалтинг|мой\s+консалтинг|наш\s+консалтинг|для\s+консалтинг/.test(normalized)) {
+    return "упаковки консалтинга";
+  }
+  return "";
+}
+
+function userWantsToolUnderstanding(text) {
+  return /разобрат|не\s+понимаю|как\s+правильно|объясни|понять\s+как|логик[ау]\s+заполн/i.test(normalizeText(text));
+}
+
+function buildBhagToolDecision(context, entryState, { isFollowUp = false } = {}) {
+  const text = normalizeText(context.userText);
+  const contour = detectBhagContourFromContext(context);
+  const wantsUnderstanding = userWantsToolUnderstanding(text);
+  const askedForFilling = /заполн|файл|инструмент|bhag|бхаг/i.test(text);
+
+  let nextStep = "Выбери формат помощи: разобраться в логике BHAG, заполнить вместе по шагам или проверить уже готовый вариант?";
+  let responseText = [
+    "Да, помогу с BHAG. Это не обычная цель и не красивый слоган, а дерзкий ориентир на несколько лет: каким должен стать проект, чтобы вся система тянулась в одну сторону.",
+    nextStep
+  ].join("\n\n");
+
+  if (contour && !wantsUnderstanding && isFollowUp) {
+    nextStep = "Теперь выбери формат помощи: разобраться в логике, заполнить вместе по шагам или проверить готовый вариант?";
+    responseText = [
+      `Ок, контур зафиксировал: BHAG для ${contour}.`,
+      "Чтобы не перескакивать сразу в красивую формулировку, сначала выберем формат помощи.",
+      nextStep
+    ].join("\n\n");
+  }
+
+  if (wantsUnderstanding) {
+    nextStep = "На какой горизонт делаем BHAG для упаковки консалтинга: 3 года, 5 лет или другой срок?";
+    responseText = [
+      `Да, держу контекст: речь про BHAG${contour ? ` для ${contour}` : ""}.`,
+      "Заполнять его лучше не с фразы, а с логики. Нужно ответить на несколько простых вопросов:",
+      "1. Для какого контура делаем цель.\n2. На какой горизонт смотрим.\n3. Какой заметный скачок должен произойти.\n4. По какому признаку будет понятно, что цель достигнута.\n5. Что точно не должно стать ценой этой цели.",
+      "То есть сначала собираем смысл, а уже потом превращаем его в сильную формулировку.",
+      nextStep
+    ].join("\n\n");
+  } else if (askedForFilling && !contour && !isFollowUp) {
+    responseText = [
+      "Да, помогу с заполнением BHAG.",
+      "Чтобы не делать за тебя красивую, но пустую формулировку, сначала уточню формат помощи.",
+      nextStep
+    ].join("\n\n");
+  }
+
+  return {
+    selectedMode: "clarification_mode",
+    decision: {
+      action: "clarify",
+      signalSufficiency: contour ? "partial" : "weak",
+      confidence: contour ? 0.78 : 0.68,
+      rationale:
+        "Пользователь находится в сценарии заполнения конкретного инструмента BHAG; нужно удерживать инструментальный контекст и не переключаться в общую диагностику."
+    },
+    response: {
+      whatIUnderstood: contour
+        ? `Пользователь работает с BHAG для ${contour}.`
+        : "Пользователь просит помочь с BHAG.",
+      hypotheses: [
+        "Нужна помощь с заполнением конкретного инструмента, а не выбор другого инструмента.",
+        "Пока нельзя предлагать готовую формулировку BHAG без горизонта, желаемого скачка и критерия результата."
+      ],
+      whyItMatters: "BHAG должен задавать ориентир для системы, а не быть красивой фразой без управленческого смысла.",
+      nextStep,
+      responseText
+    },
+    guardrails: {
+      knownFacts: [
+        "Запрошен инструмент: BHAG.",
+        contour ? `Контур: ${contour}.` : "Контур BHAG пока не зафиксирован."
+      ],
+      observations: [
+        wantsUnderstanding
+          ? "Пользователь просит разобраться, как правильно заполнить инструмент."
+          : "Пользователь просит помощь с заполнением инструмента."
+      ],
+      workingHypotheses: ["Нужно вести пользователя по смысловым блокам BHAG."],
+      canNotAssert: ["Нельзя формулировать BHAG как готовое решение без горизонта и критерия результата."],
+      confidenceNote: "Это инструментальный режим, а не бизнес-диагноз."
+    },
+    graphAnalysis: buildGraphAnalysisPacket(context.graphPacket),
+    entryState: {
+      ...entryState,
+      entryMode: context.classification.entryMode,
+      claimedProblem: `BHAG${contour ? ` для ${contour}` : ""}`,
+      nextBestQuestion: nextStep,
+      nextBestStep: wantsUnderstanding
+        ? "Объяснить логику заполнения BHAG и начать с горизонта."
+        : "Уточнить формат помощи по заполнению BHAG.",
+      whyThisStep:
+        "Так бот удерживает контекст инструмента, не повторяется и не подменяет помощь преждевременным решением."
+    },
+    memory: {
+      companyName: "",
+      caseKind: "diagnostic_case",
+      goal: `Помочь заполнить BHAG${contour ? ` для ${contour}` : ""}.`,
+      symptoms: [],
+      hypotheses: ["Нужно собрать смысловую основу BHAG перед формулировкой."],
+      constraint: "",
+      situation: "Пользователь пришёл с запросом на заполнение инструмента.",
+      actionWave: {
+        enabled: false,
+        firstStep: "",
+        notNow: "",
+        whyThisFirst: ""
+      },
+      toolRecommendations: [
+        {
+          name: "BHAG",
+          reason: "Пользователь прямо запросил помощь с этим инструментом.",
+          usageMoment: "После выбора формата помощи и фиксации горизонта."
+        }
+      ],
+      artifact: {
+        shouldSave: false,
+        title: "",
+        summary: "",
+        kind: "snapshot"
+      }
+    }
+  };
+}
+
 function buildToolFollowUpDecision(context, requestedTool, entryState) {
+  if (isBhagTool(requestedTool)) {
+    return buildBhagToolDecision(context, entryState, { isFollowUp: true });
+  }
+
   const text = normalizeText(context.userText);
   const zone = detectToolZoneFromContext(context);
   const asksConnection = /как\s+.*связан|прич[её]м|зачем|почему/i.test(text);
@@ -1863,6 +2018,12 @@ function buildToolFirstDecision(context) {
   const requestedTool = detectRequestedToolFromContext(context);
   const entryState = buildEntryState(context, "operations", "weak", "", "keep_in_entry");
   const isSpecific = context.classification.entryMode === "specific_tool_request";
+
+  if (isBhagTool(requestedTool)) {
+    return buildBhagToolDecision(context, entryState, {
+      isFollowUp: Boolean(context.classification.inferredToolFollowUp)
+    });
+  }
 
   if (context.classification.inferredToolFollowUp) {
     return buildToolFollowUpDecision(context, requestedTool, entryState);

@@ -46,6 +46,16 @@ const CASES = [
     text: "Мне нужен RACI для ролей",
     expectedType: "tool_request",
     expectedDepth: "standard"
+  },
+  {
+    text: "Можешь помочь с заполнением BHAG?",
+    expectedType: "tool_request",
+    expectedDepth: "standard"
+  },
+  {
+    text: "Разобраться. Я не понимаю как правильно заполнить файл с инструментом",
+    expectedType: "tool_request",
+    expectedDepth: "standard"
   }
 ];
 

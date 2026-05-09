@@ -30,6 +30,7 @@
     "consultant:deep-import:check": "node src/scripts/check-deep-diagnostic-importer.js",
     "diagnostic:excellence:check": "node src/scripts/check-diagnostic-excellence.js",
     "diagnostic:chat:excellence:check": "node src/scripts/check-chat-diagnostic-excellence.js",
+    "tool-filling:check": "node src/scripts/check-tool-filling-dialog.js",
     "miniapp:phase1": "node src/scripts/check-mini-app-phase1.js",
     "miniapp:phase2": "node src/scripts/check-mini-app-phase2.js",
     "miniapp:phase3": "node src/scripts/check-mini-app-phase3.js",
