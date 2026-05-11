@@ -1023,7 +1023,8 @@ label {
 }
 
 .portal-class-grid,
-.portal-guide-grid {
+.portal-guide-grid,
+.maturity-explainer-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
@@ -1159,6 +1160,48 @@ label {
   margin-top: 18px;
 }
 
+.maturity-scale-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.maturity-scale-card {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff;
+}
+
+.maturity-scale-card strong {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--teal-dark);
+  font-size: 20px;
+}
+
+.maturity-scale-card h4 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.maturity-scale-card p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.maturity-layer-note {
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+}
+
 .maturity-level {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr);
@@ -1276,6 +1319,8 @@ label {
   .grid-three,
   .portal-class-grid,
   .portal-guide-grid,
+  .maturity-explainer-grid,
+  .maturity-scale-grid,
   .portal-subdomain-grid,
   .portal-tool-grid,
   .maturity-levels,

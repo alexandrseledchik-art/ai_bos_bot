@@ -993,23 +993,97 @@ function renderToolsPortal(methodology) {
 
 function renderMaturityPortal(methodology) {
   const layerRows = methodology.items.filter((item) => item.block === "Слой");
+  const maturityScale = [
+    {
+      level: "1",
+      title: "Хаос",
+      text: "Область держится на ручном управлении, личной памяти и отдельных людях. Результат плохо повторяется."
+    },
+    {
+      level: "2",
+      title: "Есть отдельные практики",
+      text: "Что-то уже работает, но система не собрана: правила разные, данные неполные, ответственность часто размыта."
+    },
+    {
+      level: "3",
+      title: "Рабочий стандарт",
+      text: "Есть понятный способ работы. Результат в целом предсказуем, но ещё зависит от дисциплины и ручного контроля."
+    },
+    {
+      level: "4",
+      title: "Сильная система",
+      text: "Область управляется регулярно, выдерживает рост и помогает принимать решения быстрее и спокойнее."
+    },
+    {
+      level: "5",
+      title: "Ориентир",
+      text: "Эталонный уровень. Не обязательная цель для всех, а верхняя планка, с которой можно сравнивать потенциал."
+    }
+  ];
+
   content.innerHTML = `
     <section class="content-section portal-hero">
       <p class="eyebrow">Диагностика</p>
-      <h2>Матрица зрелости</h2>
-      <p>Матрица нужна не ради оценки. Она показывает, насколько область уже управляется, где хаос, где рабочая середина, а где есть опора для роста.</p>
+      <h2>Матрица зрелости бизнеса</h2>
+      <p>Это не оценка ради оценки и не финальный диагноз. Матрица показывает, насколько каждая область бизнеса уже управляется: где всё держится на ручном режиме, где есть рабочий порядок, а где можно опираться на систему для роста.</p>
     </section>
+
     <section class="content-section">
+      <div class="maturity-explainer-grid">
+        <article class="card">
+          <h3>Зачем она нужна</h3>
+          <p>Матрица помогает быстро увидеть слабые и сильные области. Но она не выбирает главное ограничение автоматически: низкая оценка может быть причиной, а может быть следствием другой проблемы.</p>
+        </article>
+        <article class="card">
+          <h3>Как AI-BOSS её использует</h3>
+          <p>AI-BOSS смотрит на оценки как на карту сигналов: где нужна проверка, какие данные собрать, что можно улучшать параллельно и какую версию ограничения стоит проверить первой.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="content-section">
+      <div class="section-head">
+        <div>
+          <h3>Что означает шкала 1–5</h3>
+          <p class="section-note">Шкала показывает уровень управляемости области, а не “хорошая компания или плохая”.</p>
+        </div>
+      </div>
+      <div class="maturity-scale-grid">
+        ${maturityScale.map((item) => `
+          <article class="maturity-scale-card">
+            <strong>${escapeHtml(item.level)}</strong>
+            <div>
+              <h4>${escapeHtml(item.title)}</h4>
+              <p>${escapeHtml(item.text)}</p>
+            </div>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+
+    <section class="content-section">
+      <div class="section-head">
+        <div>
+          <h3>Шкала по 11 слоям</h3>
+          <p class="section-note">Раскрой слой, чтобы увидеть, как выглядит зрелость от 1 до 5 именно в этой области.</p>
+        </div>
+      </div>
       <div class="stack">
         ${layerRows.map((row) => `
           <details class="portal-details">
             <summary>
               <div>
                 <strong>${escapeHtml(row.layer)}</strong>
-                <span>${escapeHtml(row.description || "")}</span>
+                <span>${escapeHtml(row.description || "Как эта область выглядит на разных уровнях зрелости.")}</span>
               </div>
               <span class="portal-toggle"></span>
             </summary>
+            ${row.action || row.expectedResult ? `
+              <div class="methodology-note maturity-layer-note">
+                ${row.action ? `<p><strong>Что проверяем:</strong> ${escapeHtml(row.action)}</p>` : ""}
+                ${row.expectedResult ? `<p><strong>Что должно стать понятнее:</strong> ${escapeHtml(row.expectedResult)}</p>` : ""}
+              </div>
+            ` : ""}
             <div class="maturity-levels">
               ${Object.entries(row.maturity || {}).map(([level, text]) => `
                 <article class="maturity-level">
