@@ -832,12 +832,43 @@ function renderMethodologyDetails(row) {
 function renderArchitecturePortal(methodology) {
   const enriched = enrichMethodologyItems(methodology.items);
   const itemsByLayer = new Map();
+  const layersByClass = new Map();
+  const classesById = new Map(methodology.layerClasses.map((item) => [item.classId, item]));
   for (const item of enriched) {
     if (!itemsByLayer.has(item.layerId)) {
       itemsByLayer.set(item.layerId, []);
     }
     itemsByLayer.get(item.layerId).push(item);
   }
+  for (const layer of methodology.layers) {
+    if (!layersByClass.has(layer.classId)) {
+      layersByClass.set(layer.classId, []);
+    }
+    layersByClass.get(layer.classId).push(layer);
+  }
+
+  const sequenceSteps = [
+    {
+      classId: "A",
+      label: "Сначала",
+      note: "Проверяем, чего хочет собственник и есть ли рынок, в котором вообще можно играть."
+    },
+    {
+      classId: "B",
+      label: "Затем",
+      note: "Смотрим, какую ценность создаём, кому продаём и почему клиент должен купить."
+    },
+    {
+      classId: "C",
+      label: "После этого",
+      note: "Проверяем, как спрос проходит через исполнение и превращается в деньги."
+    },
+    {
+      classId: "D",
+      label: "Параллельно",
+      note: "Команда, управление, технологии и данные проверяются рядом со всеми шагами, потому что они либо поддерживают поток, либо ломают его."
+    }
+  ];
 
   content.innerHTML = `
     <section class="content-section portal-hero">
@@ -851,12 +882,41 @@ function renderArchitecturePortal(methodology) {
       </div>
       <div class="portal-class-grid">
         ${methodology.layerClasses.map((item) => `
-          <article class="card">
+          <article class="card architecture-class-card">
             <p class="eyebrow">Класс ${escapeHtml(item.classId)}</p>
             <h3>${escapeHtml(item.name)}</h3>
             <p>${escapeHtml(item.description)}</p>
+            <div class="class-layer-list" aria-label="Слои класса ${escapeHtml(item.classId)}">
+              ${(layersByClass.get(item.classId) || []).map((layer) => `
+                <span>${escapeHtml(layer.name)}</span>
+              `).join("")}
+            </div>
           </article>
         `).join("")}
+      </div>
+    </section>
+    <section class="content-section">
+      <div class="section-head">
+        <div>
+          <h3>Как идти по архитектуре</h3>
+          <p class="section-note">Это не жёсткая анкета, а логика проверки бизнеса: сначала задаём условия игры, потом смотрим поток ценности и результата. Устойчивость проверяется параллельно, потому что команда, управление, технологии и данные влияют на каждый этап.</p>
+        </div>
+      </div>
+      <div class="architecture-sequence">
+        ${sequenceSteps.map((step) => {
+          const classItem = classesById.get(step.classId);
+          const layers = layersByClass.get(step.classId) || [];
+          return `
+            <article class="sequence-step ${step.classId === "D" ? "is-parallel" : ""}">
+              <p class="eyebrow">${escapeHtml(step.label)} · класс ${escapeHtml(step.classId)}</p>
+              <h4>${escapeHtml(classItem?.name || "")}</h4>
+              <p>${escapeHtml(step.note)}</p>
+              <div class="class-layer-list">
+                ${layers.map((layer) => `<span>${escapeHtml(layer.name)}</span>`).join("")}
+              </div>
+            </article>
+          `;
+        }).join("")}
       </div>
     </section>
     <section class="content-section">
@@ -873,7 +933,7 @@ function renderArchitecturePortal(methodology) {
               <summary>
                 <div>
                   <strong>${escapeHtml(layer.name)}</strong>
-                  <span>Слой ${index + 1} из 11 · ${escapeHtml(layer.whatItIs || "")}</span>
+                  <span>Класс ${escapeHtml(layer.classId || "")} · слой ${index + 1} из 11 · ${escapeHtml(layer.whatItIs || "")}</span>
                 </div>
                 <span class="portal-toggle"></span>
               </summary>

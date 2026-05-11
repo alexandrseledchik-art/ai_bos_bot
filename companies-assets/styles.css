@@ -1030,6 +1030,83 @@ label {
   gap: 14px;
 }
 
+.architecture-class-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.class-layer-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.class-layer-list span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: var(--chip);
+  color: var(--teal-dark);
+  font-weight: 900;
+}
+
+.architecture-sequence {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sequence-step {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  background: #fff;
+}
+
+.sequence-step:not(:last-child)::after {
+  content: "→";
+  position: absolute;
+  top: 24px;
+  right: -13px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--teal-dark);
+  font-weight: 900;
+}
+
+.sequence-step.is-parallel {
+  border-color: rgba(158, 73, 15, 0.25);
+  background: #fffaf3;
+}
+
+.sequence-step.is-parallel::after {
+  content: none;
+}
+
+.sequence-step h4 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.sequence-step p {
+  margin: 0;
+  color: var(--muted);
+}
+
 .portal-details {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1321,6 +1398,7 @@ label {
   .portal-guide-grid,
   .maturity-explainer-grid,
   .maturity-scale-grid,
+  .architecture-sequence,
   .portal-subdomain-grid,
   .portal-tool-grid,
   .maturity-levels,
