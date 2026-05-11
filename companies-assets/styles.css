@@ -800,29 +800,23 @@ label {
   background: rgba(255, 255, 255, 0.56);
 }
 
-.inline-more {
+.methodology-note {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
 }
 
-.inline-more summary {
-  padding: 9px 10px;
-  cursor: pointer;
-  color: var(--teal-dark);
-  font-weight: 900;
-  list-style: none;
+.methodology-note p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.4;
 }
 
-.inline-more summary::-webkit-details-marker {
-  display: none;
-}
-
-.inline-more-body {
-  display: grid;
-  gap: 8px;
-  border-top: 1px solid var(--line);
-  padding: 10px;
+.methodology-note strong {
+  color: var(--ink);
 }
 
 .architecture-item.is-covered {
@@ -1042,6 +1036,7 @@ label {
   display: flex;
   justify-content: space-between;
   gap: 16px;
+  align-items: center;
   padding: 16px;
   cursor: pointer;
   list-style: none;
@@ -1049,6 +1044,15 @@ label {
 
 .portal-details > summary::-webkit-details-marker {
   display: none;
+}
+
+.portal-details > summary:focus {
+  outline: none;
+}
+
+.portal-details > summary:focus-visible {
+  outline: 2px solid rgba(0, 95, 102, 0.18);
+  outline-offset: -2px;
 }
 
 .portal-details > summary:hover {
@@ -1064,12 +1068,40 @@ label {
   color: var(--muted);
 }
 
-.portal-details .drawer-toggle::after {
-  content: "Подробнее";
+.portal-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: max-content;
+  color: var(--teal-dark);
+  font-size: 14px;
+  font-weight: 900;
 }
 
-.portal-details[open] .drawer-toggle::after {
+.portal-toggle::after {
+  content: "Раскрыть";
+}
+
+.portal-toggle::before {
+  content: "+";
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #fff;
+  line-height: 1;
+}
+
+.portal-details[open] > summary .portal-toggle::after,
+.domain-group[open] > summary .portal-toggle::after {
   content: "Свернуть";
+}
+
+.portal-details[open] > summary .portal-toggle::before,
+.domain-group[open] > summary .portal-toggle::before {
+  content: "−";
 }
 
 .portal-details-body,

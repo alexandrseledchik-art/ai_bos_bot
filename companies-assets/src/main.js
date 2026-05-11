@@ -771,16 +771,23 @@ function enrichMethodologyItems(items = []) {
 }
 
 function renderMethodologyDetails(row) {
+  const rows = [
+    ["Что это", row.description],
+    ["Что делаем", row.action],
+    ["Результат", row.expectedResult],
+    ["Инструменты", row.toolHints]
+  ].filter(([, value]) => String(value || "").trim());
+
+  if (!rows.length) {
+    return "";
+  }
+
   return `
-    <details class="inline-more">
-      <summary>Подробнее</summary>
-      <div class="inline-more-body">
-        ${row.description ? `<p><strong>Что это:</strong> ${escapeHtml(row.description)}</p>` : ""}
-        ${row.action ? `<p><strong>Что делаем:</strong> ${escapeHtml(row.action)}</p>` : ""}
-        ${row.expectedResult ? `<p><strong>Результат:</strong> ${escapeHtml(row.expectedResult)}</p>` : ""}
-        ${row.toolHints ? `<p><strong>Подходящие инструменты:</strong> ${escapeHtml(row.toolHints)}</p>` : ""}
-      </div>
-    </details>
+    <div class="methodology-note">
+      ${rows.map(([label, value]) => `
+        <p><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</p>
+      `).join("")}
+    </div>
   `;
 }
 
@@ -830,7 +837,7 @@ function renderArchitecturePortal(methodology) {
                   <strong>${escapeHtml(layer.name)}</strong>
                   <span>Слой ${index + 1} из 11 · ${escapeHtml(layer.whatItIs || "")}</span>
                 </div>
-                <span class="drawer-toggle"></span>
+                <span class="portal-toggle"></span>
               </summary>
               <div class="portal-details-body">
                 ${layerRow ? renderMethodologyDetails(layerRow) : ""}
@@ -844,7 +851,7 @@ function renderArchitecturePortal(methodology) {
                             <strong>${escapeHtml(domain.domain)}</strong>
                             <span>${escapeHtml(subdomains.length)} поддоменов</span>
                           </div>
-                          <span class="drawer-toggle compact-toggle"></span>
+                          <span class="portal-toggle compact-toggle"></span>
                         </summary>
                         <div class="portal-domain-body">
                           ${renderMethodologyDetails(domain)}
@@ -919,7 +926,7 @@ function renderToolsPortal(methodology) {
                 <strong>${escapeHtml(layer)}</strong>
                 <span>${escapeHtml(rows.length)} инструментов</span>
               </div>
-              <span class="drawer-toggle"></span>
+              <span class="portal-toggle"></span>
             </summary>
             <div class="portal-tool-grid">
               ${rows.map((tool) => `
@@ -963,7 +970,7 @@ function renderMaturityPortal(methodology) {
                 <strong>${escapeHtml(row.layer)}</strong>
                 <span>${escapeHtml(row.description || "")}</span>
               </div>
-              <span class="drawer-toggle"></span>
+              <span class="portal-toggle"></span>
             </summary>
             <div class="maturity-levels">
               ${Object.entries(row.maturity || {}).map(([level, text]) => `
