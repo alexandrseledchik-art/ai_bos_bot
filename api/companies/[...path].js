@@ -1,7 +1,14 @@
 import { assertAdminRequest, readAdminJsonBody } from "../../src/application/admin-api-context.js";
 import { ConsultantWebService } from "../../src/application/consultant-web-service.js";
+import { answerWorkspaceQuestion } from "../../src/application/workspace-chat-service.js";
 import { loadConfig } from "../../src/config.js";
 import { getServices } from "../../src/create-services.js";
+import {
+  BUSINESS_ARCHITECTURE_ITEMS,
+  BUSINESS_ARCHITECTURE_LAYER_CLASSES,
+  BUSINESS_ARCHITECTURE_LAYERS,
+  BUSINESS_ARCHITECTURE_TOOLS
+} from "../../src/domain/business-architecture-knowledge.js";
 
 function json(payload, init = {}) {
   return new Response(JSON.stringify(payload), {
@@ -62,6 +69,28 @@ async function dispatch(request) {
       const payload = await readAdminJsonBody(request);
       return json({ ok: true, ...(await service.createCompany(payload)) });
     }
+  }
+
+  if (path === "methodology" && request.method === "GET") {
+    return json({
+      ok: true,
+      layerClasses: BUSINESS_ARCHITECTURE_LAYER_CLASSES,
+      layers: BUSINESS_ARCHITECTURE_LAYERS,
+      items: BUSINESS_ARCHITECTURE_ITEMS,
+      tools: BUSINESS_ARCHITECTURE_TOOLS
+    });
+  }
+
+  if (path === "chat" && request.method === "POST") {
+    const payload = await readAdminJsonBody(request);
+    const reply = await answerWorkspaceQuestion({
+      config,
+      text: payload.text,
+      context: payload.context || {},
+      systemHint: "Контекст: кабинет компаний, методология, слои, инструменты, матрица зрелости и анализ AI-BOSS."
+    });
+
+    return json({ ok: true, reply });
   }
 
   const companyMatch = path.match(/^([^/]+)$/);

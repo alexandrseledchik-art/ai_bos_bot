@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>AI-BOSS Admin</title>
-    <link rel="stylesheet" href="/admin-assets/styles.css?v=20260503-3">
+    <link rel="stylesheet" href="/admin-assets/styles.css?v=20260510-1">
   </head>
   <body>
     <main class="shell">
@@ -15,6 +15,15 @@
         </div>
         <button class="ghost" id="logoutButton" type="button">Сбросить токен</button>
       </header>
+
+      <nav class="site-nav" id="siteNav" aria-label="AI-BOSS">
+        <a href="/companies">Компании</a>
+        <a href="/companies#architecture">Архитектура</a>
+        <a href="/companies#tools">Инструменты</a>
+        <a href="/companies#maturity">Матрица зрелости</a>
+        <a href="/companies#guide">Как пользоваться</a>
+        <a class="active" href="/admin">Админка</a>
+      </nav>
 
       <section class="token-panel" id="tokenPanel">
         <h2>Вход в админку</h2>
@@ -42,12 +51,13 @@
           <button class="tab active" data-view="conversations" type="button">Диалоги</button>
           <button class="tab" data-view="evaluations" type="button">Оценки</button>
           <button class="tab" data-view="improvements" type="button">Улучшения</button>
+          <button class="tab" data-view="access" type="button">Доступы</button>
         </nav>
 
         <section class="panel" id="content"></section>
       </section>
     </main>
 
-    <script type="module" src="/admin-assets/src/main.js?v=20260503-3"></script>
+    <script type="module" src="/admin-assets/src/main.js?v=20260510-1"></script>
   </body>
 </html>

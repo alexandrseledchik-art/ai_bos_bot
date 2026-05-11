@@ -1,10 +1,13 @@
+import { initWorkspaceChat } from "/companies-assets/src/workspace-chat.js";
+
 const TOKEN_KEY = "aibos_admin_token";
 
 const state = {
   token: localStorage.getItem(TOKEN_KEY) || "",
   view: "conversations",
   selectedConversationId: "",
-  search: ""
+  search: "",
+  usersStatus: ""
 };
 
 const tokenPanel = document.querySelector("#tokenPanel");
@@ -356,6 +359,69 @@ function renderImprovements(payload) {
   content.querySelector("#collectButton").addEventListener("click", collectImprovements);
 }
 
+function renderUsers(payload) {
+  const users = payload.users || [];
+  const statusOptions = [
+    ["", "Все"],
+    ["pending", "Заявки"],
+    ["approved", "С доступом"],
+    ["blocked", "Закрыт доступ"]
+  ];
+
+  content.innerHTML = `
+    <div class="toolbar">
+      <div>
+        <h2>Доступы</h2>
+        <p>Здесь можно открыть или закрыть доступ к боту. Сейчас MVP работает по Telegram ID: пользователь пишет боту, появляется в списке, администратор меняет статус.</p>
+      </div>
+      <form id="accessFilterForm">
+        <select id="accessStatusFilter" aria-label="Фильтр доступа">
+          ${statusOptions.map(([value, label]) => `<option value="${escapeHtml(value)}" ${state.usersStatus === value ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}
+        </select>
+        <button class="secondary" type="submit">Показать</button>
+      </form>
+    </div>
+    <div class="access-note">
+      <strong>Логика доступа:</strong> pending — человек попросил вход, approved — может пользоваться ботом, blocked — доступ закрыт. Компаниям и ролям позже можно добавить отдельные права, но сначала держим простой контур.
+    </div>
+    <div class="grid">
+      ${users.length ? users.map((user) => {
+        const name = [user.first_name, user.last_name].filter(Boolean).join(" ").trim() || "Без имени";
+        const username = user.username ? `@${user.username}` : "username не указан";
+        const status = user.access_status || "pending";
+        return `
+          <article class="row access-row">
+            <div>
+              <div class="row-title">${escapeHtml(name)}</div>
+              <p>${escapeHtml(username)} · Telegram ID: ${escapeHtml(user.telegram_user_id)}</p>
+              <div class="meta">
+                <span class="pill ${status === "approved" ? "green" : status === "blocked" ? "red" : "orange"}">${escapeHtml(accessStatusLabel(status))}</span>
+                <span class="pill">обновлён: ${escapeHtml(formatDate(user.updated_at || user.access_decided_at))}</span>
+                ${user.access_note ? `<span class="pill">${escapeHtml(user.access_note)}</span>` : ""}
+              </div>
+            </div>
+            <div class="access-actions">
+              <button data-access-action="approved" data-user-id="${escapeHtml(user.telegram_user_id)}" type="button">Открыть</button>
+              <button class="secondary" data-access-action="pending" data-user-id="${escapeHtml(user.telegram_user_id)}" type="button">В заявку</button>
+              <button class="secondary danger" data-access-action="blocked" data-user-id="${escapeHtml(user.telegram_user_id)}" type="button">Закрыть</button>
+            </div>
+          </article>
+        `;
+      }).join("") : `<div class="empty">Пользователей пока нет. Они появятся после первого обращения к боту.</div>`}
+    </div>
+  `;
+
+  content.querySelector("#accessFilterForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    state.usersStatus = content.querySelector("#accessStatusFilter").value;
+    loadUsers();
+  });
+
+  content.querySelectorAll("[data-access-action]").forEach((button) => {
+    button.addEventListener("click", () => updateUserAccess(button.dataset.userId, button.dataset.accessAction));
+  });
+}
+
 async function loadConversations() {
   renderLoading("Загружаю диалоги");
   try {
@@ -416,6 +482,34 @@ async function loadImprovements() {
   }
 }
 
+async function loadUsers() {
+  renderLoading("Загружаю доступы");
+  try {
+    const params = new URLSearchParams({ limit: "120" });
+    if (state.usersStatus) {
+      params.set("status", state.usersStatus);
+    }
+    renderUsers(await api(`users?${params.toString()}`));
+  } catch (error) {
+    renderError(error);
+  }
+}
+
+async function updateUserAccess(telegramUserId, status) {
+  try {
+    await api(`users/${encodeURIComponent(telegramUserId)}/access`, {
+      method: "PATCH",
+      body: {
+        status,
+        note: status === "approved" ? "approved from admin" : status === "blocked" ? "blocked from admin" : "returned to pending from admin"
+      }
+    });
+    await loadUsers();
+  } catch (error) {
+    renderError(error);
+  }
+}
+
 async function collectImprovements() {
   renderLoading("Пересобираю улучшения");
   try {
@@ -437,6 +531,10 @@ async function loadCurrentView() {
   }
   if (state.view === "improvements") {
     await loadImprovements();
+    return;
+  }
+  if (state.view === "access") {
+    await loadUsers();
     return;
   }
   await loadConversations();
@@ -500,3 +598,13 @@ setAuthenticated(Boolean(state.token));
 if (state.token) {
   loadCurrentView();
 }
+
+initWorkspaceChat({
+  endpoint: "/api/admin/chat",
+  title: "AI-BOSS",
+  tokenProvider: () => state.token,
+  contextProvider: () => ({
+    page: `admin:${state.view}`,
+    selectedConversationId: state.selectedConversationId
+  })
+});

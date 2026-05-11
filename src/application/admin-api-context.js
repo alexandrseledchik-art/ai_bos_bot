@@ -1,3 +1,4 @@
+import { AccessControlService } from "./access-control-service.js";
 import { AdminAnalyticsService } from "./admin-analytics-service.js";
 import { loadConfig } from "../config.js";
 import { MiniAppCompatSyncClient } from "../infrastructure/storage/mini-app-compat-sync.js";
@@ -92,6 +93,11 @@ export async function createAdminContext(request) {
   return {
     config,
     syncClient,
+    accessControl: new AccessControlService({
+      syncClient,
+      mode: config.accessControlMode,
+      adminTelegramUserIds: config.adminTelegramUserIds
+    }),
     adminAnalytics: new AdminAnalyticsService({ syncClient })
   };
 }

@@ -1,3 +1,5 @@
+import { initWorkspaceChat } from "./workspace-chat.js";
+
 const TOKEN_KEY = "aibos_companies_token";
 
 const state = {
@@ -5,6 +7,8 @@ const state = {
   companies: [],
   selectedCompanyId: "",
   selectedDetail: null,
+  methodology: null,
+  toolSearch: "",
   loading: false
 };
 
@@ -18,6 +22,9 @@ const content = document.querySelector("#content");
 const logoutButton = document.querySelector("#logoutButton");
 const refreshButton = document.querySelector("#refreshButton");
 const newCompanyButton = document.querySelector("#newCompanyButton");
+const siteNavLinks = [...document.querySelectorAll("[data-site-view]")];
+
+const SITE_VIEWS = new Set(["architecture", "tools", "maturity", "guide"]);
 
 const LAYER_LABELS = {
   owner_context: "Контур собственника",
@@ -661,6 +668,17 @@ async function api(path, options = {}) {
   return payload;
 }
 
+function routeSiteView() {
+  const value = window.location.hash.replace(/^#/, "").trim();
+  return SITE_VIEWS.has(value) ? value : "";
+}
+
+function setActiveSiteNav(view = "companies") {
+  siteNavLinks.forEach((link) => {
+    link.classList.toggle("active", link.dataset.siteView === view);
+  });
+}
+
 function routeCompanyId() {
   const match = window.location.pathname.match(/^\/companies\/([^/]+)/);
   return match ? decodeURIComponent(match[1]) : "";
@@ -671,6 +689,21 @@ function setRoute(companyId) {
   if (window.location.pathname !== target) {
     window.history.pushState({}, "", target);
   }
+}
+
+async function loadMethodology() {
+  if (state.methodology) {
+    return state.methodology;
+  }
+
+  const payload = await api("/methodology");
+  state.methodology = {
+    layerClasses: payload.layerClasses || [],
+    layers: payload.layers || [],
+    items: payload.items || [],
+    tools: payload.tools || []
+  };
+  return state.methodology;
 }
 
 function renderLoading(label = "Загрузка") {
@@ -716,6 +749,295 @@ function renderEmpty() {
       <p>Слева появятся рабочие кейсы консультанта.</p>
     </section>
   `;
+}
+
+function enrichMethodologyItems(items = []) {
+  const currentDomainByLayer = new Map();
+  return items.map((item) => {
+    const block = String(item.block || "");
+    let parentDomain = item.domain || "";
+    if (block === "Домен") {
+      currentDomainByLayer.set(item.layerId, item.domain || "");
+    }
+    if (block === "Поддомен") {
+      parentDomain = currentDomainByLayer.get(item.layerId) || "Без домена";
+    }
+
+    return {
+      ...item,
+      parentDomain
+    };
+  });
+}
+
+function renderMethodologyDetails(row) {
+  return `
+    <details class="inline-more">
+      <summary>Подробнее</summary>
+      <div class="inline-more-body">
+        ${row.description ? `<p><strong>Что это:</strong> ${escapeHtml(row.description)}</p>` : ""}
+        ${row.action ? `<p><strong>Что делаем:</strong> ${escapeHtml(row.action)}</p>` : ""}
+        ${row.expectedResult ? `<p><strong>Результат:</strong> ${escapeHtml(row.expectedResult)}</p>` : ""}
+        ${row.toolHints ? `<p><strong>Подходящие инструменты:</strong> ${escapeHtml(row.toolHints)}</p>` : ""}
+      </div>
+    </details>
+  `;
+}
+
+function renderArchitecturePortal(methodology) {
+  const enriched = enrichMethodologyItems(methodology.items);
+  const itemsByLayer = new Map();
+  for (const item of enriched) {
+    if (!itemsByLayer.has(item.layerId)) {
+      itemsByLayer.set(item.layerId, []);
+    }
+    itemsByLayer.get(item.layerId).push(item);
+  }
+
+  content.innerHTML = `
+    <section class="content-section portal-hero">
+      <p class="eyebrow">Методология</p>
+      <h2>Архитектура бизнеса</h2>
+      <p>Это карта, по которой AI-BOSS раскладывает бизнес: от воли собственника и рынка до процессов, денег, команды, технологий и данных. Здесь не нужно ничего заполнять — это справочник логики.</p>
+    </section>
+    <section class="content-section">
+      <div class="section-head">
+        <h3>4 класса и 11 слоёв</h3>
+      </div>
+      <div class="portal-class-grid">
+        ${methodology.layerClasses.map((item) => `
+          <article class="card">
+            <p class="eyebrow">Класс ${escapeHtml(item.classId)}</p>
+            <h3>${escapeHtml(item.name)}</h3>
+            <p>${escapeHtml(item.description)}</p>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+    <section class="content-section">
+      <div class="section-head">
+        <h3>Слои, домены и поддомены</h3>
+      </div>
+      <div class="stack">
+        ${methodology.layers.map((layer, index) => {
+          const rows = itemsByLayer.get(layer.id) || [];
+          const layerRow = rows.find((item) => item.block === "Слой");
+          const domains = rows.filter((item) => item.block === "Домен");
+          return `
+            <details class="portal-details">
+              <summary>
+                <div>
+                  <strong>${escapeHtml(layer.name)}</strong>
+                  <span>Слой ${index + 1} из 11 · ${escapeHtml(layer.whatItIs || "")}</span>
+                </div>
+                <span class="drawer-toggle"></span>
+              </summary>
+              <div class="portal-details-body">
+                ${layerRow ? renderMethodologyDetails(layerRow) : ""}
+                <div class="stack">
+                  ${domains.map((domain) => {
+                    const subdomains = rows.filter((item) => item.block === "Поддомен" && item.parentDomain === domain.domain);
+                    return `
+                      <details class="domain-group">
+                        <summary>
+                          <div>
+                            <strong>${escapeHtml(domain.domain)}</strong>
+                            <span>${escapeHtml(subdomains.length)} поддоменов</span>
+                          </div>
+                          <span class="drawer-toggle compact-toggle"></span>
+                        </summary>
+                        <div class="portal-domain-body">
+                          ${renderMethodologyDetails(domain)}
+                          <div class="portal-subdomain-grid">
+                            ${subdomains.map((subdomain) => `
+                              <article class="portal-subdomain">
+                                <h4>${escapeHtml(subdomain.domain)}</h4>
+                                ${renderMethodologyDetails(subdomain)}
+                              </article>
+                            `).join("")}
+                          </div>
+                        </div>
+                      </details>
+                    `;
+                  }).join("")}
+                </div>
+              </div>
+            </details>
+          `;
+        }).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderToolsPortal(methodology) {
+  const query = normalizeLookup(state.toolSearch);
+  const tools = methodology.tools.filter((tool) => {
+    if (!query) {
+      return true;
+    }
+    return normalizeLookup([
+      tool.layer,
+      tool.domain,
+      tool.name,
+      tool.description,
+      tool.whenToUse,
+      tool.result
+    ].filter(Boolean).join(" ")).includes(query);
+  });
+  const grouped = tools.reduce((map, tool) => {
+    const layer = tool.layer || LAYER_LABELS[tool.layerId] || tool.layerId || "Без слоя";
+    if (!map.has(layer)) {
+      map.set(layer, []);
+    }
+    map.get(layer).push(tool);
+    return map;
+  }, new Map());
+
+  content.innerHTML = `
+    <section class="content-section portal-hero">
+      <p class="eyebrow">Справочник</p>
+      <h2>Инструменты</h2>
+      <p>Инструмент закреплён за своим слоем, доменом и поддоменом. Его нельзя подменять другим файлом. Но данные из соседних артефактов можно использовать как опору, если видно, откуда они взялись.</p>
+      <form class="portal-search" id="toolSearchForm">
+        <label>Поиск по инструментам
+          <input id="toolSearch" type="search" value="${escapeHtml(state.toolSearch)}" placeholder="Например: BHAG, RACI, cash flow, сегменты">
+        </label>
+        <button type="submit">Найти</button>
+      </form>
+    </section>
+    <section class="content-section">
+      <div class="section-head">
+        <h3>Карта инструментов</h3>
+        <span class="pill">${escapeHtml(tools.length)} найдено</span>
+      </div>
+      <div class="stack">
+        ${[...grouped.entries()].map(([layer, rows]) => `
+          <details class="portal-details">
+            <summary>
+              <div>
+                <strong>${escapeHtml(layer)}</strong>
+                <span>${escapeHtml(rows.length)} инструментов</span>
+              </div>
+              <span class="drawer-toggle"></span>
+            </summary>
+            <div class="portal-tool-grid">
+              ${rows.map((tool) => `
+                <article class="portal-tool-card">
+                  <p class="eyebrow">${escapeHtml(tool.domain || "без домена")}</p>
+                  <h4>${escapeHtml(tool.name)}</h4>
+                  ${tool.description ? `<p>${escapeHtml(tool.description)}</p>` : ""}
+                  ${tool.whenToUse ? `<p><strong>Когда применять:</strong> ${escapeHtml(tool.whenToUse)}</p>` : ""}
+                  ${tool.result ? `<p><strong>Результат:</strong> ${escapeHtml(tool.result)}</p>` : ""}
+                  ${tool.url ? `<a href="${escapeHtml(tool.url)}" target="_blank" rel="noreferrer">Открыть инструмент</a>` : ""}
+                </article>
+              `).join("")}
+            </div>
+          </details>
+        `).join("") || `<div class="empty-state compact-empty"><h2>Ничего не найдено</h2><p>Попробуй другой запрос.</p></div>`}
+      </div>
+    </section>
+  `;
+
+  content.querySelector("#toolSearchForm")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    state.toolSearch = content.querySelector("#toolSearch").value.trim();
+    renderToolsPortal(methodology);
+  });
+}
+
+function renderMaturityPortal(methodology) {
+  const layerRows = methodology.items.filter((item) => item.block === "Слой");
+  content.innerHTML = `
+    <section class="content-section portal-hero">
+      <p class="eyebrow">Диагностика</p>
+      <h2>Матрица зрелости</h2>
+      <p>Матрица нужна не ради оценки. Она показывает, насколько область уже управляется, где хаос, где рабочая середина, а где есть опора для роста.</p>
+    </section>
+    <section class="content-section">
+      <div class="stack">
+        ${layerRows.map((row) => `
+          <details class="portal-details">
+            <summary>
+              <div>
+                <strong>${escapeHtml(row.layer)}</strong>
+                <span>${escapeHtml(row.description || "")}</span>
+              </div>
+              <span class="drawer-toggle"></span>
+            </summary>
+            <div class="maturity-levels">
+              ${Object.entries(row.maturity || {}).map(([level, text]) => `
+                <article class="maturity-level">
+                  <strong>${escapeHtml(level)}</strong>
+                  <p>${escapeHtml(text)}</p>
+                </article>
+              `).join("")}
+            </div>
+          </details>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderGuidePortal() {
+  content.innerHTML = `
+    <section class="content-section portal-hero">
+      <p class="eyebrow">Рабочий порядок</p>
+      <h2>Как пользоваться AI-BOSS</h2>
+      <p>Главная идея простая: сначала собираем факты, потом проверяем, каким инструментом они закрываются, затем делаем вывод и выбираем один следующий шаг.</p>
+    </section>
+    <section class="content-section">
+      <div class="portal-guide-grid">
+        <article class="card">
+          <h3>1. Создай компанию</h3>
+          <p>Зафиксируй название, отрасль, цель собственника и текущий запрос. Это не диагноз, а стартовый контекст.</p>
+        </article>
+        <article class="card">
+          <h3>2. Добавь источники</h3>
+          <p>Подключи папку Google Drive, вставь документы, таблицы, ссылки или заметки. AI-BOSS смотрит не только название файла, но и содержание внутри.</p>
+        </article>
+        <article class="card">
+          <h3>3. Проверь слои</h3>
+          <p>Слой раскрывается до доменов и поддоменов. Рабочая единица анализа — поддомен: у него должен быть свой артефакт или понятные данные.</p>
+        </article>
+        <article class="card">
+          <h3>4. Запусти анализ</h3>
+          <p>AI-BOSS отделяет факты от версий, показывает пробелы, выбирает рабочую гипотезу и предлагает один следующий шаг.</p>
+        </article>
+        <article class="card">
+          <h3>5. Используй чат</h3>
+          <p>На любой странице можно открыть окно AI-BOSS и спросить, что значит показатель, какой инструмент нужен или почему выбран следующий шаг.</p>
+        </article>
+      </div>
+    </section>
+  `;
+}
+
+async function renderSitePage(view) {
+  setActiveSiteNav(view);
+  renderLoading("Загружаю раздел");
+  try {
+    const methodology = view === "guide" ? null : await loadMethodology();
+    state.selectedCompanyId = "";
+    state.selectedDetail = null;
+    renderCompanyList();
+    if (view === "architecture") {
+      renderArchitecturePortal(methodology);
+      return;
+    }
+    if (view === "tools") {
+      renderToolsPortal(methodology);
+      return;
+    }
+    if (view === "maturity") {
+      renderMaturityPortal(methodology);
+      return;
+    }
+    renderGuidePortal();
+  } catch (error) {
+    renderError(error);
+  }
 }
 
 function renderOverview(detail) {
@@ -1141,32 +1463,7 @@ function renderLayers(detail) {
                 </div>
               </summary>
               <div class="layer-expand">
-                <div class="layer-expand-grid">
-                  <div class="layer-panel">
-                    <h5>С чем сравниваем реальность</h5>
-                    <p>Это не оценка и не готовый вывод. Это базовые вопросы слоя. Галочка появляется только тогда, когда в источниках есть конкретный фрагмент, который отвечает на этот вопрос.</p>
-                    <div class="parameter-list">
-                      ${filledEntries.length ? filledEntries.map(([field, value]) => `
-                        <div class="parameter-row is-covered">
-                          <span class="parameter-status">✓</span>
-                          <div>
-                            <strong>${escapeHtml(field)}</strong>
-                            <p><b>Найдено в данных:</b> ${escapeHtml(humanizeEvidenceItem(value))}</p>
-                          </div>
-                        </div>
-                      `).join("") : ""}
-                      ${missingFields.length ? missingFields.map((field) => `
-                        <div class="parameter-row is-missing">
-                          <span class="parameter-status">!</span>
-                          <div>
-                            <strong>${escapeHtml(field)}</strong>
-                            <p>По этому параметру пока нет достаточного факта или документа.</p>
-                          </div>
-                        </div>
-                      `).join("") : ""}
-                      ${!filledEntries.length && !missingFields.length ? `<p class="hint-text">Эталон слоя ещё не собран. Запусти анализ или добавь источники.</p>` : ""}
-                    </div>
-                  </div>
+                <div class="layer-expand-grid single-panel">
                   <div class="layer-panel">
                     <h5>Домены и поддомены</h5>
                     <p>Слой и домен показывают общую заполненность. Рабочая единица ниже — поддомен: именно по нему проверяется свой артефакт, его содержание и недостающие данные.</p>
@@ -1196,7 +1493,7 @@ function renderLayers(detail) {
                                     <em class="source-quality source-quality-${escapeHtml(status.code === "covered" ? "sufficient" : status.code === "review" ? "partial" : status.code === "draft" ? "partial" : "insufficient")}">${escapeHtml(status.label)} · ${escapeHtml(status.percent)}%</em>
                                   </summary>
                                   <div class="architecture-item-body">
-                                    <p>${escapeHtml(item.description || "")}</p>
+                                    ${renderMethodologyDetails(item)}
                                     ${status.code === "covered" ? `
                                       <div class="source-link-list compact-source-list">
                                         <strong>Основание:</strong>
@@ -1500,6 +1797,7 @@ async function loadCompanies() {
 
 async function openCompany(companyId, options = {}) {
   state.selectedCompanyId = companyId;
+  setActiveSiteNav("companies");
   if (!options.replaceRoute) {
     setRoute(companyId);
   }
@@ -1634,6 +1932,12 @@ async function bootstrap() {
 
   try {
     await loadCompanies();
+    const siteView = routeSiteView();
+    if (siteView) {
+      await renderSitePage(siteView);
+      return;
+    }
+    setActiveSiteNav("companies");
     const fromRoute = routeCompanyId();
     const firstId = fromRoute || state.companies[0]?.id || "";
     if (firstId) {
@@ -1671,6 +1975,11 @@ refreshButton.addEventListener("click", async () => {
 newCompanyButton.addEventListener("click", () => openCompanyModal());
 
 window.addEventListener("popstate", async () => {
+  const siteView = routeSiteView();
+  if (siteView) {
+    await renderSitePage(siteView);
+    return;
+  }
   const companyId = routeCompanyId();
   if (companyId) {
     await openCompany(companyId, { replaceRoute: true });
@@ -1682,8 +1991,31 @@ window.addEventListener("popstate", async () => {
   }
 });
 
+window.addEventListener("hashchange", async () => {
+  if (!state.token) {
+    return;
+  }
+  const siteView = routeSiteView();
+  if (siteView) {
+    await renderSitePage(siteView);
+    return;
+  }
+  await bootstrap();
+});
+
 if (state.token) {
   tokenInput.value = state.token;
 }
 
 bootstrap();
+
+initWorkspaceChat({
+  endpoint: "/api/companies/chat",
+  title: "AI-BOSS",
+  tokenProvider: () => state.token,
+  contextProvider: () => ({
+    page: routeSiteView() || "companies",
+    companyId: state.selectedCompanyId,
+    companyName: state.selectedDetail?.company?.name || ""
+  })
+});

@@ -3,6 +3,7 @@ import {
   handleAdminRoute,
   readAdminJsonBody
 } from "../../src/application/admin-api-context.js";
+import { answerWorkspaceQuestion } from "../../src/application/workspace-chat-service.js";
 
 function adminPath(request) {
   const url = new URL(request.url);
@@ -41,6 +42,46 @@ async function dispatchAdminRoute(request) {
 
   if (path === "health") {
     return handleAdminRoute(request, ["GET"], async () => adminJsonResponse({ ok: true }));
+  }
+
+  if (path === "chat") {
+    return handleAdminRoute(request, ["POST"], async ({ config }) => {
+      const payload = await readAdminJsonBody(request);
+      const reply = await answerWorkspaceQuestion({
+        config,
+        text: payload.text,
+        context: payload.context || {},
+        systemHint: "Контекст: админка качества, диалоги, оценки, улучшения и управление доступами."
+      });
+
+      return adminJsonResponse({ ok: true, reply });
+    });
+  }
+
+  if (path === "users") {
+    return handleAdminRoute(request, ["GET"], async ({ accessControl }) => {
+      const users = await accessControl.listUsers({
+        status: url.searchParams.get("status") || "",
+        limit: url.searchParams.get("limit") || 100
+      });
+
+      return adminJsonResponse({ ok: true, users });
+    });
+  }
+
+  const userAccessMatch = path.match(/^users\/([^/]+)\/access$/);
+  if (userAccessMatch) {
+    return handleAdminRoute(request, ["POST", "PATCH"], async ({ accessControl, config }) => {
+      const payload = await readAdminJsonBody(request);
+      const user = await accessControl.setUserStatus({
+        telegramUserId: readPathParam(userAccessMatch[1]),
+        status: payload.status,
+        decidedBy: config.adminTelegramUserIds?.[0] || "",
+        note: payload.note || ""
+      });
+
+      return adminJsonResponse({ ok: true, user });
+    });
   }
 
   if (path === "conversations") {
