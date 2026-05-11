@@ -87,6 +87,7 @@ async function dispatch(request) {
       config,
       text: payload.text,
       context: payload.context || {},
+      history: payload.history || [],
       systemHint: "Контекст: кабинет компаний, методология, слои, инструменты, матрица зрелости и анализ AI-BOSS."
     });
 

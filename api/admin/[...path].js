@@ -51,6 +51,7 @@ async function dispatchAdminRoute(request) {
         config,
         text: payload.text,
         context: payload.context || {},
+        history: payload.history || [],
         systemHint: "Контекст: админка качества, диалоги, оценки, улучшения и управление доступами."
       });
 

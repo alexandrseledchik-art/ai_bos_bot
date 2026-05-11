@@ -34,7 +34,21 @@ function fallbackReply({ text, context = {} }) {
   return `Я вижу контекст${page}${company}. Могу помочь разобрать текущий вывод, слой, инструмент, доступы или следующий шаг. Если вопрос про решение, сначала отделю факт от версии и предложу один ближайший шаг.`;
 }
 
-export async function answerWorkspaceQuestion({ config, text, context = {}, systemHint = "" }) {
+function normalizeHistory(history) {
+  if (!Array.isArray(history)) {
+    return [];
+  }
+
+  return history
+    .map((message) => ({
+      role: message?.role === "user" ? "user" : "assistant",
+      text: normalizeText(message?.text).slice(0, 1200)
+    }))
+    .filter((message) => message.text)
+    .slice(-12);
+}
+
+export async function answerWorkspaceQuestion({ config, text, context = {}, history = [], systemHint = "" }) {
   const cleanText = normalizeText(text);
   if (!cleanText) {
     return "Напиши вопрос одним сообщением, и я отвечу по текущему контексту.";
@@ -53,9 +67,17 @@ export async function answerWorkspaceQuestion({ config, text, context = {}, syst
     systemHint
   ].filter(Boolean).join("\n");
 
+  const cleanHistory = normalizeHistory(history);
+  const historyBlock = cleanHistory.length
+    ? cleanHistory.map((message) => `${message.role === "user" ? "Пользователь" : "AI-BOSS"}: ${message.text}`).join("\n")
+    : "Истории этого окна пока нет.";
+
   const user = [
     "Контекст страницы:",
     JSON.stringify(context, null, 2),
+    "",
+    "Предыдущие сообщения в этом web-чате:",
+    historyBlock,
     "",
     "Вопрос:",
     cleanText

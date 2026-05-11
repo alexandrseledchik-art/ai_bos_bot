@@ -1,4 +1,4 @@
-import { initWorkspaceChat } from "./workspace-chat.js";
+import { initWorkspaceChat } from "./workspace-chat.js?v=20260512-1";
 
 const TOKEN_KEY = "aibos_companies_token";
 
