@@ -215,9 +215,47 @@ function humanizeMissingField(value) {
   return dictionary[text.toLowerCase()] || text;
 }
 
+function humanizeBusinessLanguage(value) {
+  let text = cleanHumanText(value);
+  if (!text) {
+    return "";
+  }
+
+  const replacements = [
+    [/слаб(?:ая|ую|ой)\s+верхн(?:яя|юю|ей)\s+рамк[ауеи]/gi, "не до конца ясные главные ориентиры"],
+    [/верхн(?:яя|юю|ей)\s+рамк[ауеи]/gi, "главные ориентиры"],
+    [/общ(?:ая|ую|ей)\s+рамк[ауеи]/gi, "общую картину"],
+    [/рабоч(?:ая|ую|ей)\s+рамк[ауеи]/gi, "рабочую картину"],
+    [/собрать\s+рамк[ауеи]\s+собственник-рынок/gi, "сформулировать цель собственника и выбрать клиентские сегменты"],
+    [/собрать\s+рамк[ауеи]\s+собственника/gi, "сформулировать цель, горизонт и ограничения собственника"],
+    [/рамк[ауеи]\s+собственник-рынок/gi, "цель собственника и карту клиентских сегментов"],
+    [/рамк[ауеи]\s+собственника/gi, "цель, горизонт и ограничения собственника"],
+    [/рамк[ауеи]\s+сравнения/gi, "точку сравнения"],
+    [/условия\s+игры:\s*собственник,\s*рынок\s+и\s+стратегия/gi, "цель собственника, рынок и стратегия"],
+    [/условия\s+игры/gi, "главные ориентиры бизнеса"],
+    [/нижн(?:их|ие|ими)\s+просад(?:ок|ки|ками)/gi, "слабых мест ниже по системе"],
+    [/просад(?:ок|ки|ками)/gi, "слабых мест"],
+    [/невыбранн(?:ой|ую|ая|ого)\s+игр(?:ы|у|а|ой)/gi, "невыбранного направления"],
+    [/невыбранн(?:ой|ую|ая|ого)\s+модел(?:и|ь|ью)/gi, "неясной модели работы"],
+    [/какую\s+игру\s+компания\s+выбирает/gi, "какое направление компания выбирает"],
+    [/какой\s+игрой\s+занимается\s+компания/gi, "в каком направлении развивается компания"],
+    [/игра\s+сверху\s+не\s+выбрана/gi, "главное направление ещё не выбрано"],
+    [/слоем\s+выше/gi, "более общей причиной"],
+    [/верхн(?:ий|его|ему)\s+уров(?:ень|ня|ню)/gi, "более общий уровень"],
+    [/нижн(?:ий|его|ему|их)\s+сло(?:й|я|ю|ёв)/gi, "практические области ниже по системе"]
+  ];
+
+  for (const [pattern, replacement] of replacements) {
+    text = text.replace(pattern, replacement);
+  }
+
+  return text;
+}
+
 function renderSmallList(items, emptyText = "Пока нет данных.", formatter = (item) => item) {
   const rows = asArray(items)
     .map((item) => formatter(item))
+    .map((item) => humanizeBusinessLanguage(item))
     .filter((item) => String(item || "").trim());
   if (!rows.length) {
     return `<p class="hint-text">${escapeHtml(emptyText)}</p>`;
@@ -238,7 +276,7 @@ function renderRejectedRows(rejected = []) {
 
   return `
     <ul class="split-list compact-list">
-      ${rows.map((item) => `<li><strong>${escapeHtml(item.layerName || item.layer || "Версия")}</strong> — ${escapeHtml(item.reason || "объясняет запрос слабее основной версии")}</li>`).join("")}
+      ${rows.map((item) => `<li><strong>${escapeHtml(item.layerName || item.layer || "Версия")}</strong> — ${escapeHtml(humanizeBusinessLanguage(item.reason || "объясняет запрос слабее основной версии"))}</li>`).join("")}
     </ul>
   `;
 }
@@ -1122,12 +1160,12 @@ function renderOverview(detail) {
       <div class="grid-two">
         <article class="card">
           <h3>Главный вывод</h3>
-          <p>${escapeHtml(analysis?.summary || "Анализ ещё не запускался.")}</p>
+          <p>${escapeHtml(humanizeBusinessLanguage(analysis?.summary || "Анализ ещё не запускался."))}</p>
         </article>
         <article class="card">
           <h3>Следующий шаг</h3>
-          <p>${escapeHtml(nextStep.title || "Не выбран.")}</p>
-          ${nextStep.why ? `<p><strong>Зачем:</strong> ${escapeHtml(nextStep.why)}</p>` : ""}
+          <p>${escapeHtml(humanizeBusinessLanguage(nextStep.title || "Не выбран."))}</p>
+          ${nextStep.why ? `<p><strong>Зачем:</strong> ${escapeHtml(humanizeBusinessLanguage(nextStep.why))}</p>` : ""}
         </article>
       </div>
       ${analysis ? `
@@ -1149,8 +1187,8 @@ function renderOverview(detail) {
               nextStep.why || "Шаг выбран как минимальная проверка текущей версии.",
               "Он должен снизить неопределённость, а не сразу запустить большой проект изменений."
             ])}
-            ${nextStep.expectedResult ? `<p><strong>Что должно получиться:</strong> ${escapeHtml(nextStep.expectedResult)}</p>` : ""}
-            ${nextStep.successCriteria ? `<p><strong>Критерий результата:</strong> ${escapeHtml(nextStep.successCriteria)}</p>` : ""}
+            ${nextStep.expectedResult ? `<p><strong>Что должно получиться:</strong> ${escapeHtml(humanizeBusinessLanguage(nextStep.expectedResult))}</p>` : ""}
+            ${nextStep.successCriteria ? `<p><strong>Критерий результата:</strong> ${escapeHtml(humanizeBusinessLanguage(nextStep.successCriteria))}</p>` : ""}
             ${missingForHigh.length ? `
               <p><strong>Чего не хватает, чтобы говорить увереннее:</strong></p>
               ${renderSmallList(missingForHigh.slice(0, 4), "Пока дополнительных уточнений не нужно.", humanizeMissingField)}
@@ -1330,25 +1368,24 @@ function renderDeepDiagnostic(detail) {
 
       <article class="card">
         <h3>Что показывает диагностика</h3>
-        <p>${escapeHtml(overall.conclusion || "")}</p>
+        <p>${escapeHtml(humanizeBusinessLanguage(overall.conclusion || ""))}</p>
+        ${root.title || root.why ? `
+          <p><strong>Вероятная причина:</strong> ${escapeHtml(humanizeBusinessLanguage(root.title || "пока не выбрана"))}</p>
+          ${root.why ? `<p>${escapeHtml(humanizeBusinessLanguage(root.why))}</p>` : ""}
+          ${root.notRootYet?.length ? `<p><strong>Что пока не считаю главной причиной:</strong> ${escapeHtml(root.notRootYet.join(", "))}.</p>` : ""}
+        ` : ""}
       </article>
 
-      <div class="grid-two">
+      <div class="grid-two single-card-grid">
         <article class="card">
-          <h3>Главная рабочая версия</h3>
-          <p><strong>${escapeHtml(root.title || "Пока не выбрана")}</strong></p>
-          <p>${escapeHtml(root.why || "")}</p>
-          ${root.notRootYet?.length ? `<p><strong>Не считаю корнем прямо сейчас:</strong> ${escapeHtml(root.notRootYet.join(", "))}.</p>` : ""}
-        </article>
-        <article class="card">
-          <h3>Следующий шаг</h3>
-          <p><strong>${escapeHtml(nextStep.title || "Не выбран")}</strong></p>
-          <p>${escapeHtml(nextStep.why || "")}</p>
-          ${nextStep.result ? `<p><strong>Результат:</strong> ${escapeHtml(nextStep.result)}</p>` : ""}
+          <h3>Что проверить дальше</h3>
+          <p><strong>${escapeHtml(humanizeBusinessLanguage(nextStep.title || "Не выбрано"))}</strong></p>
+          <p>${escapeHtml(humanizeBusinessLanguage(nextStep.why || ""))}</p>
+          ${nextStep.result ? `<p><strong>Что должно получиться:</strong> ${escapeHtml(humanizeBusinessLanguage(nextStep.result))}</p>` : ""}
           ${missingForConfidence.length ? `
-            <p><strong>Для большей уверенности нужны:</strong></p>
+            <p><strong>Чтобы говорить увереннее, нужно:</strong></p>
             <ul class="split-list">
-              ${missingForConfidence.slice(0, 5).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+              ${missingForConfidence.slice(0, 5).map((item) => `<li>${escapeHtml(humanizeBusinessLanguage(item))}</li>`).join("")}
             </ul>
           ` : ""}
         </article>
@@ -1362,7 +1399,7 @@ function renderDeepDiagnostic(detail) {
               <div class="mini-row">
                 <strong>${escapeHtml(item.classKey)} · ${escapeHtml(item.title || "")}</strong>
                 <span>${escapeHtml(formatScore(item.averageScore))} · ${escapeHtml(item.status || "")}</span>
-                <p>${escapeHtml(item.conclusion || "")}</p>
+                <p>${escapeHtml(humanizeBusinessLanguage(item.conclusion || ""))}</p>
               </div>
             `).join("")}
           </div>
@@ -1371,7 +1408,7 @@ function renderDeepDiagnostic(detail) {
           <h3>Что можно запускать параллельно</h3>
           ${parallel.length ? `
             <ul class="split-list">
-              ${parallel.slice(0, 4).map((item) => `<li><strong>${escapeHtml(item.title)}</strong> — ${escapeHtml(item.why || "")}</li>`).join("")}
+              ${parallel.slice(0, 4).map((item) => `<li><strong>${escapeHtml(humanizeBusinessLanguage(item.title))}</strong> — ${escapeHtml(humanizeBusinessLanguage(item.why || ""))}</li>`).join("")}
             </ul>
           ` : `<p>Параллельные действия пока не выделены.</p>`}
         </article>

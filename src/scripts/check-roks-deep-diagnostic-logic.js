@@ -55,7 +55,7 @@ async function main() {
   const constraint = analysis.probableConstraint;
 
   assert.equal(constraint.mode, "upper_frame");
-  assert.match(constraint.title, /Условия игры|общая рамка/i);
+  assert.match(constraint.title, /цель собственника|рынок|стратег/i);
   assert.match(constraint.explanation, /собственник/i);
   assert.match(constraint.explanation, /рын/i);
   assert.match(constraint.explanation, /финансы, операции, команда и данные/i);
@@ -65,8 +65,8 @@ async function main() {
   assert.ok((constraint.relatedLayers || []).some((item) => item.layer === "external_environment"));
   assert.ok((constraint.relatedLayers || []).some((item) => item.layer === "strategy"));
 
-  assert.match(analysis.nextStep.title, /собственник-рынок|сегмент/i);
-  assert.match(analysis.nextStep.why, /какой бизнес мы строим|не начать чинить финансы/i);
+  assert.match(analysis.nextStep.title, /цель собственника|сегмент/i);
+  assert.match(analysis.nextStep.why, /какой бизнес мы строим|клиентах/i);
 
   const parallelLayers = new Set((analysis.parallelActions || []).map((item) => item.layer));
   assert.equal(parallelLayers.has("finance"), true);

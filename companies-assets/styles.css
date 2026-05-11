@@ -335,6 +335,10 @@ label {
   gap: 14px;
 }
 
+.single-card-grid {
+  grid-template-columns: 1fr;
+}
+
 .grid-three {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
