@@ -1220,12 +1220,7 @@ async function renderSitePage(view) {
 }
 
 function renderOverview(detail) {
-  const { company, analysis } = detail;
-  const constraint = analysis?.probableConstraint || company.probableConstraint || {};
-  const layerSummary = analysis?.layerSummary || [];
-  const avgFilled = layerSummary.length
-    ? Math.round(layerSummary.reduce((sum, item) => sum + filledPercent(item), 0) / layerSummary.length)
-    : 0;
+  const { company } = detail;
 
   return `
     <section class="content-section">
@@ -1240,34 +1235,37 @@ function renderOverview(detail) {
           <button id="analyzeButton" type="button">Проанализировать</button>
         </div>
       </div>
-      <div class="grid-three">
-        <article class="card metric">
-          <span class="muted">Отрасль</span>
-          <b>${escapeHtml(company.industry || "не указана")}</b>
-        </article>
-        <article class="card metric">
-          <span class="muted">Вероятное ограничение</span>
-          <b>${escapeHtml(constraint.title || "не выбрано")}</b>
-        </article>
-        <article class="card metric">
-          <span class="muted">Заполненность слоёв</span>
-          <b>${escapeHtml(avgFilled)}%</b>
-          <div class="progress" aria-hidden="true"><span style="--value: ${avgFilled}%"></span></div>
-        </article>
-      </div>
-    </section>
-
-    <section class="content-section">
-      <div class="grid-two">
-        <article class="card">
-          <h3>Цель</h3>
-          <p>${escapeHtml(company.ownerGoal || "Не указана.")}</p>
-        </article>
-        <article class="card">
-          <h3>Текущий запрос</h3>
-          <p>${escapeHtml(company.currentRequest || "Не указан.")}</p>
-        </article>
-      </div>
+      <details class="data-drawer about-drawer">
+        <summary>
+          <div>
+            <strong>О компании</strong>
+            <span>Паспорт кейса: отрасль, описание, цель и текущий запрос.</span>
+          </div>
+          <span class="drawer-toggle"></span>
+        </summary>
+        <div class="company-about-grid">
+          <div class="company-about-field">
+            <strong>Название</strong>
+            <span>${escapeHtml(company.name || "Не указано.")}</span>
+          </div>
+          <div class="company-about-field">
+            <strong>Отрасль</strong>
+            <span>${escapeHtml(company.industry || "Не указана.")}</span>
+          </div>
+          <div class="company-about-field wide">
+            <strong>Описание</strong>
+            <span>${escapeHtml(company.description || "Не указано.")}</span>
+          </div>
+          <div class="company-about-field wide">
+            <strong>Цель собственника</strong>
+            <span>${escapeHtml(company.ownerGoal || "Не указана.")}</span>
+          </div>
+          <div class="company-about-field wide">
+            <strong>Текущий запрос</strong>
+            <span>${escapeHtml(company.currentRequest || "Не указан.")}</span>
+          </div>
+        </div>
+      </details>
     </section>
   `;
 }

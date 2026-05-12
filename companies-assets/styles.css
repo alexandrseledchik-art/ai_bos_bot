@@ -542,6 +542,54 @@ label {
   content: "Скрыть источники";
 }
 
+.about-drawer {
+  margin-top: 16px;
+}
+
+.about-drawer .drawer-toggle::after {
+  content: "Открыть";
+}
+
+.about-drawer[open] .drawer-toggle::after {
+  content: "Свернуть";
+}
+
+.company-about-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--line);
+  background: #fbfcfb;
+}
+
+.company-about-field {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.company-about-field:nth-child(2n),
+.company-about-field.wide {
+  border-right: 0;
+}
+
+.company-about-field.wide {
+  grid-column: 1 / -1;
+}
+
+.company-about-field strong {
+  color: var(--ink);
+  font-size: 17px;
+}
+
+.company-about-field span {
+  color: var(--muted);
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
 .data-source-list {
   border-top: 1px solid var(--line);
   padding: 16px;
@@ -1402,6 +1450,7 @@ label {
   .portal-subdomain-grid,
   .portal-tool-grid,
   .maturity-levels,
+  .company-about-grid,
   .form-grid {
     grid-template-columns: 1fr;
   }
@@ -1435,6 +1484,10 @@ label {
   .data-drawer summary {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .company-about-field {
+    border-right: 0;
   }
 
   .section-head {
