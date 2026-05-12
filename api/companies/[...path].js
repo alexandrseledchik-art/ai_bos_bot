@@ -83,8 +83,10 @@ async function dispatch(request) {
 
   if (path === "chat" && request.method === "POST") {
     const payload = await readAdminJsonBody(request);
+    const { conversationService } = getServices();
     const reply = await answerWorkspaceQuestion({
       config,
+      conversationService,
       text: payload.text,
       context: payload.context || {},
       history: payload.history || [],

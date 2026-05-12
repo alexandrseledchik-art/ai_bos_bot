@@ -4,6 +4,7 @@ import {
   readAdminJsonBody
 } from "../../src/application/admin-api-context.js";
 import { answerWorkspaceQuestion } from "../../src/application/workspace-chat-service.js";
+import { getServices } from "../../src/create-services.js";
 
 function adminPath(request) {
   const url = new URL(request.url);
@@ -47,8 +48,10 @@ async function dispatchAdminRoute(request) {
   if (path === "chat") {
     return handleAdminRoute(request, ["POST"], async ({ config }) => {
       const payload = await readAdminJsonBody(request);
+      const { conversationService } = getServices();
       const reply = await answerWorkspaceQuestion({
         config,
+        conversationService,
         text: payload.text,
         context: payload.context || {},
         history: payload.history || [],

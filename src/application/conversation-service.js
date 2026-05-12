@@ -12,6 +12,7 @@ import {
   createSituation,
   createSnapshot,
   createSymptom,
+  createTelegramContext,
   createThread,
   createToolRecommendation,
   emptyEntryState,
@@ -192,6 +193,56 @@ function ensureCompany(state, thread, userMeta) {
     company.updatedAt = nowIso();
   }
 
+  return company;
+}
+
+function findTelegramContext(state, telegramChatId, telegramUserId = "") {
+  const chatId = String(telegramChatId || "");
+  const userId = String(telegramUserId || chatId);
+  return (state.telegramContexts || []).find((item) =>
+    String(item.telegramChatId || "") === chatId ||
+    (userId && String(item.telegramUserId || "") === userId)
+  ) || null;
+}
+
+function upsertTelegramContext(state, { telegramChatId, telegramUserId, activeCompanyId }) {
+  state.telegramContexts = state.telegramContexts || [];
+  let context = findTelegramContext(state, telegramChatId, telegramUserId);
+
+  if (!context) {
+    context = createTelegramContext({ telegramChatId, telegramUserId, activeCompanyId });
+    state.telegramContexts.push(context);
+    return context;
+  }
+
+  context.activeCompanyId = activeCompanyId || context.activeCompanyId || "";
+  context.lastMessageAt = nowIso();
+  return context;
+}
+
+function applyActiveCompanyContext(state, thread, telegramChatId, userMeta = {}) {
+  const activeCompanyId = String(userMeta.activeCompanyId || userMeta.companyId || "").trim();
+  if (!activeCompanyId) {
+    return null;
+  }
+
+  const company = (state.companies || []).find((item) => item.id === activeCompanyId);
+  if (!company) {
+    return null;
+  }
+
+  const telegramUserId = userMeta.telegramUserId || userMeta.id || telegramChatId;
+  upsertTelegramContext(state, {
+    telegramChatId,
+    telegramUserId,
+    activeCompanyId: company.id
+  });
+  const previousCompanyId = thread.companyId;
+  thread.companyId = company.id;
+  if (previousCompanyId !== company.id) {
+    thread.activeCaseId = "";
+  }
+  thread.updatedAt = nowIso();
   return company;
 }
 
@@ -695,7 +746,8 @@ export class ConversationService {
   async handleUserMessage({ telegramChatId, text, userMeta = {} }) {
     return this.store.update(async (state) => {
       const thread = ensureThread(state, telegramChatId);
-      const company = ensureCompany(state, thread, userMeta);
+      let company = ensureCompany(state, thread, userMeta);
+      company = applyActiveCompanyContext(state, thread, telegramChatId, userMeta) || company;
       const consultantResult = await this.consultantTelegramMode.handle({
         state,
         thread,

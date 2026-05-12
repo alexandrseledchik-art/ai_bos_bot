@@ -48,10 +48,60 @@ function normalizeHistory(history) {
     .slice(-12);
 }
 
-export async function answerWorkspaceQuestion({ config, text, context = {}, history = [], systemHint = "" }) {
+function workspaceChatId(context = {}) {
+  const page = normalizeText(context.page || "workspace").replace(/[^а-яёa-z0-9:_-]+/gi, "-").slice(0, 64) || "workspace";
+  const companyId = normalizeText(context.companyId || context.selectedCompanyId || "");
+  return `web:${page}:${companyId || "global"}`;
+}
+
+function cleanAssistantReply(value) {
+  return normalizeText(value)
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .trim();
+}
+
+async function answerWithConversationCore({ conversationService, text, context = {} }) {
+  if (!conversationService || typeof conversationService.handleUserMessage !== "function") {
+    return "";
+  }
+
+  const result = await conversationService.handleUserMessage({
+    telegramChatId: workspaceChatId(context),
+    text,
+    userMeta: {
+      id: workspaceChatId(context),
+      telegramUserId: workspaceChatId(context),
+      username: "web_workspace",
+      chatTitle: context.companyName || context.page || "Web AI-BOSS",
+      source: "web_workspace_chat",
+      activeCompanyId: context.companyId || context.selectedCompanyId || "",
+      companyName: context.companyName || "",
+      workspaceContext: context
+    }
+  });
+
+  return cleanAssistantReply(result?.reply || "");
+}
+
+export async function answerWorkspaceQuestion({ config, conversationService = null, text, context = {}, history = [], systemHint = "" }) {
   const cleanText = normalizeText(text);
   if (!cleanText) {
     return "Напиши вопрос одним сообщением, и я отвечу по текущему контексту.";
+  }
+
+  try {
+    const coreReply = await answerWithConversationCore({
+      conversationService,
+      text: cleanText,
+      context
+    });
+    if (coreReply) {
+      return coreReply;
+    }
+  } catch {
+    // Если единое ядро временно недоступно, отвечаем через лёгкий web-fallback ниже.
   }
 
   if (!config?.openaiApiKey) {
@@ -60,7 +110,9 @@ export async function answerWorkspaceQuestion({ config, text, context = {}, hist
 
   const system = [
     "Ты AI-BOSS внутри web-кабинета.",
+    "Ты должен держать тот же стиль поведения, что и Telegram-бот AI-BOSS: не быть справочником советов, а помогать отделить факт от версии, понять текущий контекст и выбрать один следующий разумный шаг.",
     "Отвечай по-русски, понятно и по-человечески.",
+    "Не используй Markdown-разметку вроде **жирного текста**: web-чат показывает ответ как обычный текст.",
     "Не раскрывай внутренние рассуждения. Показывай короткое объяснение, на что опираешься.",
     "Если данных не хватает, задай один минимальный вопрос.",
     "Не предлагай переход в mini app и не создавай длинный план без запроса.",
@@ -113,7 +165,7 @@ export async function answerWorkspaceQuestion({ config, text, context = {}, hist
     }
 
     const payload = await response.json();
-    return readOutputText(payload) || fallbackReply({ text: cleanText, context });
+    return cleanAssistantReply(readOutputText(payload)) || fallbackReply({ text: cleanText, context });
   } catch {
     return fallbackReply({ text: cleanText, context });
   }
