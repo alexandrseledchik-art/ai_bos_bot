@@ -1222,15 +1222,6 @@ async function renderSitePage(view) {
 function renderOverview(detail) {
   const { company, analysis } = detail;
   const constraint = analysis?.probableConstraint || company.probableConstraint || {};
-  const nextStep = analysis?.nextStep || company.nextStep || {};
-  const diagnosticQuality = analysis?.diagnosticQuality || {};
-  const rejectedHypotheses = analysis?.rejectedHypotheses || constraint.rejectedAlternatives || [];
-  const evidence = asArray(constraint.evidence).length
-    ? asArray(constraint.evidence)
-    : asArray(analysis?.keyProblemAreas).flatMap((item) => asArray(item.evidence)).slice(0, 4);
-  const selectionBasis = asArray(constraint.selectionBasis);
-  const missingForHigh = asArray(constraint.missingForHigh);
-  const nextStepBasis = asArray(nextStep.basis);
   const layerSummary = analysis?.layerSummary || [];
   const avgFilled = layerSummary.length
     ? Math.round(layerSummary.reduce((sum, item) => sum + filledPercent(item), 0) / layerSummary.length)
@@ -1277,67 +1268,6 @@ function renderOverview(detail) {
           <p>${escapeHtml(company.currentRequest || "Не указан.")}</p>
         </article>
       </div>
-    </section>
-
-    <section class="content-section">
-      <div class="section-head">
-        <h3>Вывод AI-BOSS</h3>
-        <div class="pill-row">
-          <span class="pill ${confidenceClass(analysis?.confidence)}" title="Насколько фактов хватает, чтобы опираться на текущий вывод.">${escapeHtml(conclusionConfidenceLabel(analysis?.confidence))}</span>
-          ${diagnosticQuality.score10 != null ? `<span class="pill green" title="Оценивает не результат бизнеса, а дисциплину рассуждения: отделены факты, версии и следующий шаг.">${escapeHtml(diagnosticQualityLabel(diagnosticQuality.score10))}</span>` : ""}
-          <span class="pill">${escapeHtml(formatDate(analysis?.createdAt || company.lastAnalysisAt))}</span>
-        </div>
-      </div>
-      ${analysis ? `
-        <p class="section-note">Уверенность показывает, насколько вывод подтверждён данными. Логика разбора показывает, аккуратно ли AI-BOSS отделил факты, версии и следующий шаг.</p>
-      ` : ""}
-      <div class="grid-two">
-        <article class="card">
-          <h3>Главный вывод</h3>
-          <p>${escapeHtml(humanizeBusinessLanguage(analysis?.summary || "Анализ ещё не запускался."))}</p>
-        </article>
-        <article class="card">
-          <h3>Следующий шаг</h3>
-          <p>${escapeHtml(humanizeBusinessLanguage(nextStep.title || "Не выбран."))}</p>
-          ${nextStep.why ? `<p><strong>Зачем:</strong> ${escapeHtml(humanizeBusinessLanguage(nextStep.why))}</p>` : ""}
-        </article>
-      </div>
-      ${analysis ? `
-        <div class="grid-two evidence-grid">
-          <article class="card">
-            <h3>Как AI-BOSS пришёл к выводу</h3>
-            ${selectionBasis.length ? `
-              <p><strong>Почему выбрана эта версия:</strong></p>
-              ${renderSmallList(selectionBasis.slice(0, 3))}
-            ` : ""}
-            <p><strong>На что опираюсь:</strong></p>
-            ${renderSmallList(evidence.slice(0, 3), "Пока нет понятных опор в данных. Нужно открыть области и источники.", humanizeEvidenceItem)}
-            <p><strong>Что важно, но пока не похоже на главную причину:</strong></p>
-            ${renderRejectedRows(rejectedHypotheses)}
-          </article>
-          <article class="card">
-            <h3>Почему следующий шаг такой</h3>
-            ${nextStepBasis.length ? renderSmallList(nextStepBasis) : renderSmallList([
-              nextStep.why || "Шаг выбран как минимальная проверка текущей версии.",
-              "Он должен снизить неопределённость, а не сразу запустить большой проект изменений."
-            ])}
-            ${nextStep.expectedResult ? `<p><strong>Что должно получиться:</strong> ${escapeHtml(humanizeBusinessLanguage(nextStep.expectedResult))}</p>` : ""}
-            ${nextStep.successCriteria ? `<p><strong>Критерий результата:</strong> ${escapeHtml(humanizeBusinessLanguage(nextStep.successCriteria))}</p>` : ""}
-            ${missingForHigh.length ? `
-              <p><strong>Чего не хватает, чтобы говорить увереннее:</strong></p>
-              ${renderSmallList(missingForHigh.slice(0, 4), "Пока дополнительных уточнений не нужно.", humanizeMissingField)}
-            ` : ""}
-          </article>
-        </div>
-      ` : ""}
-      ${diagnosticQuality.missing?.length ? `
-        <article class="card">
-          <h3>Что мешает диагностике быть 10/10</h3>
-          <ul class="split-list">
-            ${diagnosticQuality.missing.slice(0, 4).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
-          </ul>
-        </article>
-      ` : ""}
     </section>
   `;
 }
@@ -1483,7 +1413,6 @@ function renderDeepDiagnostic(detail) {
   const classes = diagnostic.classSummary || [];
   const weakZones = diagnostic.weakZones || [];
   const strengths = diagnostic.strengths || [];
-  const parallel = diagnostic.parallelActions || [];
   const missingForConfidence = diagnostic.missingForConfidence || [];
 
   return `
@@ -1525,7 +1454,7 @@ function renderDeepDiagnostic(detail) {
         </article>
       </div>
 
-      <div class="grid-two">
+      <div class="grid-two single-card-grid">
         <article class="card">
           <h3>Классы системы</h3>
           <div class="stack compact-stack">
@@ -1537,14 +1466,6 @@ function renderDeepDiagnostic(detail) {
               </div>
             `).join("")}
           </div>
-        </article>
-        <article class="card">
-          <h3>Что можно запускать параллельно</h3>
-          ${parallel.length ? `
-            <ul class="split-list">
-              ${parallel.slice(0, 4).map((item) => `<li><strong>${escapeHtml(humanizeBusinessLanguage(item.title))}</strong> — ${escapeHtml(humanizeBusinessLanguage(item.why || ""))}</li>`).join("")}
-            </ul>
-          ` : `<p>Параллельные действия пока не выделены.</p>`}
         </article>
       </div>
 
@@ -1734,53 +1655,6 @@ function renderLayers(detail) {
   `;
 }
 
-function renderProblems(detail) {
-  const analysis = detail.analysis || {};
-  const missing = analysis.missingData || [];
-  const constraint = analysis.probableConstraint || {};
-  const parallelActions = analysis.parallelActions || constraint.parallelActions || [];
-
-  return `
-    ${parallelActions.length ? `
-      <section class="content-section">
-        <div class="section-head">
-          <h3>Параллельные действия</h3>
-        </div>
-        <div class="stack">
-          ${parallelActions.slice(0, 3).map((action) => `
-            <article class="problem-row">
-              <h4>${escapeHtml(action.title)}</h4>
-              <p>${escapeHtml(action.description || "")}</p>
-              ${action.why ? `<p><strong>Зачем:</strong> ${escapeHtml(action.why)}</p>` : ""}
-              <div class="pill-row">
-                <span class="pill orange">${escapeHtml(action.layerName || action.layer)}</span>
-              </div>
-            </article>
-          `).join("")}
-        </div>
-      </section>
-    ` : ""}
-
-    <section class="content-section">
-      <div class="section-head">
-        <h3>Пробелы</h3>
-      </div>
-      <p class="section-note">Это не список всех пустых мест. Здесь только ближайшие данные, которые сильнее всего влияют на текущий вывод и следующий шаг.</p>
-      <div class="stack">
-        ${missing.length ? missing.slice(0, 8).map((item) => `
-          <article class="problem-row">
-            <h4>${escapeHtml(item.layerName || item.layer)}</h4>
-            <p>${escapeHtml(item.whyNeeded)}</p>
-            <div class="pill-row">
-              ${(item.missingFields || []).slice(0, 6).map((field) => `<span class="pill">${escapeHtml(field)}</span>`).join("")}
-            </div>
-          </article>
-        `).join("") : `<div class="empty-state"><h2>Пробелов нет</h2><p>Или анализ ещё не запускался.</p></div>`}
-      </div>
-    </section>
-  `;
-}
-
 function renderDetail() {
   const detail = state.selectedDetail;
   if (!detail) {
@@ -1793,8 +1667,7 @@ function renderDetail() {
     renderDeepDiagnostic(detail),
     renderIntegrations(detail),
     renderSources(detail),
-    renderLayers(detail),
-    renderProblems(detail)
+    renderLayers(detail)
   ].join("");
 
   document.querySelector("#analyzeButton")?.addEventListener("click", analyzeSelectedCompany);
