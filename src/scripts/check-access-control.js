@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 
-import { handleAccessAdminCommand, looksLikeAdminCommand } from "../application/access-admin-commands.js";
+import {
+  buildAccessApprovedMiniAppInvite,
+  buildAccessApprovedUserMessage,
+  handleAccessAdminCommand,
+  looksLikeAdminCommand
+} from "../application/access-admin-commands.js";
 import { AccessControlService } from "../application/access-control-service.js";
 import { MiniAppBootstrapService } from "../application/mini-app-bootstrap-service.js";
 
@@ -195,12 +200,24 @@ async function main() {
   assert.match(pendingReply, /222/);
   assert.match(pendingReply, /pending/);
 
+  const approvalNotifications = [];
   const approvedReply = await handleAccessAdminCommand({
     text: "/approve222",
     fromTelegramUserId: 111,
-    accessControl
+    accessControl,
+    onUserApproved: async (user, context) => {
+      approvalNotifications.push({ user, context });
+    }
   });
   assert.match(approvedReply, /Доступ одобрен/);
+  assert.equal(approvalNotifications.length, 1);
+  assert.equal(approvalNotifications[0].user.telegram_user_id, 222);
+  assert.equal(approvalNotifications[0].context.command, "/approve");
+  assert.match(buildAccessApprovedUserMessage(), /Доступ открыт/);
+  assert.deepEqual(buildAccessApprovedMiniAppInvite(), {
+    route: "/mini-app",
+    label: "Открыть кабинет"
+  });
 
   const approvedDecision = await accessControl.checkTelegramAccess({
     telegramUser: { id: 222, username: "pending_user" }

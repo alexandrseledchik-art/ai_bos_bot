@@ -2,7 +2,12 @@ import {
   buildAccessDeniedReply,
   buildAccessRequestAdminMessage
 } from "../../application/access-control-service.js";
-import { handleAccessAdminCommand, looksLikeAdminCommand } from "../../application/access-admin-commands.js";
+import {
+  buildAccessApprovedMiniAppInvite,
+  buildAccessApprovedUserMessage,
+  handleAccessAdminCommand,
+  looksLikeAdminCommand
+} from "../../application/access-admin-commands.js";
 import { extractTelegramMessagePayload, TelegramApiClient } from "./telegram-api.js";
 import { buildMiniAppReplyMarkup } from "./mini-app-webapp.js";
 import {
@@ -86,7 +91,14 @@ export class TelegramBotRunner {
             const reply = await handleAccessAdminCommand({
               text: payload.text,
               fromTelegramUserId: payload.userMeta?.telegramUserId || payload.userMeta?.id || payload.chatId,
-              accessControl: this.accessControl
+              accessControl: this.accessControl,
+              onUserApproved: async (user) => {
+                await this.sendMessage(user.telegram_user_id, buildAccessApprovedUserMessage(), {
+                  replyMarkup: buildMiniAppReplyMarkup(buildAccessApprovedMiniAppInvite(), {
+                    appBaseUrl: this.appBaseUrl
+                  })
+                });
+              }
             });
             await this.sendMessage(payload.chatId, reply);
             continue;

@@ -48,11 +48,49 @@ function helpText() {
   ].join("\n");
 }
 
+export function buildAccessApprovedUserMessage() {
+  return [
+    "Доступ открыт.",
+    "",
+    "Теперь у тебя есть кабинет AI-BOSS: там будут храниться диагностика, инструменты, документы и рабочий контекст по компании.",
+    "",
+    "Нажми «Открыть кабинет», чтобы перейти в веб-интерфейс. В чате можно продолжать задавать вопросы и присылать материалы."
+  ].join("\n");
+}
+
+export function buildAccessApprovedMiniAppInvite() {
+  return {
+    route: "/mini-app",
+    label: "Открыть кабинет"
+  };
+}
+
+async function notifyApprovedUser({ user, command, onUserApproved }) {
+  if (typeof onUserApproved !== "function") {
+    return { ok: false, skipped: true };
+  }
+
+  try {
+    await onUserApproved(user, { command });
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error?.message || "unknown notification error"
+    };
+  }
+}
+
 export function looksLikeAdminCommand(text) {
   return isAdminCommand(text);
 }
 
-export async function handleAccessAdminCommand({ text, fromTelegramUserId, accessControl }) {
+export async function handleAccessAdminCommand({
+  text,
+  fromTelegramUserId,
+  accessControl,
+  onUserApproved = null
+}) {
   const adminId = normalizeId(fromTelegramUserId);
 
   if (!accessControl?.isAdmin(adminId)) {
@@ -105,7 +143,12 @@ export async function handleAccessAdminCommand({ text, fromTelegramUserId, acces
       note: command === "/unblock" ? "unblocked by admin" : "approved by admin"
     });
 
-    return `Доступ одобрен: ${formatUserLine(user)}`;
+    const notification = await notifyApprovedUser({ user, command, onUserApproved });
+    const warning = notification.error
+      ? `\n\nДоступ сохранён, но сообщение пользователю не отправилось: ${notification.error}`
+      : "";
+
+    return `Доступ одобрен: ${formatUserLine(user)}${warning}`;
   }
 
   if (command === "/block") {

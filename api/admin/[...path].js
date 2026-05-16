@@ -3,9 +3,16 @@ import {
   handleAdminRoute,
   readAdminJsonBody
 } from "../../src/application/admin-api-context.js";
+import {
+  buildAccessApprovedMiniAppInvite,
+  buildAccessApprovedUserMessage
+} from "../../src/application/access-admin-commands.js";
 import { answerWorkspaceQuestion } from "../../src/application/workspace-chat-service.js";
 import { getServices } from "../../src/create-services.js";
-import { buildMiniAppMenuButton } from "../../src/infrastructure/telegram/mini-app-webapp.js";
+import {
+  buildMiniAppMenuButton,
+  buildMiniAppReplyMarkup
+} from "../../src/infrastructure/telegram/mini-app-webapp.js";
 import { TelegramApiClient } from "../../src/infrastructure/telegram/telegram-api.js";
 
 function adminPath(request) {
@@ -131,7 +138,35 @@ async function dispatchAdminRoute(request) {
         note: payload.note || ""
       });
 
-      return adminJsonResponse({ ok: true, user });
+      let notification = null;
+      if (user.access_status === "approved" && payload.notifyUser !== false) {
+        if (!config.telegramToken) {
+          notification = {
+            ok: false,
+            error: "TELEGRAM_BOT_TOKEN is not configured."
+          };
+        } else {
+          try {
+            const telegramApi = new TelegramApiClient({
+              token: config.telegramToken,
+              apiBaseUrl: config.telegramApiBaseUrl
+            });
+            await telegramApi.sendMessage(user.telegram_user_id, buildAccessApprovedUserMessage(), {
+              replyMarkup: buildMiniAppReplyMarkup(buildAccessApprovedMiniAppInvite(), {
+                appBaseUrl: config.appBaseUrl
+              })
+            });
+            notification = { ok: true };
+          } catch (error) {
+            notification = {
+              ok: false,
+              error: error?.message || "unknown notification error"
+            };
+          }
+        }
+      }
+
+      return adminJsonResponse({ ok: true, user, notification });
     });
   }
 

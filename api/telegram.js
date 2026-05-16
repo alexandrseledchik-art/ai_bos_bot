@@ -3,7 +3,12 @@ import {
   buildAccessDeniedReply,
   buildAccessRequestAdminMessage
 } from "../src/application/access-control-service.js";
-import { handleAccessAdminCommand, looksLikeAdminCommand } from "../src/application/access-admin-commands.js";
+import {
+  buildAccessApprovedMiniAppInvite,
+  buildAccessApprovedUserMessage,
+  handleAccessAdminCommand,
+  looksLikeAdminCommand
+} from "../src/application/access-admin-commands.js";
 import { MiniAppDiagnosticsService } from "../src/application/mini-app-diagnostics-service.js";
 import { MiniAppCompatSyncClient } from "../src/infrastructure/storage/mini-app-compat-sync.js";
 import { extractTelegramMessagePayload } from "../src/infrastructure/telegram/telegram-api.js";
@@ -136,7 +141,14 @@ async function handleTelegramWebhook(request) {
     const reply = await handleAccessAdminCommand({
       text: payload.text,
       fromTelegramUserId: payload.userMeta?.telegramUserId || payload.userMeta?.id || payload.chatId,
-      accessControl
+      accessControl,
+      onUserApproved: async (user) => {
+        await telegramApi.sendMessage(user.telegram_user_id, buildAccessApprovedUserMessage(), {
+          replyMarkup: buildMiniAppReplyMarkup(buildAccessApprovedMiniAppInvite(), {
+            appBaseUrl: config.appBaseUrl
+          })
+        });
+      }
     });
     await telegramApi.sendMessage(payload.chatId, reply);
     return json({ ok: true, handled: "access-admin-command" });
