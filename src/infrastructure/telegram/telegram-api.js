@@ -170,6 +170,13 @@ export class TelegramApiClient {
     });
   }
 
+  async setChatMenuButton({ chatId = "", menuButton } = {}) {
+    return this.api("setChatMenuButton", {
+      ...(chatId ? { chat_id: chatId } : {}),
+      menu_button: menuButton
+    });
+  }
+
   async sendChatAction(chatId, action = "typing") {
     return this.api("sendChatAction", {
       chat_id: chatId,

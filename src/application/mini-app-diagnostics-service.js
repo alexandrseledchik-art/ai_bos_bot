@@ -1892,7 +1892,7 @@ export class MiniAppDiagnosticsService {
         select: "*"
       })
     ]);
-    const catalogTools = this.getCatalogTools();
+    const catalogTools = await this.getRuntimeCatalogTools();
     const layers = [...BUSINESS_LAYERS_V1]
       .sort((left, right) => getBusinessAssemblyOrderIndex(left.key) - getBusinessAssemblyOrderIndex(right.key))
       .map((layer, index) => this.buildAssemblyLayer({
@@ -2070,23 +2070,64 @@ export class MiniAppDiagnosticsService {
     return MINI_APP_TOOL_CATALOG;
   }
 
-  decorateTool(row, recommendation = null) {
-    if (!row) {
+  normalizeStoredTool(row) {
+    if (!row?.id || !row?.slug || !row?.title) {
       return null;
     }
 
     return {
       ...row,
-      layerKeys: row.layer_keys || [],
-      problemTypes: row.problem_types || [],
-      templateUrl: row.template_url || "",
-      hasTemplate: Boolean(row.template_url),
+      short_description: row.short_description || row.description || row.title,
+      when_to_use: row.when_to_use || row.whenToUse || "Использовать, когда нужно структурировать этот участок бизнеса.",
+      template_url: row.template_url || row.templateUrl || null,
+      layer_keys: Array.isArray(row.layer_keys) ? row.layer_keys : Array.isArray(row.layerKeys) ? row.layerKeys : [],
+      problem_types: Array.isArray(row.problem_types) ? row.problem_types : Array.isArray(row.problemTypes) ? row.problemTypes : [],
+      is_active: row.is_active !== false,
+      source: row.source || "supabase_tools"
+    };
+  }
+
+  async loadStoredTools() {
+    if (!this.syncClient?.enabled) {
+      return [];
+    }
+
+    try {
+      const rows = await this.findMany("tools", {
+        is_active: "eq.true",
+        order: "slug.asc",
+        select: "*"
+      });
+
+      return (rows || []).map((row) => this.normalizeStoredTool(row)).filter(Boolean);
+    } catch {
+      return [];
+    }
+  }
+
+  async getRuntimeCatalogTools() {
+    const storedTools = await this.loadStoredTools();
+    return storedTools.length ? storedTools : this.getCatalogTools();
+  }
+
+  decorateTool(row, recommendation = null) {
+    if (!row) {
+      return null;
+    }
+    const templateUrl = row.template_url || row.templateUrl || "";
+
+    return {
+      ...row,
+      layerKeys: row.layer_keys || row.layerKeys || [],
+      problemTypes: row.problem_types || row.problemTypes || [],
+      templateUrl,
+      hasTemplate: Boolean(templateUrl),
       recommendation
     };
   }
 
   async getTools({ bootstrap }) {
-    const tools = this.getCatalogTools();
+    const tools = await this.getRuntimeCatalogTools();
     const recommendations = await this.findMany("tool_recommendations", {
       case_id: `eq.${bootstrap.activeCase.id}`,
       order: "priority.asc",
@@ -2101,7 +2142,8 @@ export class MiniAppDiagnosticsService {
   }
 
   async getToolBySlug({ bootstrap, slug }) {
-    const tool = this.getCatalogTools().find((item) => item.slug === trimString(slug));
+    const tools = await this.getRuntimeCatalogTools();
+    const tool = tools.find((item) => item.slug === trimString(slug));
 
     if (!tool) {
       throw new Error("Tool was not found.");
@@ -2178,7 +2220,7 @@ export class MiniAppDiagnosticsService {
   }
 
   async getRecommendedTools({ bootstrap, recalculate = false } = {}) {
-    const tools = this.getCatalogTools();
+    const tools = await this.getRuntimeCatalogTools();
     const existing = recalculate
       ? []
       : await this.findMany("tool_recommendations", {
@@ -2212,7 +2254,9 @@ export class MiniAppDiagnosticsService {
   }
 
   async markToolOpened({ bootstrap, toolId }) {
-    const tool = this.getCatalogTools().find((item) => item.id === trimString(toolId));
+    const tools = await this.getRuntimeCatalogTools();
+    const normalizedToolId = trimString(toolId);
+    const tool = tools.find((item) => item.id === normalizedToolId || item.slug === normalizedToolId);
 
     if (!tool) {
       throw new Error("Tool was not found.");

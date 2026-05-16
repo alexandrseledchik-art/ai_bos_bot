@@ -35,3 +35,18 @@ export function buildMiniAppReplyMarkup(invite, { appBaseUrl } = {}) {
     ]
   };
 }
+
+export function buildMiniAppMenuButton(appBaseUrl, { route = "/mini-app", text = "Кабинет" } = {}) {
+  const url = buildMiniAppUrl(appBaseUrl, route);
+  if (!url) {
+    return null;
+  }
+
+  return {
+    type: "web_app",
+    text,
+    web_app: {
+      url
+    }
+  };
+}

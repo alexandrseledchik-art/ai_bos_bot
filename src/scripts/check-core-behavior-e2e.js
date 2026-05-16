@@ -61,6 +61,20 @@ assert.equal(crm.decision?.orchestration?.transition, "ask_one_question");
 assert.equal(crm.decision?.orchestration?.shouldAskOneQuestion, true);
 assert.equal(crm.intentIntegrity?.integrityType, "proposed_solution");
 
+const metaHelp = await service.handleUserMessage({
+  telegramChatId: "core-behavior-e2e-meta-help",
+  text: "чем можешь помочь?",
+  userMeta: {
+    firstName: "Александр",
+    username: "core_e2e_meta"
+  }
+});
+
+assert.equal(metaHelp.classification?.entryMode, "meta_role");
+assert.match(metaHelp.reply, /CEO-контур|управленческ/i);
+assert.match(metaHelp.reply, /собственник|бизнес/i);
+assert.doesNotMatch(metaHelp.reply, /Ты пока не приш[её]л|Коротко перечислить/i);
+
 const profit = await service.handleUserMessage({
   telegramChatId: "core-behavior-e2e-profit",
   text: "Выручка есть, а прибыль почти не остаётся. Маржа упала с 22% до 11% за 3 месяца.",

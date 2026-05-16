@@ -16,7 +16,6 @@ const COMPAT_TABLES = new Set([
   "maturity_scores",
   "constraint_hypotheses",
   "next_steps",
-  "tools",
   "tool_recommendations",
   "document_sources",
   "document_snapshots",

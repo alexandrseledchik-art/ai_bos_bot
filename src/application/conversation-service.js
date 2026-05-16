@@ -24,7 +24,7 @@ import { checkIntentIntegrity } from "./intent-integrity-checker.js";
 import { extractObservations } from "./observation-extractor.js";
 import { analyzeWithGraph } from "./graph-reasoner.js";
 import { applyGuardrails } from "./guardrails.js";
-import { buildMiniAppInvite, createMiniAppInviteSnapshot } from "./mini-app-invite-policy.js";
+import { buildMiniAppInvite, createMiniAppInviteSnapshot, MINI_APP_CABINET_SCREENS } from "./mini-app-invite-policy.js";
 import { AutonomousDataCollector } from "./autonomous-data-collector.js";
 import { assessChatDiagnosticExcellence } from "./chat-diagnostic-excellence-assessor.js";
 import { ConsultantTelegramMode } from "./consultant-telegram-mode.js";
@@ -279,6 +279,24 @@ function looksToolFirstFollowUp(classification, history) {
   }
 
   return lastAssistantAskedQuestion(history) && wordCount <= 5;
+}
+
+function looksStartCommand(text) {
+  return /^\/start(?:@\w+)?$/i.test(String(text || "").trim());
+}
+
+function buildStartMiniAppInvite() {
+  const screen = MINI_APP_CABINET_SCREENS.dashboard;
+
+  return {
+    screenId: screen.screenId,
+    route: screen.route,
+    label: "Открыть кабинет",
+    title: screen.title,
+    stage: "start",
+    reason: "Пользователь запустил бота; нужно дать быстрый вход в личный кабинет AI-BOSS.",
+    purpose: screen.purpose
+  };
 }
 
 function contextualizeClassification(classification, thread, history) {
@@ -1113,14 +1131,16 @@ export class ConversationService {
         persistedMemory,
         decisionObject: decision.decisionObject || null
       };
-      const miniAppInvite = buildMiniAppInvite({
-        classification,
-        decision,
-        runtime,
-        activeCase,
-        persistedMemory,
-        entryState: thread.entryState
-      });
+      const miniAppInvite = looksStartCommand(text)
+        ? buildStartMiniAppInvite()
+        : buildMiniAppInvite({
+            classification,
+            decision,
+            runtime,
+            activeCase,
+            persistedMemory,
+            entryState: thread.entryState
+          });
 
       if (miniAppInvite) {
         const offeredAt = nowIso();

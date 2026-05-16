@@ -5,6 +5,8 @@ import {
 } from "../../src/application/admin-api-context.js";
 import { answerWorkspaceQuestion } from "../../src/application/workspace-chat-service.js";
 import { getServices } from "../../src/create-services.js";
+import { buildMiniAppMenuButton } from "../../src/infrastructure/telegram/mini-app-webapp.js";
+import { TelegramApiClient } from "../../src/infrastructure/telegram/telegram-api.js";
 
 function adminPath(request) {
   const url = new URL(request.url);
@@ -59,6 +61,51 @@ async function dispatchAdminRoute(request) {
       });
 
       return adminJsonResponse({ ok: true, reply });
+    });
+  }
+
+  if (path === "telegram/miniapp-menu") {
+    return handleAdminRoute(request, ["POST"], async ({ config }) => {
+      if (!config.telegramToken) {
+        return adminJsonResponse(
+          {
+            ok: false,
+            error: "TELEGRAM_BOT_TOKEN is not configured."
+          },
+          { status: 503 }
+        );
+      }
+
+      const payload = await readAdminJsonBody(request);
+      const menuButton = buildMiniAppMenuButton(config.appBaseUrl, {
+        route: payload.route || "/mini-app",
+        text: payload.text || "Кабинет"
+      });
+
+      if (!menuButton) {
+        return adminJsonResponse(
+          {
+            ok: false,
+            error: "APP_BASE_URL must be configured as HTTPS."
+          },
+          { status: 503 }
+        );
+      }
+
+      const telegramApi = new TelegramApiClient({
+        token: config.telegramToken,
+        apiBaseUrl: config.telegramApiBaseUrl
+      });
+
+      await telegramApi.setChatMenuButton({ menuButton });
+
+      return adminJsonResponse({
+        ok: true,
+        menuButton: {
+          text: menuButton.text,
+          url: menuButton.web_app.url
+        }
+      });
     });
   }
 
