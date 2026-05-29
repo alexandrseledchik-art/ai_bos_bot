@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 
 import { ConsultantWebService } from "../application/consultant-web-service.js";
 import { classifyConsultantSource, detectConsultantLayersForText } from "../application/company-analysis-core.js";
@@ -339,6 +340,13 @@ async function main() {
   assert.equal(detail.architectureItems.some((item) => item.parentDomain === "Видение и амбиция" && item.subdomain === "Видение"), true);
   assert.equal(detail.architectureItems.some((item) => item.block === "Домен"), false);
   assert.ok(detail.analysis.probableConstraint.title);
+
+  const webClient = await readFile(new URL("../../companies-assets/src/main.js", import.meta.url), "utf8");
+  assert.match(webClient, /function renderToolJourney/);
+  assert.match(webClient, /function buildToolJourney/);
+  assert.match(webClient, /journeyPrimaryButton/);
+  assert.match(webClient, /Что собрать дальше/);
+  assert.match(webClient, /Прогресс по 11 слоям/);
 
   const list = await service.listCompanies();
   assert.equal(list.companies.length, 1);

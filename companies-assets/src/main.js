@@ -40,6 +40,8 @@ const LAYER_LABELS = {
   data_analytics: "Данные и аналитика"
 };
 
+const LAYER_ORDER = Object.keys(LAYER_LABELS);
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -667,6 +669,115 @@ function groupArchitectureRowsByDomain(items = []) {
   }));
 }
 
+function architectureRowsWithEvidence(detail) {
+  const sources = detail.sources || [];
+  return (detail.architectureItems || []).map((item) => ({
+    ...item,
+    evidence: architectureItemEvidence(item, sources)
+  }));
+}
+
+function buildToolJourney(detail) {
+  const rows = architectureRowsWithEvidence(detail);
+  const availableLayerCodes = new Set(rows.map((item) => item.layerCode).filter(Boolean));
+  const orderedLayerCodes = [
+    ...LAYER_ORDER.filter((layerCode) => availableLayerCodes.has(layerCode)),
+    ...[...availableLayerCodes].filter((layerCode) => !LAYER_ORDER.includes(layerCode))
+  ];
+
+  const layers = orderedLayerCodes.map((layerCode, index) => {
+    const layerRows = rows.filter((item) => item.layerCode === layerCode);
+    const statusRows = layerRows.map((item) => ({
+      item,
+      status: architectureItemStatus(item)
+    }));
+    const issueCount = statusRows.filter((row) => row.status.code !== "covered").length;
+
+    return {
+      layerCode,
+      layerName: LAYER_LABELS[layerCode] || layerRows[0]?.layerName || layerRows[0]?.layer || layerCode,
+      index: index + 1,
+      percent: coveragePercent(layerRows),
+      total: layerRows.length,
+      covered: statusRows.filter((row) => row.status.code === "covered").length,
+      review: statusRows.filter((row) => row.status.code === "review").length,
+      draft: statusRows.filter((row) => row.status.code === "draft").length,
+      missing: statusRows.filter((row) => row.status.code === "missing").length,
+      issueCount,
+      rows: statusRows
+    };
+  });
+
+  const currentLayer = layers.find((layer) => layer.issueCount > 0) || layers[0] || null;
+  const currentRow =
+    currentLayer?.rows.find((row) => row.status.code === "review") ||
+    currentLayer?.rows.find((row) => row.status.code === "draft") ||
+    currentLayer?.rows.find((row) => row.status.code === "missing") ||
+    currentLayer?.rows[0] ||
+    null;
+  const completedLayers = layers.filter((layer) => layer.percent >= 100 && layer.total > 0).length;
+  const coveredItems = layers.reduce((sum, layer) => sum + layer.covered, 0);
+  const totalItems = layers.reduce((sum, layer) => sum + layer.total, 0);
+
+  return {
+    layers,
+    currentLayer,
+    currentRow,
+    completedLayers,
+    coveredItems,
+    totalItems,
+    percent: totalItems ? Math.round((coveredItems / totalItems) * 100) : 0
+  };
+}
+
+function toolJourneyAction(row) {
+  if (!row) {
+    return {
+      title: "Загрузить карту инструментов",
+      text: "Пока нет поддоменов архитектуры. Подключи таблицу инструментов или запусти анализ, чтобы AI-BOSS понял, по каким артефактам вести компанию.",
+      action: "source",
+      button: "Добавить источник"
+    };
+  }
+
+  const itemName = itemSubdomain(row.item) || itemParentDomain(row.item) || "текущий инструмент";
+  const toolHint = row.item.toolHints ? ` Подходящий формат: ${row.item.toolHints}.` : "";
+
+  if (row.status.code === "review") {
+    return {
+      title: `Дожать артефакт: ${itemName}`,
+      text: `Артефакт уже найден, но его содержимого пока недостаточно, чтобы считать этот участок закрытым.${toolHint} Проверь недостающие поля, обнови документ и запусти анализ заново.`,
+      action: "source",
+      button: "Добавить источник"
+    };
+  }
+
+  if (row.status.code === "draft") {
+    return {
+      title: `Собрать артефакт: ${itemName}`,
+      text: `Данные по теме уже встречаются в источниках, но отдельный рабочий инструмент ещё не собран.${toolHint} Можно оформить это в Google-документе или пройти вопросы с ботом, а затем сохранить ссылку в кабинете.`,
+      action: "source",
+      button: "Добавить источник"
+    };
+  }
+
+  if (row.status.code === "covered") {
+    return {
+      title: `Участок закрыт: ${itemName}`,
+      text: "По этому поддомену уже есть подтверждённый артефакт. Дальше можно перейти к следующему незакрытому участку архитектуры.",
+      action: "analyze",
+      button: "Запустить анализ"
+    };
+  }
+
+  return {
+    title: `Заполнить инструмент: ${itemName}`,
+    text: `По этому участку пока нет данных. Следующий шаг — дать пользователю шаблон инструмента или пройти вопросы в чате, а результат сохранить как источник компании.${toolHint}`,
+    action: "source",
+    button: "Добавить источник"
+  };
+}
+
 function formatScore(value) {
   const score = Number(value);
   if (!Number.isFinite(score)) {
@@ -1270,6 +1381,78 @@ function renderOverview(detail) {
   `;
 }
 
+function renderToolJourney(detail) {
+  const journey = buildToolJourney(detail);
+  const action = toolJourneyAction(journey.currentRow);
+  const currentLayer = journey.currentLayer;
+  const currentItem = journey.currentRow?.item;
+  const currentStatus = journey.currentRow?.status;
+  const visibleLayers = journey.layers.slice(0, 11);
+
+  return `
+    <section class="content-section tool-journey-card">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Маршрут по инструментам</p>
+          <h3>Что собрать дальше</h3>
+          <p class="section-note">AI-BOSS идёт по поддоменам карты инструментов: каждый участок закрывается своим артефактом и проверкой его содержания.</p>
+        </div>
+        <div class="pill-row">
+          <span class="pill ${coverageClass(journey.percent)}">${escapeHtml(journey.percent)}% артефактов подтверждено</span>
+          <span class="pill">${escapeHtml(journey.completedLayers)}/${escapeHtml(journey.layers.length || 11)} слоёв закрыто</span>
+        </div>
+      </div>
+
+      <div class="tool-journey-grid">
+        <article class="tool-journey-current">
+          <span class="tool-journey-step">Следующий ход</span>
+          <h4>${escapeHtml(action.title)}</h4>
+          <p>${escapeHtml(action.text)}</p>
+          ${currentLayer ? `
+            <div class="tool-journey-meta">
+              <span>${escapeHtml(currentLayer.index)} слой · ${escapeHtml(currentLayer.layerName)}</span>
+              ${currentItem ? `<span>${escapeHtml(itemParentDomain(currentItem))}</span>` : ""}
+              ${currentStatus ? `<span>${escapeHtml(currentStatus.label)}</span>` : ""}
+            </div>
+          ` : ""}
+          <div class="actions inline-actions">
+            <button id="journeyPrimaryButton" data-journey-action="${escapeHtml(action.action)}" type="button">${escapeHtml(action.button)}</button>
+          </div>
+        </article>
+
+        <details class="tool-journey-map">
+          <summary class="tool-journey-map-head">
+            <div>
+              <strong>Прогресс по 11 слоям</strong>
+              <span>${escapeHtml(journey.coveredItems)}/${escapeHtml(journey.totalItems)} поддоменов подтверждено</span>
+            </div>
+            <span class="drawer-toggle"></span>
+          </summary>
+          <div class="tool-journey-layer-list">
+            ${visibleLayers.length ? visibleLayers.map((layer) => `
+              <div class="tool-journey-layer ${currentLayer?.layerCode === layer.layerCode ? "active" : ""}">
+                <div>
+                  <strong>${escapeHtml(layer.index)}. ${escapeHtml(layer.layerName)}</strong>
+                  <span>${escapeHtml(layer.covered)} закрыто · ${escapeHtml(layer.review)} проверить · ${escapeHtml(layer.draft)} собрать · ${escapeHtml(layer.missing)} пусто</span>
+                </div>
+                <div class="tool-journey-meter">
+                  <span>${escapeHtml(layer.percent)}%</span>
+                  <div class="progress" aria-hidden="true"><span style="--value: ${layer.percent}%"></span></div>
+                </div>
+              </div>
+            `).join("") : `
+              <div class="empty-state compact-empty">
+                <h2>Маршрут пока не собран</h2>
+                <p>Нужна карта инструментов и хотя бы один источник по компании.</p>
+              </div>
+            `}
+          </div>
+        </details>
+      </div>
+    </section>
+  `;
+}
+
 function renderSources(detail) {
   const rows = detail.sources || [];
   const processedCount = rows.filter((source) => source.processingStatus === "processed").length;
@@ -1662,6 +1845,7 @@ function renderDetail() {
 
   content.innerHTML = [
     renderOverview(detail),
+    renderToolJourney(detail),
     renderDeepDiagnostic(detail),
     renderIntegrations(detail),
     renderSources(detail),
@@ -1675,6 +1859,14 @@ function renderDetail() {
   document.querySelector("#syncPublicGoogleFolderButton")?.addEventListener("click", openPublicGoogleFolderModal);
   document.querySelector("#addSourceButton")?.addEventListener("click", openSourceModal);
   document.querySelector("#importDeepDiagnosticButton")?.addEventListener("click", importSelectedDeepDiagnostic);
+  document.querySelector("#journeyPrimaryButton")?.addEventListener("click", (event) => {
+    const action = event.currentTarget.dataset.journeyAction;
+    if (action === "analyze") {
+      analyzeSelectedCompany();
+      return;
+    }
+    openSourceModal();
+  });
 }
 
 function openModal(markup) {

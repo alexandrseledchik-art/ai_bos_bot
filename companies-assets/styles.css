@@ -390,6 +390,156 @@ label {
   font-size: 24px;
 }
 
+.tool-journey-card {
+  border: 1px solid rgba(255, 106, 26, 0.28);
+  background:
+    radial-gradient(circle at top right, rgba(255, 106, 26, 0.12), transparent 34%),
+    linear-gradient(135deg, #ffffff 0%, #fffaf5 46%, #f5fbfa 100%);
+}
+
+.tool-journey-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.15fr);
+  gap: 14px;
+}
+
+.tool-journey-current,
+.tool-journey-map {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 16px;
+}
+
+.tool-journey-current {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  box-shadow: var(--shadow);
+}
+
+.tool-journey-current h4 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.tool-journey-current p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.tool-journey-step {
+  width: max-content;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: var(--teal);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tool-journey-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tool-journey-meta span {
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #edf3f2;
+  color: var(--teal-dark);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.tool-journey-map {
+  display: grid;
+  gap: 12px;
+}
+
+.tool-journey-map-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  cursor: pointer;
+  font-weight: 800;
+  list-style: none;
+}
+
+.tool-journey-map-head::-webkit-details-marker {
+  display: none;
+}
+
+.tool-journey-map-head strong {
+  display: block;
+  color: var(--ink);
+}
+
+.tool-journey-map-head span:not(.drawer-toggle) {
+  display: block;
+  margin-top: 4px;
+}
+
+.tool-journey-map .drawer-toggle::after {
+  content: "Показать";
+}
+
+.tool-journey-map[open] .drawer-toggle::after {
+  content: "Свернуть";
+}
+
+.tool-journey-layer-list {
+  display: grid;
+  gap: 8px;
+}
+
+.tool-journey-layer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 180px);
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff;
+}
+
+.tool-journey-layer.active {
+  border-color: rgba(255, 106, 26, 0.55);
+  background: var(--amber-soft);
+}
+
+.tool-journey-layer strong,
+.tool-journey-layer span {
+  display: block;
+}
+
+.tool-journey-layer strong {
+  color: var(--ink);
+}
+
+.tool-journey-layer span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tool-journey-meter {
+  display: grid;
+  gap: 6px;
+  color: var(--teal-dark);
+  font-weight: 900;
+}
+
 .pill-row {
   display: flex;
   flex-wrap: wrap;
@@ -1442,6 +1592,7 @@ label {
   .workspace,
   .grid-two,
   .grid-three,
+  .tool-journey-grid,
   .portal-class-grid,
   .portal-guide-grid,
   .maturity-explainer-grid,
@@ -1468,7 +1619,8 @@ label {
   }
 
   .layer-summary,
-  .layer-expand-grid {
+  .layer-expand-grid,
+  .tool-journey-layer {
     grid-template-columns: 1fr;
   }
 
