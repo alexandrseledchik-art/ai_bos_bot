@@ -35,7 +35,7 @@ function normalizeLayerKey(layerId) {
 }
 
 function inferProblemTypes(tool) {
-  const text = normalizeText(tool.layer, tool.domain, tool.name, tool.description, tool.whenToUse, tool.result);
+  const text = normalizeText(tool.layer, tool.domain, tool.subdomain, tool.name, tool.description, tool.whenToUse, tool.result);
   const types = new Set();
 
   for (const hint of PROBLEM_TYPE_HINTS) {
@@ -61,6 +61,7 @@ function toCatalogTool(tool, index) {
     layer_keys: tool.layerId ? [normalizeLayerKey(tool.layerId)] : [],
     layer: tool.layer,
     domain: tool.domain,
+    subdomain: tool.subdomain || "",
     status: tool.status || "",
     relation: tool.relation || "",
     link_label: tool.linkLabel || "",

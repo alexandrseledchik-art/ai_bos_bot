@@ -1095,6 +1095,7 @@ function renderToolsPortal(methodology) {
     return normalizeLookup([
       tool.layer,
       tool.domain,
+      tool.subdomain,
       tool.name,
       tool.description,
       tool.whenToUse,
@@ -1140,7 +1141,10 @@ function renderToolsPortal(methodology) {
             <div class="portal-tool-grid">
               ${rows.map((tool) => `
                 <article class="portal-tool-card">
-                  <p class="eyebrow">${escapeHtml(tool.domain || "без домена")}</p>
+                  <p class="eyebrow">${escapeHtml([
+                    tool.domain || "без домена",
+                    tool.subdomain
+                  ].filter(Boolean).join(" / "))}</p>
                   <h4>${escapeHtml(tool.name)}</h4>
                   ${tool.description ? `<p>${escapeHtml(tool.description)}</p>` : ""}
                   ${tool.whenToUse ? `<p><strong>Когда применять:</strong> ${escapeHtml(tool.whenToUse)}</p>` : ""}
