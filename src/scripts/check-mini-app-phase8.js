@@ -657,7 +657,7 @@ function assertStaticPhase8Wiring() {
   assert.match(service, /getBusinessAssemblyPlan/);
   assert.match(service, /createBusinessAssemblyDraft/);
   assert.match(mainJs, /CEO-контур/);
-  assert.match(mainJs, /Сборка бизнеса/);
+  assert.match(mainJs, /Архитектура бизнеса/);
   assert.match(mainJs, /data-assembly-draft/);
   assert.match(mainJs, /Повестка AI-BOSS/);
   assert.match(mainJs, /Решения собственника/);

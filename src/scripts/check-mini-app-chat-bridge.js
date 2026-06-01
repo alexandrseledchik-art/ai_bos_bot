@@ -67,7 +67,7 @@ function assertInvitePolicy() {
     entryState: {}
   });
   assert.equal(ceoInvite.route, "/mini-app/ceo");
-  assert.equal(ceoInvite.label, "Открыть CEO-контур");
+  assert.equal(ceoInvite.label, "Открыть управленческую повестку");
 
   const assemblyInvite = buildMiniAppInvite({
     forceMiniAppInvite: true,
@@ -86,7 +86,7 @@ function assertInvitePolicy() {
     entryState: {}
   });
   assert.equal(assemblyInvite.route, "/mini-app/assembly");
-  assert.equal(assemblyInvite.label, "Открыть сборку бизнеса");
+  assert.equal(assemblyInvite.label, "Открыть архитектуру бизнеса");
 
   const diagnosticsInvite = buildMiniAppInvite({
     forceMiniAppInvite: true,

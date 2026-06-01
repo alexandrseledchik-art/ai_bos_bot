@@ -29,6 +29,14 @@
       "destination": "/companies/index.html"
     },
     {
+      "source": "/book",
+      "destination": "/book/index.html"
+    },
+    {
+      "source": "/book/:path*",
+      "destination": "/book/index.html"
+    },
+    {
       "source": "/admin",
       "destination": "/admin/index.html"
     },

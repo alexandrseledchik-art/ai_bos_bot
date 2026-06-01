@@ -1923,8 +1923,8 @@ export class MiniAppDiagnosticsService {
     return {
       assembly: {
         mode: "evidence_first_business_build",
-        title: "Сборка бизнеса",
-        summary: "Это второй путь работы AI-BOSS: не просить оценить бизнес словами, а последовательно собрать факты, документы и решения по 11 слоям.",
+        title: "Архитектура бизнеса",
+        summary: "Это путь для последовательной сборки бизнеса: собрать факты, документы и решения по 11 слоям, а не опираться только на ощущения.",
         storage: {
           title: "Документы и артефакты кейса",
           route: "/mini-app/documents"

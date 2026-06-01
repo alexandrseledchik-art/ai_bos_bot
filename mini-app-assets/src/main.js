@@ -214,29 +214,24 @@ function renderDashboard() {
   const onboarding = state.bootstrap?.onboardingStatus ||
     state.bootstrap?.dashboardSummary?.onboardingStatus ||
     "draft";
-  const profileActionLabel = onboarding === "completed" ? "Обновить профиль" : "Заполнить профиль";
+  const profileActionLabel = onboarding === "completed" ? "Мой бизнес" : "Заполнить профиль";
 
   return `
     <section class="hero">
       <p>AI-BOSS</p>
-      <h2>Кабинет управленческого кейса</h2>
-      <p>${escapeHtml(companyName)}: здесь чат превращается в рабочий кейс. Мы фиксируем контекст, собираем сигналы, проверяем зрелость и выводим одну рабочую гипотезу ограничения.</p>
+      <h2>Кабинет компании</h2>
+      <p>${escapeHtml(companyName)}: здесь собираются профиль компании, диагностика, архитектура бизнеса по 11 слоям, матрица зрелости и инструменты.</p>
       <div class="actions">
         <button class="primary-button" data-navigate="/mini-app/onboarding">${profileActionLabel}</button>
-        <button class="secondary-button" data-navigate="/mini-app/assembly">Собрать бизнес</button>
+        <button class="secondary-button" data-navigate="/mini-app/assembly">Архитектура бизнеса</button>
         <button class="secondary-button" data-navigate="/mini-app/diagnostics/express">Пройти диагностику</button>
-        <button class="secondary-button" data-navigate="/mini-app/maturity">Открыть матрицу</button>
-        <button class="secondary-button" data-navigate="/mini-app/constraint">Найти ограничение</button>
-        <button class="secondary-button" data-navigate="/mini-app/ceo">CEO-контур</button>
+        <button class="secondary-button" data-navigate="/mini-app/maturity">Матрица зрелости</button>
         <button class="secondary-button" data-navigate="/mini-app/tools">Инструменты</button>
         <button class="secondary-button" data-navigate="/mini-app/consultation">Разбор с экспертом</button>
       </div>
     </section>
 
-    <div class="grid two">
-      ${renderBootstrapCard()}
-      ${renderCeoSummaryCard()}
-    </div>
+    ${renderBootstrapCard()}
 
     ${renderAssemblySummaryCard()}
 
@@ -265,22 +260,12 @@ function renderDashboard() {
         </li>
         <li>
           <strong>Кабинет</strong>
-          <span>Здесь фиксируются профиль, диагностика, сборка бизнеса, гипотеза, следующий шаг, инструменты и документы по кейсу.</span>
+          <span>Здесь фиксируются профиль, диагностика, архитектура бизнеса, матрица зрелости, инструменты и документы по кейсу.</span>
         </li>
         <li>
           <strong>Маршрут</strong>
-          <span>Можно идти двумя путями: быстрый срез через диагностику или сборка бизнеса через документы и факты по слоям.</span>
+          <span>Можно идти двумя путями: быстрый срез через диагностику или последовательная сборка бизнеса через 11 слоёв.</span>
         </li>
-      </ul>
-    </section>
-
-    ${renderRecommendedToolsPanel()}
-
-    <section class="card next-card">
-      <h3>Экраны</h3>
-      <ul class="screen-list">
-        ${ROUTES.filter((route) => route.path !== "/mini-app").map(routeLink).join("")}
-        ${routeLink({ path: "/mini-app/tools/sample-tool", title: "Карточка инструмента" })}
       </ul>
     </section>
   `;
@@ -322,10 +307,10 @@ function renderAssemblySummaryCard() {
   if (!assembly) {
     return `
       <section class="card next-card">
-        <h3>Сборка бизнеса</h3>
-        <p>Второй путь AI-BOSS: не оценивать бизнес только по ответам, а собрать документы, факты и решения по 11 слоям.</p>
+        <h3>Архитектура бизнеса</h3>
+        <p>Последовательная сборка бизнеса по 11 слоям: от цели собственника и рынка до процессов, команды, управления, технологий и данных.</p>
         <div class="actions">
-          <button class="secondary-button compact-button" data-navigate="/mini-app/assembly">Открыть сборку</button>
+          <button class="secondary-button compact-button" data-navigate="/mini-app/assembly">Открыть архитектуру</button>
         </div>
       </section>
     `;
@@ -335,26 +320,14 @@ function renderAssemblySummaryCard() {
 
   return `
     <section class="card next-card">
-      <h3>Сборка бизнеса</h3>
+      <h3>Архитектура бизнеса</h3>
       <p>${escapeHtml(assembly.nextRequest?.title || assembly.summary)}</p>
       <div class="status-row">
         <span class="pill ${Number(progress.percent || 0) >= 100 ? "success" : "neutral"}">документы: ${escapeHtml(progress.ready)}/${escapeHtml(progress.total)}</span>
         <span class="pill neutral">слои: ${escapeHtml(assembly.completedLayers || 0)}/${escapeHtml(assembly.totalLayers || 11)}</span>
       </div>
       <div class="actions">
-        <button class="secondary-button compact-button" data-navigate="/mini-app/assembly">Открыть сборку</button>
-      </div>
-    </section>
-  `;
-}
-
-function renderRecommendedToolsPanel() {
-  return `
-    <section class="card next-card">
-      <h3>Инструменты под ситуацию</h3>
-      <p>Если нужен прикладной набор под текущий запрос, гипотезу ограничения и следующий шаг, открой отдельную подборку. Каталог при этом останется ниже как справочник.</p>
-      <div class="actions">
-        <button class="secondary-button" type="button" data-open-tool-recommendations>Рекомендованные инструменты под текущую ситуацию</button>
+        <button class="secondary-button compact-button" data-navigate="/mini-app/assembly">Открыть архитектуру</button>
       </div>
     </section>
   `;
@@ -478,7 +451,7 @@ function renderExpressDiagnostics() {
       <h3>Матрица зрелости</h3>
       <p>Матрица покажет фактические оценки по компании. Главное ограничение мы потом ищем отдельно: по оценкам, запросу и сигналам из диалога.</p>
       <div class="actions">
-        <button class="primary-button" data-navigate="/mini-app/maturity">Открыть матрицу</button>
+        <button class="primary-button" data-navigate="/mini-app/maturity">Матрица зрелости</button>
       </div>
     </section>
   `;
@@ -1520,7 +1493,7 @@ function renderBusinessAssembly() {
   const block = state.assembly;
 
   if (block.loading) {
-    return renderLoadingCard("Собираю карту сборки бизнеса...");
+    return renderLoadingCard("Собираю архитектуру бизнеса...");
   }
 
   if (block.error) {
@@ -1528,7 +1501,7 @@ function renderBusinessAssembly() {
   }
 
   if (!block.data?.assembly) {
-    return renderLoadingCard("Готовлю маршрут сборки бизнеса...");
+    return renderLoadingCard("Готовлю маршрут по 11 слоям...");
   }
 
   const assembly = block.data.assembly;
@@ -1536,9 +1509,9 @@ function renderBusinessAssembly() {
 
   return `
     <section class="hero compact">
-      <p>Сборка бизнеса</p>
-      <h2>Соберём систему по фактам</h2>
-      <p>${escapeHtml(assembly.summary)} Идём по приоритетам: сначала рамка и рынок, затем фокус, оффер, коммерция, исполнение, деньги и управленческая инфраструктура.</p>
+      <p>Архитектура бизнеса</p>
+      <h2>Соберём бизнес по 11 слоям</h2>
+      <p>${escapeHtml(assembly.summary)} Идём последовательно: сначала цель собственника и рынок, затем стратегия, продукт, продажи, исполнение, деньги, команда, управление, технологии и данные.</p>
       ${renderAssemblyProgress(progress)}
       <div class="actions">
         <button class="secondary-button" data-navigate="/mini-app/documents">Открыть документы</button>
@@ -1569,7 +1542,7 @@ function renderAssemblyProgress(progress = {}) {
         <span>Документы в кейсе</span>
         <strong>${escapeHtml(ready)}/${escapeHtml(total)}</strong>
       </div>
-      <div class="progress progress-single" aria-label="Сборка бизнеса: создано или добавлено ${escapeAttribute(ready)}/${escapeAttribute(total)} документов">
+      <div class="progress progress-single" aria-label="Архитектура бизнеса: создано или добавлено ${escapeAttribute(ready)}/${escapeAttribute(total)} документов">
         <div class="progress-bar"><span style="width: ${Math.max(0, Math.min(100, percent))}%"></span></div>
       </div>
       <p class="progress-caption">Шкала показывает, сколько нужных документов уже создано или добавлено. Это не оценка качества бизнеса и не оценка глубины заполнения.</p>
@@ -1604,7 +1577,7 @@ function renderAssemblyNextRequest(nextRequest, block) {
           </button>
         ` : ""}
         <button class="secondary-button" type="button" data-navigate="${escapeAttribute(nextRequest.route || "/mini-app/documents")}">
-          ${nextRequest.status === "complete" ? "Открыть CEO-контур" : "Добавить документ"}
+          ${nextRequest.status === "complete" ? "Вернуться в кабинет" : "Добавить документ"}
         </button>
       </div>
       ${block.message ? `<p class="hint-text">${escapeHtml(block.message)}</p>` : ""}
