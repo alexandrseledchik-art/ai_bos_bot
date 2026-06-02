@@ -792,6 +792,66 @@ a {
   box-shadow: 0 8px 22px rgba(16, 39, 39, 0.055);
 }
 
+.assembly-architecture,
+.assembly-domain {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.assembly-architecture {
+  padding: 12px;
+}
+
+.assembly-architecture summary,
+.assembly-domain summary {
+  cursor: pointer;
+  color: var(--teal);
+  font-weight: 800;
+}
+
+.assembly-domain-list,
+.assembly-subdomain-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.assembly-domain {
+  padding: 12px;
+}
+
+.assembly-domain summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.assembly-domain summary small {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.assembly-domain p,
+.assembly-subdomain span {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.assembly-subdomain {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(13, 45, 48, 0.04);
+}
+
+.assembly-subdomain strong {
+  color: var(--ink);
+}
+
 .assembly-artifact {
   background: rgba(13, 45, 48, 0.035);
 }

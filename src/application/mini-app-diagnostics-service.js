@@ -5,6 +5,10 @@ import { DiagnosticPrefillEngine } from "./diagnostic-prefill-engine.js";
 import { MiniAppAnalyticsService } from "./mini-app-analytics-service.js";
 import { NextStepSelector } from "./next-step-selector.js";
 import { ToolRecommender } from "./tool-recommender.js";
+import {
+  buildArchitectureTree,
+  canonicalArchitectureLayerId
+} from "../domain/business-architecture-map.js";
 import { assertBusinessLayerKey, BUSINESS_LAYERS_V1, getBusinessLayerByKey } from "../domain/business-layers.js";
 import { MINI_APP_TOOL_CATALOG } from "../domain/mini-app-tools-catalog.js";
 
@@ -22,15 +26,19 @@ const BUSINESS_ASSEMBLY_LAYER_ORDER = [
   "owner_context",
   "external_environment",
   "strategy",
-  "product_value_proposition",
+  "product",
   "commercial",
-  "operating_model",
+  "operations",
   "finance",
-  "people_organization",
-  "governance_risks",
+  "team",
+  "governance",
   "technology",
   "data_analytics"
 ];
+const BUSINESS_ASSEMBLY_ARCHITECTURE_TREE = buildArchitectureTree();
+const BUSINESS_ASSEMBLY_ARCHITECTURE_BY_LAYER = new Map(
+  BUSINESS_ASSEMBLY_ARCHITECTURE_TREE.map((layer) => [layer.layerId, layer])
+);
 const BUSINESS_ASSEMBLY_ARTIFACTS = {
   owner_context: [
     {
@@ -62,7 +70,7 @@ const BUSINESS_ASSEMBLY_ARTIFACTS = {
       fillPrompt: "Выбрать стартовый сегмент, обещание результата, границы продукта, отказ от лишних направлений и критерий успеха на 4 недели."
     }
   ],
-  product_value_proposition: [
+  product: [
     {
       id: "offer-map",
       title: "Карта оффера и результата",
@@ -78,7 +86,7 @@ const BUSINESS_ASSEMBLY_ARTIFACTS = {
       fillPrompt: "Описать этапы от первого сообщения до оплаты/разбора, критерии подходящего клиента, точки доверия и причины отказа."
     }
   ],
-  operating_model: [
+  operations: [
     {
       id: "delivery-process",
       title: "Процесс проведения разбора",
@@ -94,7 +102,7 @@ const BUSINESS_ASSEMBLY_ARTIFACTS = {
       fillPrompt: "Посчитать цену оффера, количество разборов, долю ручного времени, расходы, чистую прибыль и ограничение по мощности."
     }
   ],
-  people_organization: [
+  team: [
     {
       id: "role-map",
       title: "Карта ролей и ответственности",
@@ -102,7 +110,7 @@ const BUSINESS_ASSEMBLY_ARTIFACTS = {
       fillPrompt: "Разложить роли по задачам: кто собирает факты, кто принимает решения, кто ведёт клиента, кто фиксирует артефакты и кто контролирует выполнение."
     }
   ],
-  governance_risks: [
+  governance: [
     {
       id: "management-rhythm",
       title: "Ритм управления и контрольные петли",
@@ -152,11 +160,11 @@ function assemblyArtifactExternalId(caseId, artifactId) {
 }
 
 function getAssemblyArtifactDefinitions(layerKey) {
-  return BUSINESS_ASSEMBLY_ARTIFACTS[layerKey] || [];
+  return BUSINESS_ASSEMBLY_ARTIFACTS[canonicalArchitectureLayerId(layerKey)] || [];
 }
 
 function getBusinessAssemblyOrderIndex(layerKey) {
-  const index = BUSINESS_ASSEMBLY_LAYER_ORDER.indexOf(layerKey);
+  const index = BUSINESS_ASSEMBLY_LAYER_ORDER.indexOf(canonicalArchitectureLayerId(layerKey));
   return index >= 0 ? index : BUSINESS_ASSEMBLY_LAYER_ORDER.length;
 }
 
@@ -1767,11 +1775,14 @@ export class MiniAppDiagnosticsService {
   }
 
   buildAssemblyLayer({ layer, index, artifacts, documents, observations, answers, catalogTools, caseId }) {
+    const canonicalLayerKey = canonicalArchitectureLayerId(layer.key);
+    const architectureLayer = BUSINESS_ASSEMBLY_ARCHITECTURE_BY_LAYER.get(canonicalLayerKey) || null;
     const definitions = getAssemblyArtifactDefinitions(layer.key);
     const answer = (answers || []).find((item) => item.subject_key === layer.key && isOfficialAnswer(item));
     const layerObservations = (observations || []).filter((item) => item.layer === layer.key);
     const layerTools = (catalogTools || [])
-      .filter((tool) => (tool.layer_keys || tool.layerKeys || []).includes(layer.key));
+      .filter((tool) => (tool.layer_keys || tool.layerKeys || [])
+        .some((toolLayerKey) => canonicalArchitectureLayerId(toolLayerKey) === canonicalLayerKey));
     const recommendedTools = layerTools
       .slice(0, 3)
       .map((tool) => this.decorateTool(tool));
@@ -1795,11 +1806,23 @@ export class MiniAppDiagnosticsService {
     return {
       order: index + 1,
       layerKey: layer.key,
-      classKey: layer.classKey,
-      title: layer.title,
-      shortDescription: layer.shortDescription,
-      role: layer.role,
+      canonicalLayerKey,
+      classKey: architectureLayer?.classId || layer.classKey,
+      title: architectureLayer?.name || layer.title,
+      shortDescription: architectureLayer?.description || layer.shortDescription,
+      role: architectureLayer?.description || layer.role,
       priorityReason: layer.priorityWhen,
+      architecture: architectureLayer
+        ? {
+            layerId: architectureLayer.layerId,
+            description: architectureLayer.description,
+            action: architectureLayer.action,
+            expectedResult: architectureLayer.expectedResult,
+            domainCount: architectureLayer.domainCount,
+            subdomainCount: architectureLayer.subdomainCount,
+            domains: architectureLayer.domains
+          }
+        : null,
       maturityScore: Number.isFinite(Number(answer?.score)) ? Number(answer.score) : null,
       observationCount: layerObservations.length,
       status,

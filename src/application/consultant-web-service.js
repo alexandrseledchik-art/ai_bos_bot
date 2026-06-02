@@ -3,41 +3,13 @@ import {
   createCompanySource,
   nowIso
 } from "../domain/entities.js";
-import { BUSINESS_ARCHITECTURE_ITEMS } from "../domain/business-architecture-knowledge.js";
+import { buildArchitectureItems } from "../domain/business-architecture-map.js";
 import { isBusinessArchitectureReferenceSource } from "../domain/business-architecture-tool-matcher.js";
 import { PublicGoogleLinkReader } from "../infrastructure/google/public-google-link-reader.js";
 import { CompanyAnalysisCore, classifyConsultantSource } from "./company-analysis-core.js";
 import { importDeepDiagnosticXlsx } from "./deep-diagnostic-importer.js";
 
-function buildConsultantArchitectureItems(items = []) {
-  const currentDomainByLayer = new Map();
-  return items.flatMap((item) => {
-    if (item.block === "Домен") {
-      currentDomainByLayer.set(item.layerId, item.domain);
-      return [];
-    }
-
-    if (item.block !== "Поддомен") {
-      return [];
-    }
-
-    return {
-      number: item.number,
-      layerCode: item.layerId,
-      layerName: item.layer,
-      block: item.block,
-      parentDomain: currentDomainByLayer.get(item.layerId) || "",
-      subdomain: item.domain,
-      domain: item.domain,
-      description: item.description,
-      action: item.action,
-      expectedResult: item.expectedResult,
-      toolHints: item.toolHints
-    };
-  });
-}
-
-const CONSULTANT_LAYER_ARCHITECTURE_ITEMS = buildConsultantArchitectureItems(BUSINESS_ARCHITECTURE_ITEMS);
+const CONSULTANT_LAYER_ARCHITECTURE_ITEMS = buildArchitectureItems();
 
 function cleanText(value) {
   return String(value || "").trim();

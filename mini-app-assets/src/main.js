@@ -214,7 +214,7 @@ function renderDashboard() {
   const onboarding = state.bootstrap?.onboardingStatus ||
     state.bootstrap?.dashboardSummary?.onboardingStatus ||
     "draft";
-  const profileActionLabel = onboarding === "completed" ? "Мой бизнес" : "Заполнить профиль";
+  const profileActionLabel = onboarding === "completed" ? "Профиль" : "Заполнить профиль";
 
   return `
     <section class="hero">
@@ -1510,8 +1510,8 @@ function renderBusinessAssembly() {
   return `
     <section class="hero compact">
       <p>Архитектура бизнеса</p>
-      <h2>Соберём бизнес по 11 слоям</h2>
-      <p>${escapeHtml(assembly.summary)} Идём последовательно: сначала цель собственника и рынок, затем стратегия, продукт, продажи, исполнение, деньги, команда, управление, технологии и данные.</p>
+      <h2>Карта бизнеса по 11 слоям</h2>
+      <p>${escapeHtml(assembly.summary)} Это тот же подход, что в web-кабинете: слой → домен → поддомен → нужный артефакт или факт.</p>
       ${renderAssemblyProgress(progress)}
       <div class="actions">
         <button class="secondary-button" data-navigate="/mini-app/documents">Открыть документы</button>
@@ -1522,8 +1522,8 @@ function renderBusinessAssembly() {
     ${renderAssemblyNextRequest(assembly.nextRequest, block)}
 
     <section class="card next-card">
-      <h3>Маршрут по 11 слоям</h3>
-      <p>Каждый слой закрывается не красивой формулировкой, а рабочим документом или фактом. Если документа нет, AI-BOSS может создать черновик, который потом нужно заполнить или заменить реальным файлом.</p>
+      <h3>Архитектура бизнеса</h3>
+      <p>Здесь видно, какие части бизнеса уже собраны документами и фактами, а какие ещё пустые. Слой показывает общий уровень, но работа всегда идёт ниже — по доменам и поддоменам.</p>
       <div class="assembly-list">
         ${(assembly.layers || []).map((layer) => renderAssemblyLayer(layer, block)).join("")}
       </div>
@@ -1599,7 +1599,10 @@ function renderAssemblyLayer(layer, block) {
       <div class="status-row">
         <span class="pill neutral">фактов: ${escapeHtml(layer.observationCount || 0)}</span>
         <span class="pill neutral">оценка: ${escapeHtml(layer.maturityScore ? `${layer.maturityScore}/5` : "не нужна для старта")}</span>
+        ${layer.architecture ? `<span class="pill neutral">доменов: ${escapeHtml(layer.architecture.domainCount || 0)}</span>` : ""}
+        ${layer.architecture ? `<span class="pill neutral">поддоменов: ${escapeHtml(layer.architecture.subdomainCount || 0)}</span>` : ""}
       </div>
+      ${renderAssemblyArchitecture(layer.architecture)}
       <div class="assembly-artifacts">
         ${(layer.requiredArtifacts || []).map((artifact) => renderAssemblyArtifact(layer, artifact, block)).join("")}
       </div>
@@ -1613,6 +1616,39 @@ function renderAssemblyLayer(layer, block) {
         ` : `<p class="hint-text">${escapeHtml(layer.toolGap || "Инструменты для слоя пока не найдены.")}</p>`}
       </div>
     </article>
+  `;
+}
+
+function renderAssemblyArchitecture(architecture) {
+  const domains = architecture?.domains || [];
+
+  if (!domains.length) {
+    return "";
+  }
+
+  return `
+    <details class="assembly-architecture">
+      <summary>Показать домены и поддомены слоя</summary>
+      <div class="assembly-domain-list">
+        ${domains.map((domain) => `
+          <details class="assembly-domain">
+            <summary>
+              <span>${escapeHtml(domain.title)}</span>
+              <small>${escapeHtml(domain.subdomainCount || 0)} поддоменов</small>
+            </summary>
+            ${domain.description ? `<p>${escapeHtml(domain.description)}</p>` : ""}
+            <div class="assembly-subdomain-list">
+              ${(domain.subdomains || []).map((subdomain) => `
+                <article class="assembly-subdomain">
+                  <strong>${escapeHtml(subdomain.title)}</strong>
+                  ${subdomain.description ? `<span>${escapeHtml(subdomain.description)}</span>` : ""}
+                </article>
+              `).join("")}
+            </div>
+          </details>
+        `).join("")}
+      </div>
+    </details>
   `;
 }
 
