@@ -11,6 +11,7 @@ import {
 } from "../domain/business-architecture-map.js";
 import { assertBusinessLayerKey, BUSINESS_LAYERS_V1, getBusinessLayerByKey } from "../domain/business-layers.js";
 import { MINI_APP_TOOL_CATALOG } from "../domain/mini-app-tools-catalog.js";
+import { buildBusinessArchitectureSnapshot } from "./company-architecture-snapshot.js";
 import { classifyConsultantSource } from "./company-analysis-core.js";
 
 const OFFICIAL_ANSWER_SOURCES = new Set([
@@ -2386,49 +2387,75 @@ export class MiniAppDiagnosticsService {
       })
     ]);
     const catalogTools = await this.getRuntimeCatalogTools();
-    const layers = [...BUSINESS_LAYERS_V1]
-      .sort((left, right) => getBusinessAssemblyOrderIndex(left.key) - getBusinessAssemblyOrderIndex(right.key))
-      .map((layer, index) => this.buildAssemblyLayer({
-        layer,
-        index,
-        artifacts,
-        documents,
-        observations,
-        answers,
-        catalogTools,
-        caseId: bootstrap.activeCase.id
-      }));
-    const summary = this.buildAssemblySummary(layers);
-    const nextRequest = this.buildAssemblyNextRequest(layers);
+    const assembly = buildBusinessArchitectureSnapshot({
+      sources: [
+        ...(documents || []).map(toAssemblySource),
+        ...(artifacts || []).map(toAssemblyArtifactSource)
+      ],
+      answers,
+      observations,
+      catalogTools
+    });
+    const legacyLayers = BUSINESS_LAYERS_V1.map((layer, index) => this.buildAssemblyLayer({
+      layer,
+      index,
+      artifacts,
+      documents,
+      observations,
+      answers,
+      catalogTools,
+      caseId: bootstrap.activeCase.id
+    }));
+    const legacyLayerMap = new Map(
+      legacyLayers.map((layer) => [canonicalArchitectureLayerId(layer.layerKey), layer])
+    );
+    assembly.layers = assembly.layers.map((layer) => {
+      const legacyLayer = legacyLayerMap.get(canonicalArchitectureLayerId(layer.layerKey));
+
+      if (!legacyLayer) {
+        return layer;
+      }
+
+      return {
+        ...layer,
+        requiredArtifacts: legacyLayer.requiredArtifacts || [],
+        recommendedTools: (layer.recommendedTools || []).length
+          ? layer.recommendedTools
+          : legacyLayer.recommendedTools || [],
+        toolCount: Math.max(Number(layer.toolCount || 0), Number(legacyLayer.toolCount || 0)),
+        toolGap: layer.toolGap || legacyLayer.toolGap || null
+      };
+    });
+    assembly.journey = {
+      ...assembly.journey,
+      layers: (assembly.journey?.layers || []).map((journeyLayer) => {
+        const layer = assembly.layers.find((item) => item.layerKey === journeyLayer.layerCode);
+
+        return layer
+          ? {
+              ...journeyLayer,
+              recommendedTools: layer.recommendedTools,
+              requiredArtifacts: layer.requiredArtifacts
+            }
+          : journeyLayer;
+      })
+    };
 
     await this.logMiniAppEvent({
       bootstrap,
       eventName: "business_assembly_viewed",
       metadata: {
-        completedLayers: summary.completedLayers,
-        totalLayers: summary.totalLayers,
-        readyArtifacts: summary.artifactProgress.ready,
-        totalArtifacts: summary.artifactProgress.total,
-        confirmedArchitectureItems: summary.architectureProgress.confirmed,
-        totalArchitectureItems: summary.architectureProgress.total,
-        nextLayerKey: nextRequest.layer?.layerKey || ""
+        completedLayers: assembly.completedLayers,
+        totalLayers: assembly.totalLayers,
+        readyArtifacts: assembly.artifactProgress.ready,
+        totalArtifacts: assembly.artifactProgress.total,
+        confirmedArchitectureItems: assembly.architectureProgress.confirmed,
+        totalArchitectureItems: assembly.architectureProgress.total,
+        nextLayerKey: assembly.nextRequest?.layer?.layerKey || ""
       }
     });
 
-    return {
-      assembly: {
-        mode: "evidence_first_business_build",
-        title: "Архитектура бизнеса",
-        summary: "Это путь для последовательной сборки бизнеса: собрать факты, документы и решения по 11 слоям, а не опираться только на ощущения.",
-        storage: {
-          title: "Источники и материалы",
-          route: "/mini-app/documents"
-        },
-        ...summary,
-        nextRequest,
-        layers
-      }
-    };
+    return { assembly };
   }
 
   buildAssemblyDraftContent({ bootstrap, layer, definition }) {

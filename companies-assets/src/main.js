@@ -1386,8 +1386,8 @@ function renderOverview(detail) {
 }
 
 function renderToolJourney(detail) {
-  const journey = buildToolJourney(detail);
-  const action = toolJourneyAction(journey.currentRow);
+  const journey = detail.businessAssembly?.journey || buildToolJourney(detail);
+  const action = journey.currentAction || toolJourneyAction(journey.currentRow);
   const currentLayer = journey.currentLayer;
   const currentItem = journey.currentRow?.item;
   const currentStatus = journey.currentRow?.status;

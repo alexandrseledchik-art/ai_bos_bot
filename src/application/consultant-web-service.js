@@ -6,6 +6,7 @@ import {
 import { buildArchitectureItems } from "../domain/business-architecture-map.js";
 import { isBusinessArchitectureReferenceSource } from "../domain/business-architecture-tool-matcher.js";
 import { PublicGoogleLinkReader } from "../infrastructure/google/public-google-link-reader.js";
+import { buildBusinessArchitectureSnapshot } from "./company-architecture-snapshot.js";
 import { CompanyAnalysisCore, classifyConsultantSource } from "./company-analysis-core.js";
 import { importDeepDiagnosticXlsx } from "./deep-diagnostic-importer.js";
 
@@ -289,17 +290,24 @@ export class ConsultantWebService {
     const state = await this.store.readState();
     const company = assertCompany(state, companyId);
     const analysis = latestAnalysis(state, companyId);
+    const sources = (state.companySources || [])
+      .filter((source) => source.companyId === companyId)
+      .map(enrichSourceForRead)
+      .sort((left, right) => String(right.updatedAt || right.createdAt || "").localeCompare(String(left.updatedAt || left.createdAt || "")));
+    const businessAssembly = buildBusinessArchitectureSnapshot({
+      sources,
+      observations: (state.observations || []).filter((item) => item.companyId === companyId),
+      catalogTools: this.analysisCore?.toolCatalog || []
+    });
 
     return {
       company: companySummary(state, company),
-      sources: (state.companySources || [])
-        .filter((source) => source.companyId === companyId)
-        .map(enrichSourceForRead)
-        .sort((left, right) => String(right.updatedAt || right.createdAt || "").localeCompare(String(left.updatedAt || left.createdAt || ""))),
+      sources,
       layerAnalyses: (state.layerAnalyses || []).filter((item) => item.companyId === companyId),
       architectureItems: CONSULTANT_LAYER_ARCHITECTURE_ITEMS,
       toolResults: (state.toolResults || []).filter((item) => item.companyId === companyId),
       analysis,
+      businessAssembly,
       integrations: this.buildIntegrationsStatus(state, company),
       analyses: (state.companyAnalyses || [])
         .filter((item) => item.companyId === companyId)
