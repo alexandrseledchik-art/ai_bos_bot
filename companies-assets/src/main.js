@@ -108,6 +108,76 @@ function coverageLabel(percent) {
   return "данных нет";
 }
 
+function diagnosticScoreValue(value) {
+  const score = Number(value);
+  if (!Number.isFinite(score)) {
+    return null;
+  }
+  return Math.max(0, Math.min(5, score));
+}
+
+function diagnosticScorePercent(score) {
+  if (score === null) {
+    return 0;
+  }
+  return Math.round((score / 5) * 100);
+}
+
+function diagnosticScoreStatus(score) {
+  if (score === null) {
+    return "нет оценки";
+  }
+  if (score < 1.5) {
+    return "критично";
+  }
+  if (score < 2) {
+    return "зона риска";
+  }
+  if (score < 3) {
+    return "переходная зона";
+  }
+  if (score < 4) {
+    return "рабочая середина";
+  }
+  return "опора";
+}
+
+function diagnosticScoreNote(score) {
+  if (score === null) {
+    return "По этому слою в диагностике пока нет оценки.";
+  }
+  if (score < 1.5) {
+    return "Слой выглядит критично: здесь много хаоса, ручного управления или незакрытых базовых вопросов.";
+  }
+  if (score < 2) {
+    return "Слой в зоне риска: он может ограничивать систему или быть сильным симптомом другой проблемы.";
+  }
+  if (score < 3) {
+    return "Есть отдельные элементы, но слой ещё не выглядит устойчиво управляемым.";
+  }
+  if (score < 4) {
+    return "Есть рабочая база, но слой ещё может ограничивать рост или требовать настройки.";
+  }
+  return "Слой выглядит как возможная опора: на него можно опираться при следующих изменениях.";
+}
+
+function diagnosticScorePillClass(score) {
+  if (score === null) {
+    return "";
+  }
+  if (score >= 3) {
+    return "green";
+  }
+  return "orange";
+}
+
+function diagnosticScoreText(score) {
+  if (score === null) {
+    return "нет";
+  }
+  return `${formatScore(score)}/5`;
+}
+
 function conclusionConfidenceLabel(value) {
   if (value === "HIGH") {
     return "вывод хорошо подтверждён";
@@ -1704,27 +1774,21 @@ function renderDeepDiagnostic(detail) {
 function renderCompanyMaturity(detail) {
   const diagnostic = detail.analysis?.deepDiagnostic;
   const classes = diagnostic?.classSummary || [];
-  const rows = detail.layerAnalyses || [];
-  const architectureItemsByLayer = (detail.architectureItems || []).reduce((map, item) => {
-    const key = item.layerCode || "";
-    if (!map.has(key)) {
-      map.set(key, []);
-    }
-    map.get(key).push(item);
-    return map;
-  }, new Map());
-  const layerCards = rows.map((layer, index) => {
-    const architectureRows = (architectureItemsByLayer.get(layer.layerCode) || []).map((item) => ({
-      ...item,
-      evidence: architectureItemEvidence(item, detail.sources || [])
-    }));
-    const percent = architectureRows.length ? coveragePercent(architectureRows) : filledPercent(layer);
+  const sourceTitle = diagnostic?.sourceTitle || "";
+  const importedAt = diagnostic?.importedAt ? formatDate(diagnostic.importedAt) : "";
+  const layerCards = (diagnostic?.layerScores || []).map((layer, index) => {
+    const score = diagnosticScoreValue(layer.score);
+    const percent = diagnosticScorePercent(score);
+    const gapToThree = Number(layer.gapToThree);
     return {
       index: index + 1,
-      name: layerLabel(layer),
+      name: layer.layerName || layerLabel({ layerCode: layer.layerCode }),
+      score,
+      scoreText: diagnosticScoreText(score),
       percent,
-      status: coverageLabel(percent),
-      conclusion: humanizeBusinessLanguage((layer.conclusions || [])[0] || "")
+      status: diagnosticScoreStatus(score),
+      note: diagnosticScoreNote(score),
+      gapToThree: Number.isFinite(gapToThree) && gapToThree > 0 ? gapToThree : null
     };
   });
 
@@ -1734,18 +1798,19 @@ function renderCompanyMaturity(detail) {
         <div>
           <p class="eyebrow">Матрица зрелости</p>
           <h3>Срез зрелости компании</h3>
-          <p class="section-note">Матрица показывает не “оценку бизнеса”, а где уже есть управляемость, где только отдельные факты, а где пока пусто.</p>
+          <p class="section-note">Матрица формируется из диагностики. Это не заполненность документов и не прогресс по архитектуре. Она показывает оценку зрелости по слоям по шкале 1–5.</p>
+          ${sourceTitle || importedAt ? `<p class="section-note">Источник: ${escapeHtml(sourceTitle || "диагностика")}${importedAt ? ` · ${escapeHtml(importedAt)}` : ""}</p>` : ""}
         </div>
       </div>
 
-      ${classes.length ? `
+      ${diagnostic && classes.length ? `
         <div class="maturity-company-grid">
           ${classes.map((item) => `
             <article class="maturity-company-card">
               <p class="eyebrow">${escapeHtml(item.classKey || "")}</p>
               <h4>${escapeHtml(item.title || "Класс")}</h4>
               <p>${escapeHtml(humanizeBusinessLanguage(item.conclusion || ""))}</p>
-              <span class="pill orange">средняя: ${escapeHtml(formatScore(item.averageScore))}</span>
+              <span class="pill orange">средняя оценка: ${escapeHtml(formatScore(item.averageScore))}/5</span>
             </article>
           `).join("")}
         </div>
@@ -1759,16 +1824,17 @@ function renderCompanyMaturity(detail) {
                 <span class="meta">Слой ${escapeHtml(layer.index)} из 11</span>
                 <h4>${escapeHtml(layer.name)}</h4>
               </div>
-              <strong>${escapeHtml(layer.percent)}%</strong>
+              <strong>${escapeHtml(layer.scoreText)}</strong>
             </div>
             <div class="progress" aria-hidden="true"><span style="--value: ${layer.percent}%"></span></div>
-            <span class="pill ${coverageClass(layer.percent)}">${escapeHtml(layer.status)}</span>
-            ${layer.conclusion ? `<p>${escapeHtml(layer.conclusion)}</p>` : ""}
+            <span class="pill ${diagnosticScorePillClass(layer.score)}">${escapeHtml(layer.status)}</span>
+            <p>${escapeHtml(layer.note)}</p>
+            ${layer.gapToThree ? `<p class="meta">До рабочей середины не хватает: ${escapeHtml(formatScore(layer.gapToThree))}</p>` : ""}
           </article>
         `).join("") : `
           <div class="empty-state compact-empty">
-            <h2>Матрица пока пустая</h2>
-            <p>Запусти анализ, чтобы увидеть срез по слоям.</p>
+            <h2>Матрица зрелости ещё не сформирована</h2>
+            <p>Она появится после импорта или прохождения диагностики. Заполненность архитектуры, источников и инструментов здесь не учитывается.</p>
           </div>
         `}
       </div>
