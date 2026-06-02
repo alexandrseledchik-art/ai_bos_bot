@@ -329,6 +329,78 @@ label {
   justify-content: flex-start;
 }
 
+.company-section-anchor {
+  scroll-margin-top: 24px;
+}
+
+.company-workspace-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.company-workspace-nav button {
+  min-height: 38px;
+  padding: 0 14px;
+}
+
+.company-profile-card {
+  display: grid;
+  gap: 18px;
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 18px;
+  background: #fbfcfb;
+}
+
+.company-profile-card h3 {
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+
+.company-profile-card p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.company-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.company-profile-field {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  background: #fff;
+}
+
+.company-profile-field.wide {
+  grid-column: 1 / -1;
+}
+
+.company-profile-field strong {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.company-profile-field span {
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
 .grid-two {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1477,6 +1549,45 @@ label {
   border-radius: 0;
 }
 
+.maturity-company-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.maturity-company-card {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  background: #fff;
+}
+
+.maturity-company-card h4 {
+  margin: 0;
+  font-size: 21px;
+}
+
+.maturity-company-card p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.maturity-company-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.maturity-company-head strong {
+  color: var(--teal-dark);
+  font-size: 22px;
+}
+
 .maturity-level {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr);
@@ -1601,6 +1712,8 @@ label {
   .portal-subdomain-grid,
   .portal-tool-grid,
   .maturity-levels,
+  .maturity-company-grid,
+  .company-profile-grid,
   .company-about-grid,
   .form-grid {
     grid-template-columns: 1fr;
@@ -1648,6 +1761,14 @@ label {
 
   .actions {
     justify-content: flex-start;
+  }
+
+  .company-workspace-nav button {
+    justify-content: center;
+  }
+
+  .maturity-company-head {
+    display: grid;
   }
 
   .token-form {

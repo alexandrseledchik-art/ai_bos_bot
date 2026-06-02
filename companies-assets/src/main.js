@@ -1,4 +1,4 @@
-import { initWorkspaceChat } from "./workspace-chat.js?v=20260512-1";
+import { initWorkspaceChat } from "./workspace-chat.js?v=20260602-1";
 
 const TOKEN_KEY = "aibos_companies_token";
 
@@ -24,7 +24,7 @@ const refreshButton = document.querySelector("#refreshButton");
 const newCompanyButton = document.querySelector("#newCompanyButton");
 const siteNavLinks = [...document.querySelectorAll("[data-site-view]")];
 
-const SITE_VIEWS = new Set(["architecture", "tools", "maturity", "guide"]);
+const SITE_VIEWS = new Set(["methodology", "architecture", "tools", "maturity", "guide"]);
 
 const LAYER_LABELS = {
   owner_context: "Контур собственника",
@@ -822,9 +822,17 @@ function routeSiteView() {
   return SITE_VIEWS.has(value) ? value : "";
 }
 
+function normalizeSiteView(view) {
+  if (view === "architecture" || view === "maturity") {
+    return "methodology";
+  }
+  return view || "companies";
+}
+
 function setActiveSiteNav(view = "companies") {
+  const activeView = normalizeSiteView(view);
   siteNavLinks.forEach((link) => {
-    link.classList.toggle("active", link.dataset.siteView === view);
+    link.classList.toggle("active", link.dataset.siteView === activeView);
   });
 }
 
@@ -1309,23 +1317,20 @@ function renderGuidePortal() {
 }
 
 async function renderSitePage(view) {
-  setActiveSiteNav(view);
+  const normalizedView = normalizeSiteView(view);
+  setActiveSiteNav(normalizedView);
   renderLoading("Загружаю раздел");
   try {
-    const methodology = view === "guide" ? null : await loadMethodology();
+    const methodology = normalizedView === "guide" ? null : await loadMethodology();
     state.selectedCompanyId = "";
     state.selectedDetail = null;
     renderCompanyList();
-    if (view === "architecture") {
+    if (normalizedView === "methodology") {
       renderArchitecturePortal(methodology);
       return;
     }
-    if (view === "tools") {
+    if (normalizedView === "tools") {
       renderToolsPortal(methodology);
-      return;
-    }
-    if (view === "maturity") {
-      renderMaturityPortal(methodology);
       return;
     }
     renderGuidePortal();
@@ -1334,11 +1339,11 @@ async function renderSitePage(view) {
   }
 }
 
-function renderOverview(detail) {
+function renderCompanyProfile(detail) {
   const { company } = detail;
 
   return `
-    <section class="content-section">
+    <section class="content-section company-section-anchor" id="profile">
       <div class="section-head">
         <div>
           <p class="eyebrow">Компания</p>
@@ -1350,37 +1355,43 @@ function renderOverview(detail) {
           <button id="analyzeButton" type="button">Проанализировать</button>
         </div>
       </div>
-      <details class="data-drawer about-drawer">
-        <summary>
-          <div>
-            <strong>О компании</strong>
-            <span>Паспорт кейса: отрасль, описание, цель и текущий запрос.</span>
-          </div>
-          <span class="drawer-toggle"></span>
-        </summary>
-        <div class="company-about-grid">
-          <div class="company-about-field">
+
+      <nav class="company-workspace-nav" aria-label="Рабочие разделы компании">
+        <button class="secondary" data-scroll-target="profile" type="button">Профиль</button>
+        <button class="secondary" data-scroll-target="businessArchitecture" type="button">Архитектура бизнеса</button>
+        <button class="secondary" data-scroll-target="sources" type="button">Источники</button>
+        <button class="secondary" data-scroll-target="diagnostics" type="button">Диагностика</button>
+        <button class="secondary" data-scroll-target="companyMaturity" type="button">Матрица зрелости</button>
+      </nav>
+
+      <article class="company-profile-card">
+        <div>
+          <h3>Профиль</h3>
+          <p>Паспорт кейса: базовая информация, с которой начинается работа по компании.</p>
+        </div>
+        <div class="company-profile-grid">
+          <div class="company-profile-field">
             <strong>Название</strong>
-            <span>${escapeHtml(company.name || "Не указано.")}</span>
+            <span>${escapeHtml(company.name || "Не указано")}</span>
           </div>
-          <div class="company-about-field">
+          <div class="company-profile-field">
             <strong>Отрасль</strong>
-            <span>${escapeHtml(company.industry || "Не указана.")}</span>
+            <span>${escapeHtml(company.industry || "Не указана")}</span>
           </div>
-          <div class="company-about-field wide">
+          <div class="company-profile-field wide">
             <strong>Описание</strong>
-            <span>${escapeHtml(company.description || "Не указано.")}</span>
+            <span>${escapeHtml(company.description || "Не указано")}</span>
           </div>
-          <div class="company-about-field wide">
+          <div class="company-profile-field wide">
             <strong>Цель собственника</strong>
-            <span>${escapeHtml(company.ownerGoal || "Не указана.")}</span>
+            <span>${escapeHtml(company.ownerGoal || "Не указана")}</span>
           </div>
-          <div class="company-about-field wide">
+          <div class="company-profile-field wide">
             <strong>Текущий запрос</strong>
-            <span>${escapeHtml(company.currentRequest || "Не указан.")}</span>
+            <span>${escapeHtml(company.currentRequest || "Не указан")}</span>
           </div>
         </div>
-      </details>
+      </article>
     </section>
   `;
 }
@@ -1394,10 +1405,10 @@ function renderToolJourney(detail) {
   const visibleLayers = journey.layers.slice(0, 11);
 
   return `
-    <section class="content-section tool-journey-card">
+    <section class="content-section tool-journey-card company-section-anchor" id="businessArchitecture">
       <div class="section-head">
         <div>
-          <p class="eyebrow">Маршрут по инструментам</p>
+          <p class="eyebrow">Архитектура бизнеса</p>
           <h3>Что собрать дальше</h3>
           <p class="section-note">AI-BOSS идёт по поддоменам карты инструментов: каждый участок закрывается своим артефактом и проверкой его содержания.</p>
         </div>
@@ -1464,11 +1475,12 @@ function renderSources(detail) {
   const layerCount = new Set(rows.flatMap((source) => source.relatedLayers || [])).size;
 
   return `
-    <section class="content-section">
+    <section class="content-section company-section-anchor" id="sources">
       <div class="section-head">
         <div>
-          <h3>Данные</h3>
-          <p class="section-note">Источники лежат в рабочем пространстве компании и учитываются при следующем анализе.</p>
+          <p class="eyebrow">Источники</p>
+          <h3>Данные и документы</h3>
+          <p class="section-note">Документы, ссылки, заметки и файлы, на которые AI-BOSS опирается в анализе.</p>
         </div>
         <div class="actions">
           <button class="secondary" id="importDeepDiagnosticButton" type="button">Импорт диагностики Excel</button>
@@ -1520,7 +1532,7 @@ function renderIntegrations(detail) {
   const publicFolderActionLabel = drivePublicFolderConnected ? "Обновить папку по ссылке" : "Подключить папку по ссылке";
 
   return `
-    <section class="content-section">
+    <section class="content-section company-section-anchor" id="integrations">
       <div class="section-head">
         <div>
           <p class="eyebrow">Подключения</p>
@@ -1589,7 +1601,24 @@ function renderIntegrations(detail) {
 function renderDeepDiagnostic(detail) {
   const diagnostic = detail.analysis?.deepDiagnostic;
   if (!diagnostic) {
-    return "";
+    return `
+      <section class="content-section company-section-anchor" id="diagnostics">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Диагностика</p>
+            <h3>Диагностика компании</h3>
+            <p class="section-note">Здесь появится разбор после запуска анализа: что видно по данным, где рабочая версия ограничения и какой следующий шаг.</p>
+          </div>
+          <div class="actions">
+            <button data-analyze-company type="button">Запустить диагностику</button>
+          </div>
+        </div>
+        <div class="empty-state compact-empty">
+          <h2>Диагностика ещё не запускалась</h2>
+          <p>Добавь источники или запусти анализ по текущим данным.</p>
+        </div>
+      </section>
+    `;
   }
 
   const overall = diagnostic.overall || {};
@@ -1601,11 +1630,11 @@ function renderDeepDiagnostic(detail) {
   const missingForConfidence = diagnostic.missingForConfidence || [];
 
   return `
-    <section class="content-section">
+    <section class="content-section company-section-anchor" id="diagnostics">
       <div class="section-head">
         <div>
-          <p class="eyebrow">Глубокая диагностика</p>
-          <h3>Срез по диагностической матрице</h3>
+          <p class="eyebrow">Диагностика</p>
+          <h3>Что сейчас видно по компании</h3>
         </div>
         <div class="pill-row">
           <span class="pill">слоёв: ${escapeHtml(overall.layerCount || 0)}</span>
@@ -1672,6 +1701,81 @@ function renderDeepDiagnostic(detail) {
   `;
 }
 
+function renderCompanyMaturity(detail) {
+  const diagnostic = detail.analysis?.deepDiagnostic;
+  const classes = diagnostic?.classSummary || [];
+  const rows = detail.layerAnalyses || [];
+  const architectureItemsByLayer = (detail.architectureItems || []).reduce((map, item) => {
+    const key = item.layerCode || "";
+    if (!map.has(key)) {
+      map.set(key, []);
+    }
+    map.get(key).push(item);
+    return map;
+  }, new Map());
+  const layerCards = rows.map((layer, index) => {
+    const architectureRows = (architectureItemsByLayer.get(layer.layerCode) || []).map((item) => ({
+      ...item,
+      evidence: architectureItemEvidence(item, detail.sources || [])
+    }));
+    const percent = architectureRows.length ? coveragePercent(architectureRows) : filledPercent(layer);
+    return {
+      index: index + 1,
+      name: layerLabel(layer),
+      percent,
+      status: coverageLabel(percent),
+      conclusion: humanizeBusinessLanguage((layer.conclusions || [])[0] || "")
+    };
+  });
+
+  return `
+    <section class="content-section company-section-anchor" id="companyMaturity">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Матрица зрелости</p>
+          <h3>Срез зрелости компании</h3>
+          <p class="section-note">Матрица показывает не “оценку бизнеса”, а где уже есть управляемость, где только отдельные факты, а где пока пусто.</p>
+        </div>
+      </div>
+
+      ${classes.length ? `
+        <div class="maturity-company-grid">
+          ${classes.map((item) => `
+            <article class="maturity-company-card">
+              <p class="eyebrow">${escapeHtml(item.classKey || "")}</p>
+              <h4>${escapeHtml(item.title || "Класс")}</h4>
+              <p>${escapeHtml(humanizeBusinessLanguage(item.conclusion || ""))}</p>
+              <span class="pill orange">средняя: ${escapeHtml(formatScore(item.averageScore))}</span>
+            </article>
+          `).join("")}
+        </div>
+      ` : ""}
+
+      <div class="maturity-company-grid">
+        ${layerCards.length ? layerCards.map((layer) => `
+          <article class="maturity-company-card">
+            <div class="maturity-company-head">
+              <div>
+                <span class="meta">Слой ${escapeHtml(layer.index)} из 11</span>
+                <h4>${escapeHtml(layer.name)}</h4>
+              </div>
+              <strong>${escapeHtml(layer.percent)}%</strong>
+            </div>
+            <div class="progress" aria-hidden="true"><span style="--value: ${layer.percent}%"></span></div>
+            <span class="pill ${coverageClass(layer.percent)}">${escapeHtml(layer.status)}</span>
+            ${layer.conclusion ? `<p>${escapeHtml(layer.conclusion)}</p>` : ""}
+          </article>
+        `).join("") : `
+          <div class="empty-state compact-empty">
+            <h2>Матрица пока пустая</h2>
+            <p>Запусти анализ, чтобы увидеть срез по слоям.</p>
+          </div>
+        `}
+      </div>
+    </section>
+  `;
+}
+
 function renderLayers(detail) {
   const rows = detail.layerAnalyses || [];
   const sourceById = new Map((detail.sources || []).map((source) => [source.id, source]));
@@ -1685,9 +1789,13 @@ function renderLayers(detail) {
   }, new Map());
 
   return `
-    <section class="content-section">
+    <section class="content-section company-section-anchor" id="businessLayers">
       <div class="section-head">
-        <h3>11 слоёв</h3>
+        <div>
+          <p class="eyebrow">Архитектура бизнеса</p>
+          <h3>Слои, домены и поддомены</h3>
+          <p class="section-note">Здесь видно, какие участки карты уже подтверждены своим артефактом или фактом, а где данных пока нет.</p>
+        </div>
       </div>
       <div class="stack">
         ${rows.length ? rows.map((layer, index) => {
@@ -1848,15 +1956,19 @@ function renderDetail() {
   }
 
   content.innerHTML = [
-    renderOverview(detail),
+    renderCompanyProfile(detail),
     renderToolJourney(detail),
-    renderDeepDiagnostic(detail),
-    renderIntegrations(detail),
+    renderLayers(detail),
     renderSources(detail),
-    renderLayers(detail)
+    renderIntegrations(detail),
+    renderDeepDiagnostic(detail),
+    renderCompanyMaturity(detail)
   ].join("");
 
   document.querySelector("#analyzeButton")?.addEventListener("click", analyzeSelectedCompany);
+  document.querySelectorAll("[data-analyze-company]").forEach((button) => {
+    button.addEventListener("click", analyzeSelectedCompany);
+  });
   document.querySelector("#editCompanyButton")?.addEventListener("click", () => openCompanyModal(detail.company));
   document.querySelector("#deleteCompanyButton")?.addEventListener("click", deleteSelectedCompany);
   document.querySelector("#syncGoogleDriveButton")?.addEventListener("click", syncGoogleDrive);
@@ -1870,6 +1982,12 @@ function renderDetail() {
       return;
     }
     openSourceModal();
+  });
+  document.querySelectorAll("[data-scroll-target]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const target = document.getElementById(button.dataset.scrollTarget);
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   });
 }
 
