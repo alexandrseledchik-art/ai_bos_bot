@@ -522,16 +522,20 @@ async function buildPhase8Case() {
 
   const assembly = await service.getBusinessAssemblyPlan({ bootstrap });
   assert.equal(assembly.assembly.layers.length, 11);
-  assert.equal(assembly.assembly.nextRequest.status, "needs_artifact");
+  assert.equal(assembly.assembly.nextRequest.status, "needs_subdomain");
   assert.equal(assembly.assembly.layers[0].layerKey, "owner_context");
+  assert.equal(assembly.assembly.architectureProgress.total > 0, true);
+  assert.equal(assembly.assembly.artifactProgress.total, assembly.assembly.architectureProgress.total);
   assert.equal(assembly.assembly.layers.every((layer) => layer.requiredArtifacts.length > 0), true);
   assert.equal(assembly.assembly.layers.every((layer) => layer.recommendedTools.length > 0), true);
+  const draftLayer = assembly.assembly.layers.find((layer) => layer.requiredArtifacts.length > 0);
+  const draftArtifact = draftLayer.requiredArtifacts[0];
 
   const draft = await service.createBusinessAssemblyDraft({
     bootstrap,
     payload: {
-      layerKey: assembly.assembly.nextRequest.layer.layerKey,
-      artifactId: assembly.assembly.nextRequest.artifact.id
+      layerKey: draftLayer.layerKey,
+      artifactId: draftArtifact.id
     }
   });
   assert.equal(Boolean(draft.artifact.id), true);

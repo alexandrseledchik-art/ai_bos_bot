@@ -842,14 +842,54 @@ a {
 
 .assembly-subdomain {
   display: grid;
-  gap: 4px;
+  gap: 8px;
   padding: 10px;
+  border: 1px solid rgba(14, 54, 54, 0.08);
   border-radius: var(--radius-sm);
   background: rgba(13, 45, 48, 0.04);
 }
 
+.assembly-subdomain.covered {
+  border-color: rgba(38, 148, 99, 0.25);
+  background: var(--good-soft);
+}
+
+.assembly-subdomain.review {
+  border-color: rgba(255, 107, 0, 0.18);
+  background: var(--warning-soft);
+}
+
+.assembly-subdomain.draft {
+  border-color: rgba(0, 79, 85, 0.16);
+  background: rgba(0, 79, 85, 0.055);
+}
+
+.assembly-subdomain > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .assembly-subdomain strong {
   color: var(--ink);
+}
+
+.assembly-subdomain em,
+.assembly-subdomain small {
+  color: var(--muted);
+  font-style: normal;
+  line-height: 1.4;
+}
+
+.assembly-evidence {
+  display: grid;
+  gap: 4px;
+  padding-top: 2px;
+}
+
+.assembly-evidence b {
+  color: var(--teal);
 }
 
 .assembly-artifact {

@@ -11,6 +11,7 @@ import {
 } from "../domain/business-architecture-map.js";
 import { assertBusinessLayerKey, BUSINESS_LAYERS_V1, getBusinessLayerByKey } from "../domain/business-layers.js";
 import { MINI_APP_TOOL_CATALOG } from "../domain/mini-app-tools-catalog.js";
+import { classifyConsultantSource } from "./company-analysis-core.js";
 
 const OFFICIAL_ANSWER_SOURCES = new Set([
   "user_explicit",
@@ -150,9 +151,402 @@ function normalizeText(value) {
 
 function normalizeLookupText(value) {
   return normalizeText(value)
+    .replaceAll("ё", "е")
     .replace(/[^a-zа-яё0-9]+/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function lookupTokens(value) {
+  return normalizeLookupText(value)
+    .split(" ")
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3);
+}
+
+function domainsOverlap(left, right) {
+  const leftText = normalizeLookupText(left);
+  const rightText = normalizeLookupText(right);
+
+  if (!leftText || !rightText) {
+    return false;
+  }
+
+  if (leftText.includes(rightText) || rightText.includes(leftText)) {
+    return true;
+  }
+
+  const leftTokens = new Set(lookupTokens(leftText));
+  return lookupTokens(rightText).some((token) => leftTokens.has(token));
+}
+
+function sourceReadableContent(source) {
+  return [
+    source?.contentText,
+    source?.content_text,
+    source?.text,
+    source?.summary,
+    source?.aiSummary,
+    source?.ai_summary,
+    source?.latestSnapshot?.content_text,
+    source?.latestSnapshot?.summary
+  ].filter(Boolean).join(" ");
+}
+
+function isReferenceCatalogSource(source) {
+  const title = normalizeLookupText(source?.title || "");
+  const fileUrl = normalizeLookupText(source?.fileUrl || source?.file_url || source?.url || "");
+  const content = normalizeLookupText(sourceReadableContent(source));
+  const joined = [title, fileUrl, content].filter(Boolean).join(" ");
+  const titleSignals = [
+    "сводная таблица инструментов",
+    "карта инструментов",
+    "business architecture tools map",
+    "business architecture tools map final",
+    "архитектурная карта инструментов"
+  ];
+
+  if (titleSignals.some((signal) => joined.includes(normalizeLookupText(signal)))) {
+    return true;
+  }
+
+  const markers = [
+    "инструмент методология",
+    "домен поддомен",
+    "ссылка на инструмент",
+    "когда применять",
+    "результат",
+    "слой"
+  ];
+
+  return markers.reduce((count, marker) => count + Number(content.includes(normalizeLookupText(marker))), 0) >= 5;
+}
+
+function sourceToolMatches(source) {
+  if (isReferenceCatalogSource(source)) {
+    return [];
+  }
+
+  const meta = source?.sourceMeta || source?.source_meta || {};
+  return Array.isArray(meta.toolMatches) ? meta.toolMatches : [];
+}
+
+function sourceContentMatches(source) {
+  if (isReferenceCatalogSource(source)) {
+    return [];
+  }
+
+  const meta = source?.sourceMeta || source?.source_meta || {};
+  return Array.isArray(meta.contentMatches) ? meta.contentMatches : [];
+}
+
+function sourceMatchCoversArchitectureItem(match, item) {
+  return match.layerId === item.layerCode && domainsOverlap(match.subdomain || match.domain, item.subdomain || item.domain);
+}
+
+function sourceArchitectureItemMatches(source, item) {
+  return sourceToolMatches(source).filter((match) => sourceMatchCoversArchitectureItem(match, item));
+}
+
+function sourceArchitectureContentMatches(source, item) {
+  return sourceContentMatches(source).filter((match) => sourceMatchCoversArchitectureItem(match, item));
+}
+
+function sourceWordCount(source) {
+  return normalizeLookupText(sourceReadableContent(source))
+    .split(" ")
+    .filter((token) => token.length >= 3).length;
+}
+
+function sourceBusinessDetailScore(source) {
+  const text = normalizeLookupText(sourceReadableContent(source));
+  const detailSignals = [
+    /\d/,
+    /руб|млн|тыс/,
+    /цель|горизонт|мисси|видени|ценност|смысл|сильн/,
+    /сегмент|рынк|спрос|конкурент|клиент/,
+    /выруч|марж|прибыл|cash|деньг/,
+    /роль|ответствен|команд|решени|процесс/,
+    /канал|заявк|лид|воронк|продаж/,
+    /вывод|риск|огранич|следующ|приоритет/
+  ];
+
+  return detailSignals.reduce((count, pattern) => count + Number(pattern.test(text)), 0);
+}
+
+function contentMatchQuality(contentMatches = []) {
+  if (contentMatches.some((match) => match.contentQuality === "sufficient")) {
+    return "sufficient";
+  }
+  if (contentMatches.some((match) => match.contentQuality === "partial")) {
+    return "partial";
+  }
+  return "";
+}
+
+function assessAssemblySourceFillingForItem({ source, item, contentMatches = [] }) {
+  const explicitQuality = contentMatchQuality(contentMatches);
+  const words = sourceWordCount(source);
+  const detailScore = sourceBusinessDetailScore(source);
+  const hasText = Boolean(sourceReadableContent(source).trim());
+
+  if (!hasText) {
+    return {
+      status: "unreadable",
+      label: "текст не прочитан",
+      summary: "Файл похож на нужный артефакт, но текст внутри не прочитан. По одному названию нельзя считать участок закрытым.",
+      missing: ["нужно добавить текст или дать доступ к содержанию файла"]
+    };
+  }
+
+  if (explicitQuality === "sufficient") {
+    return {
+      status: "sufficient",
+      label: "заполнение подтверждено",
+      summary: "Внутри есть данные, которые подходят под этот поддомен и похожи на заполненный инструмент.",
+      reasons: contentMatches.flatMap((match) => match.qualityReasons || []).slice(0, 3)
+    };
+  }
+
+  if (explicitQuality === "partial" || (words >= 12 && detailScore >= 2)) {
+    const missing = contentMatches.flatMap((match) => match.missingEvidence || []).filter(Boolean);
+    return {
+      status: "partial",
+      label: "нужно дополнить",
+      summary: "Данные есть, но пока не видно полного результата по описанию поддомена.",
+      missing: missing.length ? missing.slice(0, 3) : [
+        item.expectedResult ? `проверить результат: ${item.expectedResult}` : "добавить явный вывод по инструменту",
+        item.description ? `сверить с описанием: ${item.description}` : "добавить данные по смыслу поддомена"
+      ]
+    };
+  }
+
+  return {
+    status: "insufficient",
+    label: "не подтверждает поддомен",
+    summary: "Файл найден, но в прочитанном тексте пока нет достаточного содержания по этому поддомену.",
+    missing: [
+      item.description ? `добавить данные по описанию: ${item.description}` : "добавить данные по описанию поддомена",
+      item.expectedResult ? `зафиксировать результат: ${item.expectedResult}` : "зафиксировать результат инструмента"
+    ].slice(0, 2)
+  };
+}
+
+function architectureItemEvidence(item, sources) {
+  const directArtifacts = sources
+    .map((source) => ({
+      source,
+      matches: sourceArchitectureItemMatches(source, item),
+      contentMatches: sourceArchitectureContentMatches(source, item)
+    }))
+    .filter((entry) => entry.matches.length)
+    .map((entry) => ({
+      ...entry,
+      quality: assessAssemblySourceFillingForItem({
+        source: entry.source,
+        item,
+        contentMatches: entry.contentMatches
+      })
+    }));
+  const confirmedArtifacts = directArtifacts.filter((entry) => entry.quality.status === "sufficient");
+  const incompleteArtifacts = directArtifacts.filter((entry) => entry.quality.status !== "sufficient");
+  const draftSources = sources
+    .map((source) => ({
+      source,
+      contentMatches: sourceArchitectureContentMatches(source, item)
+    }))
+    .map((entry) => ({
+      ...entry,
+      quality: assessAssemblySourceFillingForItem({
+        source: entry.source,
+        item,
+        contentMatches: entry.contentMatches
+      })
+    }))
+    .filter((entry) =>
+      entry.contentMatches.length &&
+      ["sufficient", "partial"].includes(entry.quality.status) &&
+      !sourceToolMatches(entry.source).length &&
+      !sourceArchitectureItemMatches(entry.source, item).length
+    );
+
+  return {
+    confirmedArtifacts,
+    incompleteArtifacts,
+    draftSources
+  };
+}
+
+function architectureItemStatusFromEvidence(evidence) {
+  if (evidence.confirmedArtifacts.length) {
+    return {
+      code: "covered",
+      label: "подтверждено",
+      percent: 100
+    };
+  }
+
+  if (evidence.incompleteArtifacts.length) {
+    const hasPartial = evidence.incompleteArtifacts.some((entry) => entry.quality.status === "partial");
+    return {
+      code: "review",
+      label: hasPartial ? "нужно дополнить" : "проверить содержание",
+      percent: hasPartial ? 55 : 25
+    };
+  }
+
+  if (evidence.draftSources.length) {
+    return {
+      code: "draft",
+      label: "есть данные, артефакт не собран",
+      percent: 35
+    };
+  }
+
+  return {
+    code: "missing",
+    label: "нет данных",
+    percent: 0
+  };
+}
+
+function splitAssemblyToolHints(value) {
+  if (Array.isArray(value)) {
+    return value.flatMap(splitAssemblyToolHints);
+  }
+
+  return trimString(value)
+    .split(/[;\n]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function toAssemblySource(source) {
+  const base = {
+    id: source?.id || source?.external_id || source?.externalId || "",
+    title: source?.title || source?.url || source?.file_url || "Источник",
+    fileUrl: source?.fileUrl || source?.file_url || source?.url || "",
+    type: source?.source_kind || source?.sourceKind || source?.type || "document",
+    contentText: sourceReadableContent(source),
+    aiSummary: source?.ai_summary || source?.aiSummary || source?.summary || "",
+    relatedLayers: source?.related_layers || source?.relatedLayers || [],
+    sourceMeta: source?.source_meta || source?.sourceMeta || {}
+  };
+  const classification = classifyConsultantSource(base);
+
+  return {
+    ...base,
+    relatedLayers: classification.relatedLayers?.length ? classification.relatedLayers : base.relatedLayers,
+    sourceMeta: {
+      ...base.sourceMeta,
+      toolMatches: Array.isArray(base.sourceMeta.toolMatches) ? base.sourceMeta.toolMatches : classification.toolMatches || [],
+      contentMatches: Array.isArray(base.sourceMeta.contentMatches) ? base.sourceMeta.contentMatches : classification.contentMatches || []
+    }
+  };
+}
+
+function toAssemblyArtifactSource(artifact) {
+  const content = [
+    artifact?.title,
+    artifact?.content,
+    artifact?.body,
+    artifact?.summary,
+    artifact?.metadata ? JSON.stringify(artifact.metadata) : ""
+  ].filter(Boolean).join(" ");
+
+  return toAssemblySource({
+    id: artifact?.id,
+    title: artifact?.title || artifact?.external_id || "Артефакт",
+    type: "artifact",
+    contentText: content,
+    aiSummary: artifact?.summary || "",
+    sourceMeta: artifact?.source_meta || artifact?.sourceMeta || {}
+  });
+}
+
+function compactAssemblyEvidenceEntry(entry) {
+  return {
+    id: entry.source.id || "",
+    title: entry.source.title || entry.source.fileUrl || "Источник",
+    fileUrl: entry.source.fileUrl || "",
+    quality: entry.quality,
+    matches: entry.matches || [],
+    contentMatches: entry.contentMatches || []
+  };
+}
+
+function buildArchitectureCoverage({ architectureLayer, documents, artifacts }) {
+  const sources = [
+    ...(documents || []).map(toAssemblySource),
+    ...(artifacts || []).map(toAssemblyArtifactSource)
+  ];
+  const domains = (architectureLayer?.domains || []).map((domain) => {
+    const subdomains = (domain.subdomains || []).map((subdomain) => {
+      const item = {
+        layerCode: architectureLayer.layerCode || architectureLayer.layerId,
+        layerName: architectureLayer.name,
+        parentDomain: domain.title,
+        domain: domain.title,
+        subdomain: subdomain.title,
+        description: subdomain.description || domain.description || "",
+        action: subdomain.action || "",
+        expectedResult: subdomain.expectedResult || "",
+        toolHints: subdomain.toolHints || ""
+      };
+      const evidence = architectureItemEvidence(item, sources);
+      const status = architectureItemStatusFromEvidence(evidence);
+
+      return {
+        ...subdomain,
+        parentDomain: domain.title,
+        recommendedTools: splitAssemblyToolHints(subdomain.toolHints),
+        coverageStatus: status.code,
+        coverageLabel: status.label,
+        coveragePercent: status.percent,
+        evidence: {
+          confirmedArtifacts: evidence.confirmedArtifacts.map(compactAssemblyEvidenceEntry),
+          incompleteArtifacts: evidence.incompleteArtifacts.map(compactAssemblyEvidenceEntry),
+          draftSources: evidence.draftSources.map(compactAssemblyEvidenceEntry)
+        }
+      };
+    });
+    const confirmed = subdomains.filter((item) => item.coverageStatus === "covered").length;
+    const review = subdomains.filter((item) => item.coverageStatus === "review").length;
+    const draft = subdomains.filter((item) => item.coverageStatus === "draft").length;
+    const missing = subdomains.filter((item) => item.coverageStatus === "missing").length;
+    const percent = subdomains.length
+      ? Math.round(subdomains.reduce((sum, item) => sum + Number(item.coveragePercent || 0), 0) / subdomains.length)
+      : 0;
+
+    return {
+      ...domain,
+      subdomains,
+      confirmed,
+      review,
+      draft,
+      missing,
+      percent
+    };
+  });
+  const subdomains = domains.flatMap((domain) => domain.subdomains || []);
+  const confirmed = subdomains.filter((item) => item.coverageStatus === "covered").length;
+  const review = subdomains.filter((item) => item.coverageStatus === "review").length;
+  const draft = subdomains.filter((item) => item.coverageStatus === "draft").length;
+  const missing = subdomains.filter((item) => item.coverageStatus === "missing").length;
+  const total = subdomains.length;
+  const percent = total
+    ? Math.round(subdomains.reduce((sum, item) => sum + Number(item.coveragePercent || 0), 0) / total)
+    : 0;
+
+  return {
+    total,
+    confirmed,
+    review,
+    draft,
+    missing,
+    percent,
+    domains
+  };
 }
 
 function assemblyArtifactExternalId(caseId, artifactId) {
@@ -1796,10 +2190,16 @@ export class MiniAppDiagnosticsService {
         caseId
       })
     }));
+    const architectureCoverage = architectureLayer
+      ? buildArchitectureCoverage({ architectureLayer, documents, artifacts })
+      : null;
     const readyArtifactsCount = requiredArtifacts.filter((artifact) => artifact.match.status === "ready").length;
-    const status = requiredArtifacts.length > 0 && readyArtifactsCount >= requiredArtifacts.length
+    const confirmedSubdomains = Number(architectureCoverage?.confirmed || 0);
+    const totalSubdomains = Number(architectureCoverage?.total || 0);
+    const hasArchitectureSignals = Number(architectureCoverage?.review || 0) > 0 || Number(architectureCoverage?.draft || 0) > 0;
+    const status = totalSubdomains > 0 && confirmedSubdomains >= totalSubdomains
       ? "ready"
-      : readyArtifactsCount > 0 || layerObservations.length > 0 || Number.isFinite(Number(answer?.score))
+      : confirmedSubdomains > 0 || hasArchitectureSignals || readyArtifactsCount > 0 || layerObservations.length > 0 || Number.isFinite(Number(answer?.score))
         ? "in_progress"
         : "missing";
 
@@ -1820,7 +2220,27 @@ export class MiniAppDiagnosticsService {
             expectedResult: architectureLayer.expectedResult,
             domainCount: architectureLayer.domainCount,
             subdomainCount: architectureLayer.subdomainCount,
-            domains: architectureLayer.domains
+            domains: architectureCoverage?.domains || architectureLayer.domains,
+            coverage: architectureCoverage
+              ? {
+                  total: architectureCoverage.total,
+                  confirmed: architectureCoverage.confirmed,
+                  review: architectureCoverage.review,
+                  draft: architectureCoverage.draft,
+                  missing: architectureCoverage.missing,
+                  percent: architectureCoverage.percent
+                }
+              : null
+          }
+        : null,
+      architectureProgress: architectureCoverage
+        ? {
+            total: architectureCoverage.total,
+            confirmed: architectureCoverage.confirmed,
+            review: architectureCoverage.review,
+            draft: architectureCoverage.draft,
+            missing: architectureCoverage.missing,
+            percent: architectureCoverage.percent
           }
         : null,
       maturityScore: Number.isFinite(Number(answer?.score)) ? Number(answer.score) : null,
@@ -1843,14 +2263,31 @@ export class MiniAppDiagnosticsService {
       (sum, layer) => sum + layer.requiredArtifacts.filter((artifact) => artifact.match.status === "ready").length,
       0
     );
-    const percent = totalArtifacts > 0 ? Math.round((readyArtifacts / totalArtifacts) * 100) : 0;
+    const totalArchitectureItems = layers.reduce((sum, layer) => sum + Number(layer.architectureProgress?.total || 0), 0);
+    const confirmedArchitectureItems = layers.reduce((sum, layer) => sum + Number(layer.architectureProgress?.confirmed || 0), 0);
+    const reviewArchitectureItems = layers.reduce((sum, layer) => sum + Number(layer.architectureProgress?.review || 0), 0);
+    const draftArchitectureItems = layers.reduce((sum, layer) => sum + Number(layer.architectureProgress?.draft || 0), 0);
+    const missingArchitectureItems = layers.reduce((sum, layer) => sum + Number(layer.architectureProgress?.missing || 0), 0);
+    const percent = totalArchitectureItems > 0
+      ? Math.round((confirmedArchitectureItems / totalArchitectureItems) * 100)
+      : totalArtifacts > 0
+        ? Math.round((readyArtifacts / totalArtifacts) * 100)
+        : 0;
 
     return {
       totalLayers,
       completedLayers,
       artifactProgress: {
-        ready: readyArtifacts,
-        total: totalArtifacts,
+        ready: totalArchitectureItems > 0 ? confirmedArchitectureItems : readyArtifacts,
+        total: totalArchitectureItems > 0 ? totalArchitectureItems : totalArtifacts,
+        percent
+      },
+      architectureProgress: {
+        confirmed: confirmedArchitectureItems,
+        review: reviewArchitectureItems,
+        draft: draftArchitectureItems,
+        missing: missingArchitectureItems,
+        total: totalArchitectureItems,
         percent
       }
     };
@@ -1867,6 +2304,39 @@ export class MiniAppDiagnosticsService {
         layer: null,
         artifact: null,
         route: "/mini-app/ceo"
+      };
+    }
+
+    const nextDomain = (nextLayer.architecture?.domains || [])
+      .find((domain) => (domain.subdomains || []).some((subdomain) => subdomain.coverageStatus !== "covered")) || null;
+    const nextSubdomain = (nextDomain?.subdomains || []).find((subdomain) => subdomain.coverageStatus !== "covered") || null;
+    const recommendedTool = nextSubdomain?.recommendedTools?.[0] || nextSubdomain?.title || "";
+
+    if (nextSubdomain) {
+      return {
+        status: "needs_subdomain",
+        title: recommendedTool ? `Заполнить инструмент: ${recommendedTool}` : `Собрать данные: ${nextSubdomain.title}`,
+        text: [
+          `Следующий участок карты — ${nextLayer.title} / ${nextDomain.title} / ${nextSubdomain.title}.`,
+          nextSubdomain.description
+            ? `Что нужно понять: ${nextSubdomain.description}`
+            : "Нужно добавить артефакт или факт, который прямо закрывает этот поддомен."
+        ].join(" "),
+        layer: {
+          layerKey: nextLayer.layerKey,
+          title: nextLayer.title,
+          order: nextLayer.order
+        },
+        artifact: null,
+        architectureItem: {
+          domain: nextDomain.title,
+          subdomain: nextSubdomain.title,
+          recommendedTool,
+          status: nextSubdomain.coverageStatus,
+          label: nextSubdomain.coverageLabel,
+          expectedResult: nextSubdomain.expectedResult || ""
+        },
+        route: "/mini-app/tools"
       };
     }
 
@@ -1939,6 +2409,8 @@ export class MiniAppDiagnosticsService {
         totalLayers: summary.totalLayers,
         readyArtifacts: summary.artifactProgress.ready,
         totalArtifacts: summary.artifactProgress.total,
+        confirmedArchitectureItems: summary.architectureProgress.confirmed,
+        totalArchitectureItems: summary.architectureProgress.total,
         nextLayerKey: nextRequest.layer?.layerKey || ""
       }
     });

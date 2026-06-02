@@ -1505,13 +1505,13 @@ function renderBusinessAssembly() {
   }
 
   const assembly = block.data.assembly;
-  const progress = assembly.artifactProgress || { ready: 0, total: 0, percent: 0 };
+  const progress = assembly.architectureProgress || assembly.artifactProgress || { confirmed: 0, ready: 0, total: 0, percent: 0 };
 
   return `
     <section class="hero compact">
       <p>Архитектура бизнеса</p>
       <h2>Карта бизнеса по 11 слоям</h2>
-      <p>${escapeHtml(assembly.summary)} Это тот же подход, что в web-кабинете: слой → домен → поддомен → нужный артефакт или факт.</p>
+      <p>${escapeHtml(assembly.summary)} Это тот же подход, что в web-кабинете: слой → домен → поддомен → свой инструмент, артефакт или подтверждённый факт.</p>
       ${renderAssemblyProgress(progress)}
       <div class="actions">
         <button class="secondary-button" data-navigate="/mini-app/documents">Открыть документы</button>
@@ -1532,20 +1532,22 @@ function renderBusinessAssembly() {
 }
 
 function renderAssemblyProgress(progress = {}) {
-  const ready = Number(progress.ready || 0);
+  const ready = Number(progress.confirmed || progress.ready || 0);
   const total = Number(progress.total || 0);
   const percent = Number(progress.percent || 0);
+  const review = Number(progress.review || 0);
+  const draft = Number(progress.draft || 0);
 
   return `
     <div class="progress-block hero-progress">
       <div class="progress-label">
-        <span>Документы в кейсе</span>
+        <span>Поддомены карты</span>
         <strong>${escapeHtml(ready)}/${escapeHtml(total)}</strong>
       </div>
-      <div class="progress progress-single" aria-label="Архитектура бизнеса: создано или добавлено ${escapeAttribute(ready)}/${escapeAttribute(total)} документов">
+      <div class="progress progress-single" aria-label="Архитектура бизнеса: подтверждено ${escapeAttribute(ready)}/${escapeAttribute(total)} поддоменов">
         <div class="progress-bar"><span style="width: ${Math.max(0, Math.min(100, percent))}%"></span></div>
       </div>
-      <p class="progress-caption">Шкала показывает, сколько нужных документов уже создано или добавлено. Это не оценка качества бизнеса и не оценка глубины заполнения.</p>
+      <p class="progress-caption">Шкала показывает, сколько поддоменов подтверждено своим инструментом, артефактом или фактом. ${review || draft ? `Ещё нужно проверить или дописать: ${escapeHtml(review + draft)}.` : ""}</p>
     </div>
   `;
 }
@@ -1560,9 +1562,17 @@ function renderAssemblyNextRequest(nextRequest, block) {
 
   return `
     <section class="card insight-card">
-      <p class="eyebrow">${nextRequest.status === "complete" ? "сборка завершена" : "следующий недостающий документ"}</p>
+      <p class="eyebrow">${nextRequest.status === "complete" ? "сборка завершена" : "следующий участок карты"}</p>
       <h3>${escapeHtml(nextRequest.title)}</h3>
       <p>${escapeHtml(nextRequest.text)}</p>
+      ${nextRequest.architectureItem ? `
+        <div class="status-row">
+          <span class="pill neutral">${escapeHtml(nextRequest.architectureItem.domain)}</span>
+          <span class="pill neutral">${escapeHtml(nextRequest.architectureItem.subdomain)}</span>
+          <span class="pill neutral">${escapeHtml(nextRequest.architectureItem.label)}</span>
+        </div>
+        ${nextRequest.architectureItem.expectedResult ? `<p><strong>Что должно получиться:</strong> ${escapeHtml(nextRequest.architectureItem.expectedResult)}</p>` : ""}
+      ` : ""}
       ${nextRequest.artifact?.why ? `<p><strong>Зачем:</strong> ${escapeHtml(nextRequest.artifact.why)}</p>` : ""}
       <div class="actions">
         ${artifactId ? `
@@ -1577,7 +1587,7 @@ function renderAssemblyNextRequest(nextRequest, block) {
           </button>
         ` : ""}
         <button class="secondary-button" type="button" data-navigate="${escapeAttribute(nextRequest.route || "/mini-app/documents")}">
-          ${nextRequest.status === "complete" ? "Вернуться в кабинет" : "Добавить документ"}
+          ${nextRequest.status === "complete" ? "Вернуться в кабинет" : nextRequest.status === "needs_subdomain" ? "Открыть инструменты" : "Добавить документ"}
         </button>
       </div>
       ${block.message ? `<p class="hint-text">${escapeHtml(block.message)}</p>` : ""}
@@ -1586,6 +1596,7 @@ function renderAssemblyNextRequest(nextRequest, block) {
 }
 
 function renderAssemblyLayer(layer, block) {
+  const progress = layer.architectureProgress || layer.architecture?.coverage || null;
   return `
     <article class="assembly-layer">
       <div class="layer-head">
@@ -1601,11 +1612,11 @@ function renderAssemblyLayer(layer, block) {
         <span class="pill neutral">оценка: ${escapeHtml(layer.maturityScore ? `${layer.maturityScore}/5` : "не нужна для старта")}</span>
         ${layer.architecture ? `<span class="pill neutral">доменов: ${escapeHtml(layer.architecture.domainCount || 0)}</span>` : ""}
         ${layer.architecture ? `<span class="pill neutral">поддоменов: ${escapeHtml(layer.architecture.subdomainCount || 0)}</span>` : ""}
+        ${progress ? `<span class="pill neutral">подтверждено: ${escapeHtml(progress.confirmed || 0)}/${escapeHtml(progress.total || 0)}</span>` : ""}
+        ${progress?.review ? `<span class="pill neutral">проверить: ${escapeHtml(progress.review)}</span>` : ""}
+        ${progress?.draft ? `<span class="pill neutral">можно собрать: ${escapeHtml(progress.draft)}</span>` : ""}
       </div>
       ${renderAssemblyArchitecture(layer.architecture)}
-      <div class="assembly-artifacts">
-        ${(layer.requiredArtifacts || []).map((artifact) => renderAssemblyArtifact(layer, artifact, block)).join("")}
-      </div>
       <div class="assembly-tools">
         <strong>Инструменты для слоя${Number(layer.toolCount || 0) ? `: ${escapeHtml(layer.toolCount)} в каталоге` : ""}</strong>
         ${layer.recommendedTools?.length ? `
@@ -1634,14 +1645,19 @@ function renderAssemblyArchitecture(architecture) {
           <details class="assembly-domain">
             <summary>
               <span>${escapeHtml(domain.title)}</span>
-              <small>${escapeHtml(domain.subdomainCount || 0)} поддоменов</small>
+              <small>${escapeHtml(domain.confirmed || 0)}/${escapeHtml(domain.subdomainCount || domain.subdomains?.length || 0)} подтверждено · ${escapeHtml(domain.percent || 0)}%</small>
             </summary>
             ${domain.description ? `<p>${escapeHtml(domain.description)}</p>` : ""}
             <div class="assembly-subdomain-list">
               ${(domain.subdomains || []).map((subdomain) => `
-                <article class="assembly-subdomain">
-                  <strong>${escapeHtml(subdomain.title)}</strong>
+                <article class="assembly-subdomain ${escapeAttribute(subdomain.coverageStatus || "missing")}">
+                  <div>
+                    <strong>${escapeHtml(subdomain.title)}</strong>
+                    <em>${escapeHtml(subdomain.coverageLabel || "нет данных")}</em>
+                  </div>
                   ${subdomain.description ? `<span>${escapeHtml(subdomain.description)}</span>` : ""}
+                  ${subdomain.recommendedTools?.length ? `<small>Инструмент: ${escapeHtml(subdomain.recommendedTools[0])}</small>` : ""}
+                  ${renderAssemblyEvidence(subdomain)}
                 </article>
               `).join("")}
             </div>
@@ -1649,6 +1665,30 @@ function renderAssemblyArchitecture(architecture) {
         `).join("")}
       </div>
     </details>
+  `;
+}
+
+function renderAssemblyEvidence(subdomain) {
+  const evidence = subdomain.evidence || {};
+  const entries = [
+    ...(evidence.confirmedArtifacts || []),
+    ...(evidence.incompleteArtifacts || []),
+    ...(evidence.draftSources || [])
+  ].slice(0, 2);
+
+  if (!entries.length) {
+    return "";
+  }
+
+  return `
+    <div class="assembly-evidence">
+      ${entries.map((entry) => `
+        <small>
+          <b>${escapeHtml(entry.title || "Источник")}</b>
+          ${entry.quality?.label ? ` · ${escapeHtml(entry.quality.label)}` : ""}
+        </small>
+      `).join("")}
+    </div>
   `;
 }
 
