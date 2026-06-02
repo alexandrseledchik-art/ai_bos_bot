@@ -1513,8 +1513,8 @@ function renderBusinessAssembly() {
       <p>${escapeHtml(assembly.summary)} Это тот же подход, что в web-кабинете: слой → домен → поддомен → свой инструмент, артефакт или подтверждённый факт.</p>
       ${renderAssemblyProgress(progress)}
       <div class="actions">
-        <button class="secondary-button" data-navigate="/mini-app/documents">Открыть документы</button>
-        <button class="secondary-button" data-navigate="/mini-app/tools">Инструменты</button>
+        <button class="secondary-button" data-navigate="/mini-app/tools">Карта инструментов</button>
+        <button class="secondary-button" data-navigate="/mini-app/documents">Добавить источник</button>
       </div>
     </section>
 
@@ -1582,11 +1582,11 @@ function renderAssemblyNextRequest(nextRequest, block) {
             data-assembly-layer="${escapeAttribute(layerKey)}"
             ${block.creatingArtifactId === artifactId ? "disabled" : ""}
           >
-            ${block.creatingArtifactId === artifactId ? "Создаю..." : "Создать черновик"}
+            ${block.creatingArtifactId === artifactId ? "Создаю..." : "Создать шаблон"}
           </button>
         ` : ""}
         <button class="secondary-button" type="button" data-navigate="${escapeAttribute(nextRequest.route || "/mini-app/documents")}">
-          ${nextRequest.status === "complete" ? "Вернуться в кабинет" : nextRequest.status === "needs_subdomain" ? "Открыть инструменты" : "Добавить документ"}
+          ${nextRequest.status === "complete" ? "Вернуться в кабинет" : nextRequest.status === "needs_subdomain" ? "Открыть инструменты" : "Добавить источник"}
         </button>
       </div>
       ${block.message ? `<p class="hint-text">${escapeHtml(block.message)}</p>` : ""}
@@ -1716,7 +1716,7 @@ function renderAssemblyArtifact(layer, artifact, block) {
             data-assembly-layer="${escapeAttribute(layer.layerKey)}"
             ${block.creatingArtifactId === artifact.id ? "disabled" : ""}
           >
-            ${block.creatingArtifactId === artifact.id ? "Создаю..." : "Создать черновик"}
+            ${block.creatingArtifactId === artifact.id ? "Создаю..." : "Создать шаблон"}
           </button>
         `}
       </div>
@@ -1886,18 +1886,16 @@ function renderDocuments() {
   }
 
   const documents = block.data?.documents || [];
-  const artifacts = block.data?.artifacts || [];
-
   return `
     <section class="hero compact">
-      <p>Документы</p>
-      <h2>Документы и артефакты кейса</h2>
-      <p>Здесь хранится всё, на что AI-BOSS должен опираться: ссылки, вставленные материалы, снимки анализа и черновики документов для сборки бизнеса.</p>
+      <p>Источники</p>
+      <h2>Источники и материалы</h2>
+      <p>Здесь можно добавить ссылку или текст, на который AI-BOSS будет опираться. Заполнение инструментов видно не здесь, а в карте бизнеса по 11 слоям и в каталоге инструментов.</p>
     </section>
 
     <form class="card form-card" data-document-form>
       <label>
-        <span>Ссылка на документ</span>
+        <span>Ссылка на источник</span>
         <input name="url" required placeholder="https://docs.google.com/..." />
       </label>
       <label>
@@ -1909,19 +1907,15 @@ function renderDocuments() {
         <textarea name="analysisText" placeholder="Можно вставить ключевые выводы или содержимое документа. Если оставить пустым, я сохраню ссылку, но не смогу прочитать закрытый файл."></textarea>
       </label>
       <div class="form-actions">
-        <button class="primary-button" type="submit" ${block.saving ? "disabled" : ""}>${block.saving ? "Сохраняю..." : "Сохранить документ"}</button>
+        <button class="primary-button" type="submit" ${block.saving ? "disabled" : ""}>${block.saving ? "Сохраняю..." : "Сохранить источник"}</button>
       </div>
       ${block.message ? `<p class="hint-text">${escapeHtml(block.message)}</p>` : ""}
     </form>
 
     <section class="card next-card">
-      <h3>Ссылки и загруженные материалы</h3>
-      ${documents.length ? `<div class="document-list">${documents.map(renderDocumentCard).join("")}</div>` : `<p>Пока документов нет.</p>`}
-    </section>
-
-    <section class="card next-card">
-      <h3>Черновики AI-BOSS</h3>
-      ${artifacts.length ? `<div class="document-list">${artifacts.map(renderArtifactCard).join("")}</div>` : `<p>Пока черновиков нет. Их можно создать на экране сборки бизнеса.</p>`}
+      <h3>Добавленные источники</h3>
+      <p class="hint-text">Источник сам по себе не означает, что инструмент заполнен. AI-BOSS должен прочитать содержимое и связать его с конкретным слоем, доменом, поддоменом и инструментом.</p>
+      ${documents.length ? `<div class="document-list">${documents.map(renderDocumentCard).join("")}</div>` : `<p>Пока источников нет.</p>`}
     </section>
   `;
 }
@@ -1971,7 +1965,7 @@ function renderArtifactCard(artifact) {
       <div>
         <p class="eyebrow">${escapeHtml(displayArtifactKind(artifact.kind))}</p>
         <h4>${escapeHtml(artifact.title)}</h4>
-        <p>${escapeHtml(artifact.summary || "Черновик создан AI-BOSS и хранится в кейсе.")}</p>
+        <p>${escapeHtml(artifact.summary || "Шаблон создан AI-BOSS и хранится в материалах кейса.")}</p>
         <div class="status-row">
           <span class="pill success">сохранено</span>
         </div>
@@ -1991,7 +1985,7 @@ function displayArtifactKind(kind) {
     screening: "первичный разбор",
     diagnosis: "диагностика",
     action_wave: "план действий",
-    snapshot: "черновик"
+    snapshot: "шаблон"
   };
   return map[kind] || kind || "артефакт";
 }
@@ -2917,9 +2911,9 @@ async function createAssemblyDraft(layerKey, artifactId) {
     };
     state.documents.data = null;
     state.ceo.data = null;
-    state.assembly.message = "Черновик создан и сохранён в документах кейса.";
+    state.assembly.message = "Шаблон создан и сохранён в материалах кейса.";
   } catch (error) {
-    state.assembly.error = errorMessage(error, "Не удалось создать черновик документа.");
+    state.assembly.error = errorMessage(error, "Не удалось создать шаблон.");
   } finally {
     state.assembly.creatingArtifactId = "";
     render();
