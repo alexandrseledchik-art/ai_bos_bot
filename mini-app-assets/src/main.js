@@ -64,7 +64,6 @@ const state = {
     recommendedLoading: false,
     openingToolId: "",
     query: "",
-    showRecommended: false,
     error: ""
   },
   documents: {
@@ -1746,7 +1745,6 @@ function renderTools() {
   }
 
   const tools = block.catalog?.tools || [];
-  const recommendations = block.recommended?.recommendations || [];
   const query = block.query.trim().toLowerCase();
   const filteredTools = query
     ? tools.filter((tool) => normalizeToolSearchText(tool).includes(query))
@@ -1759,14 +1757,9 @@ function renderTools() {
       <h2>Каталог рабочих инструментов</h2>
       <p>В каталоге ${tools.length} инструментов из архитектурной карты. AI-BOSS использует их как ориентиры: подбирает подходящие по кейсу, но не подменяет ими живую диагностику.</p>
       <div class="actions">
-        <button class="primary-button" type="button" data-tools-recommendations-toggle ${block.recommendedLoading ? "disabled" : ""}>
-          ${block.showRecommended ? "Скрыть рекомендации" : "Рекомендованные инструменты под текущую ситуацию"}
-        </button>
         <button class="secondary-button" data-navigate="/mini-app/documents">Документы</button>
       </div>
     </section>
-
-    ${block.showRecommended ? renderToolsRecommendations(recommendations, block) : ""}
 
     <section class="card next-card">
       <h3>${query ? "Результаты поиска" : "Основные инструменты"}</h3>
@@ -1794,32 +1787,6 @@ function renderTools() {
           <button class="secondary-button" data-tools-recalculate ${block.recommendedLoading ? "disabled" : ""}>Обновить каталог</button>
         </div>
       `}
-    </section>
-  `;
-}
-
-function renderToolsRecommendations(recommendations, block) {
-  if (block.recommendedLoading) {
-    return `
-      <section class="card next-card">
-        <h3>Рекомендованные под текущую ситуацию</h3>
-        <p>Подбираю инструменты по текущему запросу, гипотезе ограничения и следующему шагу.</p>
-      </section>
-    `;
-  }
-
-  return `
-    <section class="card next-card">
-      <h3>Рекомендованные под текущую ситуацию</h3>
-      <p>Это не обязательный план внедрения. Это короткая подборка, которая может помочь проверить гипотезу и выполнить ближайший шаг.</p>
-      ${recommendations.length ? `
-        <div class="tool-grid">
-          ${recommendations.map((item) => renderToolTeaser(item.tool, item)).join("")}
-        </div>
-      ` : `<p>Рекомендации появятся после расчёта по запросу, ограничению и следующему шагу.</p>`}
-      <div class="actions">
-        <button class="secondary-button" type="button" data-tools-recalculate ${block.recommendedLoading ? "disabled" : ""}>Пересчитать рекомендации</button>
-      </div>
     </section>
   `;
 }
@@ -2358,10 +2325,6 @@ function bindEvents() {
     button.addEventListener("click", () => createAssemblyDraft(button.dataset.assemblyLayer, button.dataset.assemblyDraft));
   });
 
-  appRoot.querySelector("[data-tools-recommendations-toggle]")?.addEventListener("click", toggleToolRecommendations);
-  appRoot.querySelectorAll("[data-open-tool-recommendations]").forEach((button) => {
-    button.addEventListener("click", openToolRecommendations);
-  });
   appRoot.querySelectorAll("[data-tools-recalculate]").forEach((button) => {
     button.addEventListener("click", recalculateTools);
   });
@@ -2459,9 +2422,6 @@ async function loadRouteData({ force = false } = {}) {
 
   if (path === "/mini-app/tools" || path.startsWith("/mini-app/tools/")) {
     await loadTools({ force });
-    if (state.tools.showRecommended) {
-      await loadRecommendedTools({ force });
-    }
   }
 
   if (path === "/mini-app/documents") {
@@ -3027,39 +2987,7 @@ function clearToolSearch() {
   render();
 }
 
-function toggleToolRecommendations() {
-  state.tools.showRecommended = !state.tools.showRecommended;
-  render();
-  if (state.tools.showRecommended) {
-    loadRecommendedTools();
-  }
-}
-
-function openToolRecommendations() {
-  state.tools.showRecommended = true;
-  navigate("/mini-app/tools");
-}
-
-async function loadRecommendedTools({ force = false } = {}) {
-  if (state.tools.recommendedLoading || (state.tools.recommended && !force)) {
-    return;
-  }
-
-  state.tools.recommendedLoading = true;
-  render();
-
-  try {
-    state.tools.recommended = await api.getRecommendedTools();
-  } catch {
-    state.tools.recommended = { recommendations: [] };
-  } finally {
-    state.tools.recommendedLoading = false;
-    render();
-  }
-}
-
 async function recalculateTools() {
-  state.tools.showRecommended = true;
   state.tools.recommendedLoading = true;
   state.tools.error = "";
   render();
@@ -3091,7 +3019,6 @@ async function markToolOpened(toolId) {
     state.tools.catalog = null;
     state.tools.recommended = null;
     await loadTools({ force: true });
-    await loadRecommendedTools({ force: true });
     state.ceo.data = null;
   } catch (error) {
     state.tools.error = errorMessage(error, "Не удалось отметить инструмент.");
