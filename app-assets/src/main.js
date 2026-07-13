@@ -204,10 +204,11 @@ function renderDiagnostics() {
 
 function renderTools() {
   const query = state.toolQuery.trim().toLowerCase();
-  const tools = (state.workspace?.tools || []).filter((tool) => !query || [tool.title, tool.short_description, tool.layer, tool.domain].join(" ").toLowerCase().includes(query));
+  const matchingTools = (state.workspace?.tools || []).filter((tool) => !query || [tool.title, tool.short_description, tool.layer, tool.domain].join(" ").toLowerCase().includes(query));
+  const tools = matchingTools.slice(0, 60);
   renderShell(`
     ${sectionHero(state.bootstrap.company?.name || "Компания", "Инструменты", "Каталог рабочих шаблонов по архитектуре бизнеса. AI-BOSS помогает выбрать инструмент и сопровождает его заполнение.")}
-    <section class="tool-toolbar"><label><span>Поиск по каталогу</span><input type="search" value="${escapeHtml(state.toolQuery)}" placeholder="Например: роли, стратегия, финансы" data-tool-search /></label><b>${tools.length} найдено</b></section>
+    <section class="tool-toolbar"><label><span>Поиск по каталогу</span><input type="search" value="${escapeHtml(state.toolQuery)}" placeholder="Например: роли, стратегия, финансы" data-tool-search /></label><b>${matchingTools.length} найдено${matchingTools.length > tools.length ? ` · показано ${tools.length}` : ""}</b></section>
     <section class="tool-grid">${tools.length ? tools.map((tool) => {
       const url = safeUrl(tool.templateUrl || tool.template_url);
       return `<article class="tool-card"><div><span class="eyebrow">${escapeHtml(tool.layer || tool.domain || "Инструмент")}</span><h2>${escapeHtml(tool.title)}</h2><p>${escapeHtml(tool.short_description || "Рабочий инструмент для сборки этого участка бизнеса.")}</p></div><div class="tool-result"><b>Результат</b><span>${escapeHtml(tool.result || tool.when_to_use || "Зафиксированный управленческий артефакт.")}</span></div>${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" data-tool-open="${escapeHtml(tool.id)}">Открыть шаблон →</a>` : `<span class="tool-unavailable">Шаблон готовится</span>`}</article>`;
