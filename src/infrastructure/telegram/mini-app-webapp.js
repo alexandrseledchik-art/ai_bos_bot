@@ -1,3 +1,5 @@
+import { buildWebCabinetLoginUrl } from "../auth/web-session.js";
+
 function normalizeRoute(route) {
   const value = String(route || "/mini-app").trim();
   return value.startsWith("/") ? value : `/${value}`;
@@ -12,7 +14,12 @@ export function buildMiniAppUrl(appBaseUrl, route = "/mini-app") {
   return `${base}${normalizeRoute(route)}`;
 }
 
-export function buildMiniAppReplyMarkup(invite, { appBaseUrl } = {}) {
+export function buildMiniAppReplyMarkup(invite, {
+  appBaseUrl,
+  telegramUser = null,
+  webSessionSecret = "",
+  webLoginTtlSeconds = 600
+} = {}) {
   if (!invite?.route) {
     return null;
   }
@@ -22,8 +29,15 @@ export function buildMiniAppReplyMarkup(invite, { appBaseUrl } = {}) {
     return null;
   }
 
-  return {
-    inline_keyboard: [
+  const webCabinetUrl = telegramUser && webSessionSecret
+    ? buildWebCabinetLoginUrl({
+        appBaseUrl,
+        telegramUser,
+        secret: webSessionSecret,
+        ttlSeconds: webLoginTtlSeconds
+      })
+    : "";
+  const inlineKeyboard = [
       [
         {
           text: invite.label || "Открыть Кабинет AI-BOSS",
@@ -32,7 +46,19 @@ export function buildMiniAppReplyMarkup(invite, { appBaseUrl } = {}) {
           }
         }
       ]
-    ]
+    ];
+
+  if (webCabinetUrl) {
+    inlineKeyboard.push([
+      {
+        text: "Открыть в браузере",
+        url: webCabinetUrl
+      }
+    ]);
+  }
+
+  return {
+    inline_keyboard: inlineKeyboard
   };
 }
 

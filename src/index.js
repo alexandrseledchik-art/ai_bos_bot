@@ -15,6 +15,8 @@ async function main() {
     pollingTimeoutSeconds: config.pollingTimeoutSeconds,
     audioTranscriber,
     appBaseUrl: config.appBaseUrl,
+    webSessionSecret: config.webSessionSecret,
+    webLoginTtlSeconds: config.webLoginTtlSeconds,
     accessControl,
     accessRequestNotifyChatId: config.accessRequestNotifyChatId
   });

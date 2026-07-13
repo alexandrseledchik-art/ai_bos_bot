@@ -153,7 +153,10 @@ async function dispatchAdminRoute(request) {
             });
             await telegramApi.sendMessage(user.telegram_user_id, buildAccessApprovedUserMessage(), {
               replyMarkup: buildMiniAppReplyMarkup(buildAccessApprovedMiniAppInvite(), {
-                appBaseUrl: config.appBaseUrl
+                appBaseUrl: config.appBaseUrl,
+                telegramUser: user,
+                webSessionSecret: config.webSessionSecret,
+                webLoginTtlSeconds: config.webLoginTtlSeconds
               })
             });
             notification = { ok: true };

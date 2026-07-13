@@ -43,6 +43,7 @@
     "miniapp:phase6": "node src/scripts/check-mini-app-phase6.js",
     "miniapp:phase7": "node src/scripts/check-mini-app-phase7.js",
     "miniapp:phase8": "node src/scripts/check-mini-app-phase8.js",
-    "miniapp:chat-bridge": "node src/scripts/check-mini-app-chat-bridge.js"
+    "miniapp:chat-bridge": "node src/scripts/check-mini-app-chat-bridge.js",
+    "platform:phase1": "node src/scripts/check-web-platform-phase1.js"
   }
 }

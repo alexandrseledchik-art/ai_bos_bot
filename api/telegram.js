@@ -145,7 +145,10 @@ async function handleTelegramWebhook(request) {
       onUserApproved: async (user) => {
         await telegramApi.sendMessage(user.telegram_user_id, buildAccessApprovedUserMessage(), {
           replyMarkup: buildMiniAppReplyMarkup(buildAccessApprovedMiniAppInvite(), {
-            appBaseUrl: config.appBaseUrl
+            appBaseUrl: config.appBaseUrl,
+            telegramUser: user,
+            webSessionSecret: config.webSessionSecret,
+            webLoginTtlSeconds: config.webLoginTtlSeconds
           })
         });
       }
@@ -242,7 +245,13 @@ async function handleTelegramWebhook(request) {
   if (result?.reply) {
     await telegramApi.sendMessage(payload.chatId, result.reply, {
       replyMarkup: buildMiniAppReplyMarkup(result.miniAppInvite, {
-        appBaseUrl: config.appBaseUrl
+        appBaseUrl: config.appBaseUrl,
+        telegramUser: {
+          ...payload.userMeta,
+          id: payload.userMeta?.telegramUserId || payload.userMeta?.id || payload.chatId
+        },
+        webSessionSecret: config.webSessionSecret,
+        webLoginTtlSeconds: config.webLoginTtlSeconds
       })
     });
   }

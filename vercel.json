@@ -13,6 +13,10 @@
       "destination": "/api/mini-app/rpc?path=:first/:rest*"
     },
     {
+      "source": "/api/platform/:first/:rest*",
+      "destination": "/api/platform/rpc?path=:first/:rest*"
+    },
+    {
       "source": "/api/admin/:first/:rest*",
       "destination": "/api/admin/rpc?path=:first/:rest*"
     },
@@ -51,6 +55,14 @@
     {
       "source": "/mini-app/:path*",
       "destination": "/mini-app/index.html"
+    },
+    {
+      "source": "/app",
+      "destination": "/app/index.html"
+    },
+    {
+      "source": "/app/:path*",
+      "destination": "/app/index.html"
     }
   ]
 }

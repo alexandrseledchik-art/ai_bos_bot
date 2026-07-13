@@ -30,6 +30,8 @@ export class TelegramBotRunner {
     pollingTimeoutSeconds = 20,
     audioTranscriber = null,
     appBaseUrl = "",
+    webSessionSecret = "",
+    webLoginTtlSeconds = 600,
     accessControl = null,
     accessRequestNotifyChatId = ""
   }) {
@@ -41,6 +43,8 @@ export class TelegramBotRunner {
     this.offset = 0;
     this.audioTranscriber = audioTranscriber;
     this.appBaseUrl = appBaseUrl;
+    this.webSessionSecret = webSessionSecret;
+    this.webLoginTtlSeconds = webLoginTtlSeconds;
     this.accessControl = accessControl;
     this.accessRequestNotifyChatId = accessRequestNotifyChatId;
   }
@@ -95,7 +99,10 @@ export class TelegramBotRunner {
               onUserApproved: async (user) => {
                 await this.sendMessage(user.telegram_user_id, buildAccessApprovedUserMessage(), {
                   replyMarkup: buildMiniAppReplyMarkup(buildAccessApprovedMiniAppInvite(), {
-                    appBaseUrl: this.appBaseUrl
+                    appBaseUrl: this.appBaseUrl,
+                    telegramUser: user,
+                    webSessionSecret: this.webSessionSecret,
+                    webLoginTtlSeconds: this.webLoginTtlSeconds
                   })
                 });
               }
@@ -181,7 +188,13 @@ export class TelegramBotRunner {
           if (result?.reply) {
             await this.sendMessage(payload.chatId, result.reply, {
               replyMarkup: buildMiniAppReplyMarkup(result.miniAppInvite, {
-                appBaseUrl: this.appBaseUrl
+                appBaseUrl: this.appBaseUrl,
+                telegramUser: {
+                  ...payload.userMeta,
+                  id: payload.userMeta?.telegramUserId || payload.userMeta?.id || payload.chatId
+                },
+                webSessionSecret: this.webSessionSecret,
+                webLoginTtlSeconds: this.webLoginTtlSeconds
               })
             });
           }

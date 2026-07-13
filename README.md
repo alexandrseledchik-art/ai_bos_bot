@@ -120,8 +120,15 @@ npm run telegram:webhook
 
 - `TELEGRAM_BOT_TOKEN` — токен бота
 - `TELEGRAM_WEBHOOK_SECRET` — секрет для заголовка `x-telegram-bot-api-secret-token`
+- `WEB_SESSION_SECRET` — отдельный секрет подписи входа в веб-кабинет `/app` (минимум 24 символа; если не задан, используется `TELEGRAM_WEBHOOK_SECRET`)
 - `APP_BASE_URL` — публичный URL приложения, например `https://your-app.vercel.app`
 - `ADMIN_DASHBOARD_TOKEN` — токен для `/admin` и `/api/admin/*`
+
+### Веб-кабинет пользователя
+
+Полноэкранный кабинет доступен по адресу `/app`. Пользователь не вводит отдельный пароль: после одобрения доступа бот показывает кнопку **«Открыть в браузере»**. Кнопка содержит короткоживущую подписанную ссылку, которая создаёт защищённую HttpOnly-сессию и открывает тот же workspace/company, что используются в Telegram Mini App.
+
+Для подписи рекомендуется задать отдельный `WEB_SESSION_SECRET` длиной не менее 24 символов. Если он не задан, используется `TELEGRAM_WEBHOOK_SECRET`. Блокировка пользователя через access-control закрывает и Telegram, и веб-кабинет.
 - `OPENAI_API_KEY` — ключ OpenAI
 - `OPENAI_REASONING_MODEL` — по умолчанию `gpt-5.4-mini`
 - `OPENAI_REASONING_EFFORT` — `low|medium|high`
