@@ -25,6 +25,23 @@ export class PlatformApiClient {
     return this.request("/api/platform/bootstrap");
   }
 
+  workspace() {
+    return this.request("/api/platform/workspace");
+  }
+
+  saveProfile(payload) {
+    return this.request("/api/platform/profile", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  }
+
+  markToolOpened(toolId) {
+    return this.request(`/api/platform/tools/${encodeURIComponent(toolId)}/opened`, {
+      method: "POST"
+    });
+  }
+
   logout() {
     return this.request("/api/platform/auth/logout", { method: "POST" });
   }

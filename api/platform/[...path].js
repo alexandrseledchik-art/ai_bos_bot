@@ -1,6 +1,7 @@
 import { AccessControlService } from "../../src/application/access-control-service.js";
 import { handlePlatformRoute, platformJson } from "../../src/application/platform-api-context.js";
 import { MiniAppBootstrapService } from "../../src/application/mini-app-bootstrap-service.js";
+import { MiniAppDiagnosticsService } from "../../src/application/mini-app-diagnostics-service.js";
 import { loadConfig } from "../../src/config.js";
 import {
   clearWebSessionCookie,
@@ -23,6 +24,25 @@ function redirect(location, headers = {}) {
     status: 302,
     headers: { location, ...headers }
   });
+}
+
+async function readJsonBody(request) {
+  const text = await request.text();
+  if (!text.trim()) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    const error = new Error("Некорректный JSON в запросе.");
+    error.status = 400;
+    throw error;
+  }
+}
+
+function createWorkspaceService(syncClient) {
+  return new MiniAppDiagnosticsService({ syncClient });
 }
 
 async function exchangeLoginToken(request) {
@@ -85,6 +105,56 @@ async function dispatch(request) {
       alphaMode: config.miniAppAlphaMode,
       ...bootstrap
     }));
+  }
+
+  if (path === "workspace") {
+    return handlePlatformRoute(request, ["GET"], async ({ bootstrap, syncClient }) => {
+      const service = createWorkspaceService(syncClient);
+      // Resolve the diagnostic run once before assembly reads the same run.
+      const diagnostics = await service.getExpressDiagnostics({ bootstrap });
+      const [assemblyResult, toolsResult, documentsResult, constraintRow, nextStep] = await Promise.all([
+        service.getBusinessAssemblyPlan({ bootstrap }),
+        service.getTools({ bootstrap }),
+        service.getDocuments({ bootstrap }),
+        service.findLatestConstraintHypothesis({ bootstrap, statuses: ["confirmed", "suggested"] }),
+        service.findLatestNextStepAny({ bootstrap })
+      ]);
+      const constraintHypothesis = constraintRow
+        ? service.decorateConstraintHypothesis(constraintRow)
+        : null;
+
+      return platformJson({
+        ok: true,
+        assembly: assemblyResult.assembly,
+        diagnostics,
+        tools: toolsResult.tools || [],
+        documents: documentsResult.documents || [],
+        artifacts: documentsResult.artifacts || [],
+        constraintHypothesis,
+        nextStep
+      });
+    });
+  }
+
+  if (path === "profile") {
+    return handlePlatformRoute(request, ["POST"], async ({ bootstrap, syncClient }) => {
+      const service = createWorkspaceService(syncClient);
+      const payload = await readJsonBody(request);
+      const onboarding = await service.saveOnboarding({ bootstrap, payload });
+      return platformJson({ ok: true, ...onboarding });
+    });
+  }
+
+  const toolOpenedMatch = path.match(/^tools\/([^/]+)\/opened$/);
+  if (toolOpenedMatch) {
+    return handlePlatformRoute(request, ["POST"], async ({ bootstrap, syncClient }) => {
+      const service = createWorkspaceService(syncClient);
+      const result = await service.markToolOpened({
+        bootstrap,
+        toolId: decodeURIComponent(toolOpenedMatch[1])
+      });
+      return platformJson({ ok: true, ...result });
+    });
   }
 
   return platformJson({ ok: false, error: `Platform API route not found: ${path || "/"}` }, { status: 404 });
