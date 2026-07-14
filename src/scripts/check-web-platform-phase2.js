@@ -26,7 +26,11 @@ for (const method of [
 for (const screenText of [
   "Соберите бизнес как систему",
   "Разобрать текущую задачу",
+  "Выберите точку входа",
+  "С чего хотите начать?",
+  "Основные экраны платформы",
   "От общей картины — к собранному бизнесу",
+  "Познакомиться с платформой",
   "С чего начнём работу?",
   "Продолжаем с того места, где остановились",
   "Архитектура бизнеса",
@@ -53,7 +57,13 @@ for (const screenText of [
 for (const className of [
   "welcome-hero",
   "welcome-entry-grid",
+  "welcome-choice-title",
+  "entry-or",
   "system-flow-grid",
+  "system-assistant-note",
+  "tour-start-button",
+  "tour-spotlight",
+  "tour-tooltip",
   "ready-entry-grid",
   "dashboard-guide",
   "layer-grid",
@@ -67,6 +77,17 @@ for (const className of [
   "profile-form"
 ]) {
   assert.match(cssSource, new RegExp(`\\.${className}`));
+}
+
+for (const tourContract of [
+  "PLATFORM_TOUR_STEPS",
+  "startPlatformTour",
+  "data-tour-target",
+  "data-tour-next",
+  "data-tour-prev",
+  "data-tour-skip"
+]) {
+  assert.equal(mainSource.includes(tourContract), true, `Platform tour must include: ${tourContract}`);
 }
 
 process.env.WEB_SESSION_SECRET = "phase-two-platform-secret-123456";

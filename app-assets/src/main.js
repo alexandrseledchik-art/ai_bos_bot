@@ -3,6 +3,7 @@ import { PlatformApiClient } from "./api-client.js";
 const root = document.getElementById("app");
 const api = new PlatformApiClient();
 const TELEGRAM_CHAT_URL = "https://t.me/ai_bos_bot";
+const PLATFORM_TOUR_STORAGE_KEY = "ai-boss-platform-tour-v1";
 const state = {
   bootstrap: null,
   workspace: null,
@@ -18,6 +19,40 @@ const state = {
     deep: { layerKey: "", parentKey: "" }
   }
 };
+let platformTourStep = -1;
+
+const PLATFORM_TOUR_STEPS = [
+  {
+    target: "overview",
+    title: "Обзор",
+    text: "Здесь находится текущий запрос, состояние работы и один следующий шаг. При первом входе здесь же можно выбрать удобную точку старта."
+  },
+  {
+    target: "architecture",
+    title: "Архитектура",
+    text: "Показывает, что в бизнесе уже собрано и подтверждено, а где знания пока существуют только в голове или требуют обновления."
+  },
+  {
+    target: "diagnostics",
+    title: "Диагностика",
+    text: "Помогает оценить состояние бизнеса и понять, какую часть стоит изучить глубже. Низкая оценка сама по себе ещё не означает главное ограничение."
+  },
+  {
+    target: "tools",
+    title: "Инструменты",
+    text: "Здесь понимание превращается в рабочие правила, решения, документы и другие результаты по вашей компании."
+  },
+  {
+    target: "documents",
+    title: "Документы и память",
+    text: "Хранит материалы и подтверждённый контекст компании, чтобы результаты работы не терялись между разговорами."
+  },
+  {
+    selector: ".ai-assistant",
+    title: "AI-BOSS",
+    text: "Помощника можно вызвать на любом экране: попросить объяснить результат, помочь выбрать действие или продолжить работу с инструментом."
+  }
+];
 
 const DIAGNOSTIC_LEVEL_COPY = {
   express: {
@@ -193,6 +228,22 @@ function sectionHero(kicker, title, description) {
   return `<section class="section-hero"><a href="/app" data-link>← На главную</a><p class="kicker">${escapeHtml(kicker)}</p><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p></section>`;
 }
 
+function platformTourSeen() {
+  try {
+    return window.localStorage.getItem(PLATFORM_TOUR_STORAGE_KEY) === "seen";
+  } catch {
+    return false;
+  }
+}
+
+function markPlatformTourSeen() {
+  try {
+    window.localStorage.setItem(PLATFORM_TOUR_STORAGE_KEY, "seen");
+  } catch {
+    // The tour still works when storage is unavailable.
+  }
+}
+
 function hasStartedWorkspace(data, workspace) {
   const bootstrapProgress = data.dashboardSummary?.expressProgress || {};
   const workspaceProgress = workspace.diagnostics?.progress || {};
@@ -211,25 +262,30 @@ function hasStartedWorkspace(data, workspace) {
 
 function systemFlow({ compact = false } = {}) {
   return `<section class="system-flow ${compact ? "compact" : ""}">
-    <div class="system-flow-head"><span class="eyebrow">Как работает AI-BOSS</span><h2>От общей картины — к собранному бизнесу</h2><p>Каждый раздел отвечает на свой управленческий вопрос. Вместе они превращают знания о компании в рабочую систему.</p></div>
+    <div class="system-flow-head"><div><span class="eyebrow">Основные экраны платформы</span><h2>От общей картины — к собранному бизнесу</h2><p>Ниже — основные экраны AI-BOSS. Каждый решает свою задачу: используйте их отдельно или вместе, в зависимости от текущего запроса.</p></div><button type="button" class="tour-start-button" data-tour-start>Познакомиться с платформой <span>→</span></button></div>
     <div class="system-flow-grid">
-      <article><span>01</span><b>Увидеть</b><p><strong>Архитектура</strong> показывает, что уже собрано и подтверждено, а что пока хранится только в голове.</p></article>
-      <article><span>02</span><b>Проверить</b><p><strong>Диагностика</strong> помогает определить, какую часть бизнеса имеет смысл изучить глубже.</p></article>
-      <article><span>03</span><b>Собрать</b><p><strong>Инструменты</strong> превращают выводы в правила, решения, документы и другие рабочие результаты.</p></article>
-      <article><span>04</span><b>Закрепить</b><p><strong>AI-BOSS</strong> сохраняет контекст, связывает результаты и предлагает следующий шаг.</p></article>
+      <a href="/app/architecture" data-link data-tour-target="architecture"><b>Архитектура</b><p>Показывает, что в бизнесе уже собрано и подтверждено, а что пока хранится только в голове.</p><span>Открыть экран →</span></a>
+      <a href="/app/diagnostics" data-link data-tour-target="diagnostics"><b>Диагностика</b><p>Помогает оценить состояние бизнеса и понять, какую часть стоит изучить глубже.</p><span>Открыть экран →</span></a>
+      <a href="/app/tools" data-link data-tour-target="tools"><b>Инструменты</b><p>Помогают превратить понимание в рабочие правила, решения, документы и другие результаты.</p><span>Открыть экран →</span></a>
+      <a href="/app/documents" data-link data-tour-target="documents"><b>Документы и память</b><p>Сохраняют материалы и подтверждённый контекст компании между разговорами и рабочими циклами.</p><span>Открыть экран →</span></a>
     </div>
+    <div class="system-assistant-note"><span>AI</span><p><b>AI-BOSS доступен на каждом экране.</b> Он помогает понять информацию, выбрать действие и продолжить работу.</p></div>
+    ${!compact && !platformTourSeen() ? `<div class="tour-invite"><div><b>Хотите за минуту посмотреть, как устроена платформа?</b><span>Подсветим основные элементы прямо на экране.</span></div><div><button type="button" data-tour-start>Показать</button><button type="button" class="quiet" data-tour-dismiss-invite>Разберусь сам</button></div></div>` : ""}
   </section>`;
 }
 
 function renderWelcomeDashboard(data) {
   const firstName = data.appUser?.first_name ? `, ${escapeHtml(data.appUser.first_name)}` : "";
   renderShell(`
-    <section class="welcome-hero">
+    <section class="welcome-hero" data-tour-target="overview">
       <div class="welcome-copy"><p class="kicker">Добро пожаловать${firstName}</p><h1>Соберите бизнес как систему.</h1><p>AI-BOSS помогает вынести знания из головы, увидеть недостающие элементы, собрать их с помощью рабочих инструментов и определить, что делать дальше.</p></div>
+      <div class="welcome-choice-title"><span class="eyebrow">Выберите точку входа</span><h2>С чего хотите начать?</h2><p>Оба варианта ведут к сборке архитектуры бизнеса. Выберите то, что полезнее сейчас — маршрут можно изменить позже.</p></div>
       <div class="welcome-entry-grid">
-        <article class="welcome-entry primary-entry"><span>01</span><h2>Собрать бизнес как систему</h2><p>Увидеть компанию целиком, последовательно зафиксировать важные договорённости и собрать управляемую архитектуру.</p><a href="/app/profile?mode=system" data-link>Начать сборку <b>→</b></a></article>
-        <article class="welcome-entry"><span>02</span><h2>Разобрать текущую задачу</h2><p>Начать с конкретной проблемы, отделить симптом от возможной причины и понять, что проверить или сделать первым.</p><a href="/app/profile?mode=problem" data-link>Разобрать задачу <b>→</b></a></article>
+        <article class="welcome-entry"><div class="entry-kind"><span>◇</span><b>Общая картина</b></div><h2>Собрать бизнес как систему</h2><p>Увидеть компанию целиком, последовательно зафиксировать важные договорённости и собрать управляемую архитектуру.</p><a href="/app/profile?mode=system" data-link>Увидеть бизнес целиком <b>→</b></a></article>
+        <span class="entry-or">или</span>
+        <article class="welcome-entry"><div class="entry-kind"><span>◎</span><b>Текущая задача</b></div><h2>Разобрать конкретную ситуацию</h2><p>Начать с проблемы, отделить симптом от возможной причины и понять, что проверить или сделать первым.</p><a href="/app/profile?mode=problem" data-link>Разобрать текущую задачу <b>→</b></a></article>
       </div>
+      <p class="welcome-choice-note">Выбор определяет только начало работы. Разбор задачи всё равно учитывает бизнес целиком, а общая сборка помогает решать конкретные задачи.</p>
     </section>
     ${systemFlow()}
     <section class="work-formats panel"><div><span class="eyebrow">Работайте удобным способом</span><h2>Разговор становится частью системы</h2><p>Можно отвечать текстом или голосом, проходить диагностику, заполнять инструменты вместе с AI-BOSS и подключать рабочие документы. Результаты сохраняются в контексте компании.</p></div><a class="primary-action" href="${TELEGRAM_CHAT_URL}" target="_blank" rel="noopener">Открыть AI-BOSS <span>→</span></a></section>`);
@@ -238,7 +294,7 @@ function renderWelcomeDashboard(data) {
 function renderReadyDashboard(data, workspace) {
   const request = data.companyProfile?.current_request || "Текущий запрос ещё не зафиксирован";
   renderShell(`
-    <section class="dashboard-head ready-head"><div><p class="kicker">Контекст компании сохранён</p><h1>С чего начнём работу?</h1><p>Можно сначала увидеть бизнес целиком или начать с задачи, которая беспокоит прямо сейчас.</p></div></section>
+    <section class="dashboard-head ready-head" data-tour-target="overview"><div><p class="kicker">Контекст компании сохранён</p><h1>С чего начнём работу?</h1><p>Можно сначала увидеть бизнес целиком или начать с задачи, которая беспокоит прямо сейчас.</p></div></section>
     <section class="request-banner"><div><span>Текущий запрос</span><strong>${escapeHtml(request)}</strong></div><a href="/app/profile" data-link>Уточнить</a></section>
     <section class="ready-entry-grid">
       <article class="ready-entry"><span class="panel-icon">◇</span><div><p class="eyebrow">Общая сборка</p><h2>Увидеть бизнес как систему</h2><p>Начните с общей картины. Диагностика покажет состояние ключевых частей бизнеса, а архитектура поможет последовательно собирать пробелы.</p></div><a class="primary-action" href="/app/diagnostics/express" data-diagnostic-start="express">Получить общую картину <span>→</span></a></article>
@@ -265,7 +321,7 @@ function renderActiveDashboard(data, workspace) {
   const continueLabel = currentTool ? "Продолжить инструмент" : "Продолжить маршрут";
 
   renderShell(`
-    <section class="dashboard-head"><div><p class="kicker">Текущая управленческая картина</p><h1>Продолжаем с того места, где остановились</h1></div><a class="primary-action" href="${continueHref}" data-link>${continueLabel} <span>→</span></a></section>
+    <section class="dashboard-head" data-tour-target="overview"><div><p class="kicker">Текущая управленческая картина</p><h1>Продолжаем с того места, где остановились</h1></div><a class="primary-action" href="${continueHref}" data-link>${continueLabel} <span>→</span></a></section>
     <section class="request-banner"><div><span>Текущий запрос</span><strong>${escapeHtml(request)}</strong></div><a href="/app/profile" data-link>${profileReady ? "Уточнить" : "Заполнить профиль"}</a></section>
     <div class="dashboard-grid">
       <section class="panel maturity-panel">
@@ -294,6 +350,91 @@ function renderDashboard() {
   if (data.onboardingStatus !== "completed") return renderWelcomeDashboard(data);
   if (!hasStartedWorkspace(data, workspace)) return renderReadyDashboard(data, workspace);
   return renderActiveDashboard(data, workspace);
+}
+
+function removePlatformTour() {
+  document.querySelectorAll(".platform-tour-layer").forEach((element) => element.remove());
+}
+
+function finishPlatformTour() {
+  platformTourStep = -1;
+  removePlatformTour();
+  markPlatformTourSeen();
+}
+
+function platformTourTarget(step) {
+  if (step.selector) return document.querySelector(step.selector);
+  return document.querySelector(`[data-tour-target="${step.target}"]`);
+}
+
+function positionPlatformTour(target, spotlight, tooltip) {
+  const rect = target.getBoundingClientRect();
+  const padding = 8;
+  const spotlightLeft = Math.max(4, rect.left - padding);
+  const spotlightTop = Math.max(4, rect.top - padding);
+  spotlight.style.left = `${spotlightLeft}px`;
+  spotlight.style.top = `${spotlightTop}px`;
+  spotlight.style.width = `${Math.min(window.innerWidth - spotlightLeft - 4, rect.width + padding * 2)}px`;
+  spotlight.style.height = `${Math.min(window.innerHeight - spotlightTop - 4, rect.height + padding * 2)}px`;
+
+  if (window.innerWidth <= 700) {
+    tooltip.dataset.placement = "bottom";
+    tooltip.style.removeProperty("left");
+    tooltip.style.removeProperty("top");
+    return;
+  }
+
+  const tooltipWidth = Math.min(360, window.innerWidth - 40);
+  const gap = 20;
+  let left;
+  let top = Math.max(18, Math.min(rect.top, window.innerHeight - tooltip.offsetHeight - 18));
+  let placement;
+  if (rect.right + gap + tooltipWidth < window.innerWidth) {
+    left = rect.right + gap;
+    placement = "right";
+  } else if (rect.left - gap - tooltipWidth > 0) {
+    left = rect.left - gap - tooltipWidth;
+    placement = "left";
+  } else {
+    left = Math.max(20, Math.min(rect.left, window.innerWidth - tooltipWidth - 20));
+    top = Math.min(window.innerHeight - tooltip.offsetHeight - 18, rect.bottom + gap);
+    placement = "below";
+  }
+  tooltip.style.width = `${tooltipWidth}px`;
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
+  tooltip.dataset.placement = placement;
+}
+
+function showPlatformTourStep() {
+  removePlatformTour();
+  const step = PLATFORM_TOUR_STEPS[platformTourStep];
+  if (!step) return finishPlatformTour();
+  const target = platformTourTarget(step);
+  if (!target) return finishPlatformTour();
+
+  target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+  const layer = document.createElement("div");
+  layer.className = "platform-tour-layer";
+  layer.innerHTML = `<button type="button" class="tour-scrim" data-tour-skip aria-label="Закрыть знакомство"></button>
+    <div class="tour-spotlight" aria-hidden="true"></div>
+    <section class="tour-tooltip" role="dialog" aria-modal="true" aria-label="Знакомство с платформой">
+      <div class="tour-tooltip-top"><span>${platformTourStep + 1} из ${PLATFORM_TOUR_STEPS.length}</span><button type="button" data-tour-skip aria-label="Закрыть">×</button></div>
+      <h2>${escapeHtml(step.title)}</h2><p>${escapeHtml(step.text)}</p>
+      <div class="tour-actions"><button type="button" class="quiet" data-tour-prev ${platformTourStep === 0 ? "disabled" : ""}>Назад</button><button type="button" data-tour-next>${platformTourStep === PLATFORM_TOUR_STEPS.length - 1 ? "Готово" : "Далее"}</button></div>
+      <button type="button" class="tour-skip-link" data-tour-skip>Пропустить знакомство</button>
+    </section>`;
+  document.body.append(layer);
+  const spotlight = layer.querySelector(".tour-spotlight");
+  const tooltip = layer.querySelector(".tour-tooltip");
+  window.setTimeout(() => positionPlatformTour(target, spotlight, tooltip), 220);
+}
+
+function startPlatformTour() {
+  const guide = document.querySelector(".dashboard-guide");
+  if (guide) guide.open = true;
+  platformTourStep = 0;
+  showPlatformTourStep();
 }
 
 function renderArchitecture() {
@@ -580,6 +721,37 @@ async function openDiagnosticLevel(level, path = `/app/diagnostics/${level}`) {
 }
 
 document.addEventListener("click", async (event) => {
+  const tourStart = event.target.closest("[data-tour-start]");
+  if (tourStart) {
+    event.preventDefault();
+    startPlatformTour();
+    return;
+  }
+  if (event.target.closest("[data-tour-dismiss-invite]")) {
+    markPlatformTourSeen();
+    renderDashboard();
+    return;
+  }
+  if (event.target.closest("[data-tour-skip]")) {
+    finishPlatformTour();
+    return;
+  }
+  if (event.target.closest("[data-tour-prev]")) {
+    if (platformTourStep > 0) {
+      platformTourStep -= 1;
+      showPlatformTourStep();
+    }
+    return;
+  }
+  if (event.target.closest("[data-tour-next]")) {
+    if (platformTourStep >= PLATFORM_TOUR_STEPS.length - 1) {
+      finishPlatformTour();
+    } else {
+      platformTourStep += 1;
+      showPlatformTourStep();
+    }
+    return;
+  }
   const diagnosticStart = event.target.closest("[data-diagnostic-start]");
   if (diagnosticStart) {
     event.preventDefault();
@@ -740,7 +912,30 @@ document.addEventListener("submit", async (event) => {
   }
 });
 
-window.addEventListener("popstate", () => { state.notice = ""; render(); });
+window.addEventListener("resize", () => {
+  if (platformTourStep < 0) return;
+  const step = PLATFORM_TOUR_STEPS[platformTourStep];
+  const target = platformTourTarget(step);
+  const spotlight = document.querySelector(".tour-spotlight");
+  const tooltip = document.querySelector(".tour-tooltip");
+  if (target && spotlight && tooltip) positionPlatformTour(target, spotlight, tooltip);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (platformTourStep < 0) return;
+  if (event.key === "Escape") return finishPlatformTour();
+  if (event.key === "ArrowLeft" && platformTourStep > 0) {
+    platformTourStep -= 1;
+    showPlatformTourStep();
+  }
+  if (event.key === "ArrowRight") {
+    if (platformTourStep >= PLATFORM_TOUR_STEPS.length - 1) return finishPlatformTour();
+    platformTourStep += 1;
+    showPlatformTourStep();
+  }
+});
+
+window.addEventListener("popstate", () => { state.notice = ""; finishPlatformTour(); render(); });
 
 async function start() {
   try {
