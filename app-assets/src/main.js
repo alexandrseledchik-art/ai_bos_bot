@@ -193,9 +193,61 @@ function sectionHero(kicker, title, description) {
   return `<section class="section-hero"><a href="/app" data-link>← На главную</a><p class="kicker">${escapeHtml(kicker)}</p><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p></section>`;
 }
 
-function renderDashboard() {
-  const data = state.bootstrap;
-  const workspace = state.workspace || {};
+function hasStartedWorkspace(data, workspace) {
+  const bootstrapProgress = data.dashboardSummary?.expressProgress || {};
+  const workspaceProgress = workspace.diagnostics?.progress || {};
+  const confirmedArchitecture = workspace.assembly?.architectureProgress?.confirmed || 0;
+  return Boolean(
+    Number(bootstrapProgress.answeredCount) > 0
+    || Number(workspaceProgress.answeredCount) > 0
+    || Number(confirmedArchitecture) > 0
+    || workspace.constraintHypothesis
+    || workspace.nextStep
+    || workspace.toolInstances?.length
+    || workspace.documents?.length
+    || workspace.artifacts?.length
+  );
+}
+
+function systemFlow({ compact = false } = {}) {
+  return `<section class="system-flow ${compact ? "compact" : ""}">
+    <div class="system-flow-head"><span class="eyebrow">Как работает AI-BOSS</span><h2>От общей картины — к собранному бизнесу</h2><p>Каждый раздел отвечает на свой управленческий вопрос. Вместе они превращают знания о компании в рабочую систему.</p></div>
+    <div class="system-flow-grid">
+      <article><span>01</span><b>Увидеть</b><p><strong>Архитектура</strong> показывает, что уже собрано и подтверждено, а что пока хранится только в голове.</p></article>
+      <article><span>02</span><b>Проверить</b><p><strong>Диагностика</strong> помогает определить, какую часть бизнеса имеет смысл изучить глубже.</p></article>
+      <article><span>03</span><b>Собрать</b><p><strong>Инструменты</strong> превращают выводы в правила, решения, документы и другие рабочие результаты.</p></article>
+      <article><span>04</span><b>Закрепить</b><p><strong>AI-BOSS</strong> сохраняет контекст, связывает результаты и предлагает следующий шаг.</p></article>
+    </div>
+  </section>`;
+}
+
+function renderWelcomeDashboard(data) {
+  const firstName = data.appUser?.first_name ? `, ${escapeHtml(data.appUser.first_name)}` : "";
+  renderShell(`
+    <section class="welcome-hero">
+      <div class="welcome-copy"><p class="kicker">Добро пожаловать${firstName}</p><h1>Соберите бизнес как систему.</h1><p>AI-BOSS помогает вынести знания из головы, увидеть недостающие элементы, собрать их с помощью рабочих инструментов и определить, что делать дальше.</p></div>
+      <div class="welcome-entry-grid">
+        <article class="welcome-entry primary-entry"><span>01</span><h2>Собрать бизнес как систему</h2><p>Увидеть компанию целиком, последовательно зафиксировать важные договорённости и собрать управляемую архитектуру.</p><a href="/app/profile?mode=system" data-link>Начать сборку <b>→</b></a></article>
+        <article class="welcome-entry"><span>02</span><h2>Разобрать текущую задачу</h2><p>Начать с конкретной проблемы, отделить симптом от возможной причины и понять, что проверить или сделать первым.</p><a href="/app/profile?mode=problem" data-link>Разобрать задачу <b>→</b></a></article>
+      </div>
+    </section>
+    ${systemFlow()}
+    <section class="work-formats panel"><div><span class="eyebrow">Работайте удобным способом</span><h2>Разговор становится частью системы</h2><p>Можно отвечать текстом или голосом, проходить диагностику, заполнять инструменты вместе с AI-BOSS и подключать рабочие документы. Результаты сохраняются в контексте компании.</p></div><a class="primary-action" href="${TELEGRAM_CHAT_URL}" target="_blank" rel="noopener">Открыть AI-BOSS <span>→</span></a></section>`);
+}
+
+function renderReadyDashboard(data, workspace) {
+  const request = data.companyProfile?.current_request || "Текущий запрос ещё не зафиксирован";
+  renderShell(`
+    <section class="dashboard-head ready-head"><div><p class="kicker">Контекст компании сохранён</p><h1>С чего начнём работу?</h1><p>Можно сначала увидеть бизнес целиком или начать с задачи, которая беспокоит прямо сейчас.</p></div></section>
+    <section class="request-banner"><div><span>Текущий запрос</span><strong>${escapeHtml(request)}</strong></div><a href="/app/profile" data-link>Уточнить</a></section>
+    <section class="ready-entry-grid">
+      <article class="ready-entry"><span class="panel-icon">◇</span><div><p class="eyebrow">Общая сборка</p><h2>Увидеть бизнес как систему</h2><p>Начните с общей картины. Диагностика покажет состояние ключевых частей бизнеса, а архитектура поможет последовательно собирать пробелы.</p></div><a class="primary-action" href="/app/diagnostics/express" data-diagnostic-start="express">Получить общую картину <span>→</span></a></article>
+      <article class="ready-entry dark"><span class="panel-icon orange">AI</span><div><p class="eyebrow">Текущая задача</p><h2>Разобрать запрос с AI-BOSS</h2><p>Опишите ситуацию своими словами. AI-BOSS соберёт версии, запросит необходимые факты и поможет определить первый следующий шаг.</p></div><a class="primary-action orange-action" href="${TELEGRAM_CHAT_URL}" target="_blank" rel="noopener">Перейти к разбору <span>→</span></a></article>
+    </section>
+    ${systemFlow({ compact: true })}`);
+}
+
+function renderActiveDashboard(data, workspace) {
   const assembly = workspace.assembly || {};
   const journey = assembly.journey || {};
   const progress = data.dashboardSummary?.expressProgress || { answeredCount: 0, totalCount: 11, percent: 0 };
@@ -207,9 +259,13 @@ function renderDashboard() {
   const toolCount = workspace.tools?.length || 0;
   const documentCount = workspace.documents?.length || 0;
   const currentTool = (workspace.toolInstances || []).find((item) => ["in_progress", "waiting_for_user", "submitted", "needs_update"].includes(item.instance?.status));
+  const continueHref = currentTool
+    ? `/app/tools/${encodeURIComponent(currentTool.tool?.id || currentTool.instance.tool_id)}`
+    : "/app/architecture";
+  const continueLabel = currentTool ? "Продолжить инструмент" : "Продолжить маршрут";
 
   renderShell(`
-    <section class="dashboard-head"><div><p class="kicker">Текущая управленческая картина</p><h1>${profileReady ? "Продолжаем собирать архитектуру" : "Начнём с контекста компании"}</h1></div><a class="primary-action" href="/app/architecture" data-link>Продолжить маршрут <span>→</span></a></section>
+    <section class="dashboard-head"><div><p class="kicker">Текущая управленческая картина</p><h1>Продолжаем с того места, где остановились</h1></div><a class="primary-action" href="${continueHref}" data-link>${continueLabel} <span>→</span></a></section>
     <section class="request-banner"><div><span>Текущий запрос</span><strong>${escapeHtml(request)}</strong></div><a href="/app/profile" data-link>${profileReady ? "Уточнить" : "Заполнить профиль"}</a></section>
     <div class="dashboard-grid">
       <section class="panel maturity-panel">
@@ -228,7 +284,16 @@ function renderDashboard() {
         <div class="stat-strip"><div><b>${progress.answeredCount || 0}/11</b><span>экспресс-оценок</span></div><div><b>${assembly.completedLayers || 0}/11</b><span>собранных слоёв</span></div><div><b>${documentCount}</b><span>документов</span></div><div><b>${toolCount}</b><span>инструментов в каталоге</span></div></div>
       </section>
       ${currentTool ? `<section class="panel current-tool-panel wide"><div><span class="eyebrow orange-text">Текущий инструмент</span><h2>${escapeHtml(currentTool.tool?.title || "Инструмент в работе")}</h2><p>${escapeHtml(currentTool.tool?.short_description || "Продолжи заполнение — ответы уже сохраняются в памяти компании.")}</p></div><div><b>${percent(currentTool.instance.progress_percent)}%</b><a class="text-action" href="/app/tools/${encodeURIComponent(currentTool.tool?.id || currentTool.instance.tool_id)}" data-link>Продолжить →</a></div></section>` : ""}
-    </div>`);
+    </div>
+    <details class="dashboard-guide"><summary>Как связаны разделы AI-BOSS</summary>${systemFlow({ compact: true })}</details>`);
+}
+
+function renderDashboard() {
+  const data = state.bootstrap;
+  const workspace = state.workspace || {};
+  if (data.onboardingStatus !== "completed") return renderWelcomeDashboard(data);
+  if (!hasStartedWorkspace(data, workspace)) return renderReadyDashboard(data, workspace);
+  return renderActiveDashboard(data, workspace);
 }
 
 function renderArchitecture() {
@@ -450,16 +515,28 @@ function renderDocuments() {
 function renderProfile() {
   const company = state.bootstrap.company || {};
   const profile = state.bootstrap.companyProfile || {};
+  const mode = new URLSearchParams(window.location.search).get("mode") || "";
+  const isFirstSetup = state.bootstrap.onboardingStatus !== "completed";
+  const profileTitle = mode === "system"
+    ? "Сначала зафиксируем контекст"
+    : mode === "problem"
+      ? "Опишите компанию и текущую задачу"
+      : "Профиль компании";
+  const profileDescription = mode === "system"
+    ? "Несколько фактов помогут связать общую картину бизнеса с вашим масштабом, ролью и целью сборки."
+    : mode === "problem"
+      ? "Контекст поможет AI-BOSS не отвечать общими советами, а разбирать задачу относительно вашей компании."
+      : "Этот контекст нужен AI-BOSS, чтобы связывать инструменты и решения с реальным масштабом, ролью собственника и текущим запросом.";
   renderShell(`
-    ${sectionHero(company.name || "Компания", "Профиль компании", "Этот контекст нужен AI-BOSS, чтобы связывать инструменты и решения с реальным масштабом, ролью собственника и текущим запросом.")}
+    ${sectionHero(company.name || "Компания", profileTitle, profileDescription)}
     <form class="profile-form panel" data-profile-form>
       <label><span>Название компании</span><input name="companyName" required value="${escapeHtml(company.name || "")}" /></label>
       <label><span>Отрасль</span><input name="industry" value="${escapeHtml(profile.industry || "")}" placeholder="Например: управленческий консалтинг" /></label>
       <label><span>Размер компании</span><input name="companySize" value="${escapeHtml(profile.company_size || "")}" placeholder="Например: 1–10 человек" /></label>
       <label><span>Выручка / диапазон</span><input name="revenueRange" value="${escapeHtml(profile.revenue_range || "")}" placeholder="Можно указать диапазон" /></label>
       <label><span>Твоя роль</span><input name="userRole" required value="${escapeHtml(profile.user_role || "")}" placeholder="Собственник" /></label>
-      <label class="full"><span>Текущий запрос</span><textarea name="currentRequest" required rows="5">${escapeHtml(profile.current_request || "")}</textarea></label>
-      <div class="form-actions full"><button class="primary-action" type="submit">Сохранить профиль <span>→</span></button><span data-save-status></span></div>
+      <label class="full"><span>${mode === "system" ? "Что хотите получить от сборки бизнеса" : "Текущий запрос"}</span><textarea name="currentRequest" required rows="5" placeholder="${mode === "system" ? "Например: увидеть бизнес целиком, перестать держать решения в голове и последовательно собрать систему" : "Опишите, что сейчас происходит и какой результат хотите получить"}">${escapeHtml(profile.current_request || "")}</textarea></label>
+      <div class="form-actions full"><button class="primary-action" type="submit">${isFirstSetup ? "Продолжить" : "Сохранить профиль"} <span>→</span></button><span data-save-status></span></div>
     </form>`);
 }
 
@@ -633,6 +710,8 @@ document.addEventListener("submit", async (event) => {
   const form = event.target.closest("[data-profile-form]");
   if (!form) return;
   event.preventDefault();
+  const mode = new URLSearchParams(window.location.search).get("mode") || "";
+  const wasFirstSetup = state.bootstrap.onboardingStatus !== "completed";
   const status = form.querySelector("[data-save-status]");
   const submit = form.querySelector("button[type=submit]");
   status.textContent = "Сохраняю...";
@@ -645,6 +724,15 @@ document.addEventListener("submit", async (event) => {
     state.bootstrap.onboardingStatus = result.onboardingStatus;
     status.textContent = "Сохранено";
     state.notice = "Профиль обновлён. AI-BOSS будет использовать новый запрос в дальнейшей работе.";
+    if (wasFirstSetup && mode === "system") {
+      await openDiagnosticLevel("express");
+      return;
+    }
+    if (wasFirstSetup && mode === "problem") {
+      window.location.assign(TELEGRAM_CHAT_URL);
+      return;
+    }
+    if (wasFirstSetup) navigate("/app");
   } catch (error) {
     status.textContent = error.message;
   } finally {

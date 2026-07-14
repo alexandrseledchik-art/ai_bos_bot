@@ -24,6 +24,11 @@ for (const method of [
 }
 
 for (const screenText of [
+  "Соберите бизнес как систему",
+  "Разобрать текущую задачу",
+  "От общей картины — к собранному бизнесу",
+  "С чего начнём работу?",
+  "Продолжаем с того места, где остановились",
   "Архитектура бизнеса",
   "Как выбрать глубину диагностики",
   "Выберите глубину: быстрый обзор всей системы",
@@ -46,6 +51,11 @@ for (const screenText of [
 }
 
 for (const className of [
+  "welcome-hero",
+  "welcome-entry-grid",
+  "system-flow-grid",
+  "ready-entry-grid",
+  "dashboard-guide",
   "layer-grid",
   "diagnostic-list",
   "diagnostic-level-grid",
