@@ -413,7 +413,9 @@ function showPlatformTourStep() {
   const target = platformTourTarget(step);
   if (!target) return finishPlatformTour();
 
-  target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+  // The spotlight must use the final viewport coordinates, not an intermediate
+  // frame of a smooth scroll animation.
+  target.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
   const layer = document.createElement("div");
   layer.className = "platform-tour-layer";
   layer.innerHTML = `<button type="button" class="tour-scrim" data-tour-skip aria-label="Закрыть знакомство"></button>
@@ -427,7 +429,9 @@ function showPlatformTourStep() {
   document.body.append(layer);
   const spotlight = layer.querySelector(".tour-spotlight");
   const tooltip = layer.querySelector(".tour-tooltip");
-  window.setTimeout(() => positionPlatformTour(target, spotlight, tooltip), 220);
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => positionPlatformTour(target, spotlight, tooltip));
+  });
 }
 
 function startPlatformTour() {

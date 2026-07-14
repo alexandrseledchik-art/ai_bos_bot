@@ -85,7 +85,9 @@ for (const tourContract of [
   "data-tour-target",
   "data-tour-next",
   "data-tour-prev",
-  "data-tour-skip"
+  "data-tour-skip",
+  "behavior: \"auto\"",
+  "requestAnimationFrame"
 ]) {
   assert.equal(mainSource.includes(tourContract), true, `Platform tour must include: ${tourContract}`);
 }
