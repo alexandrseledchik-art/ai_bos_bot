@@ -85,7 +85,7 @@ for (const tourContract of [
   "startPlatformTour",
   "maybeAutoStartPlatformTour",
   "platformTourAutoStarted",
-  "data-tour-target",
+  "data-tour-nav",
   "data-tour-next",
   "data-tour-prev",
   "data-tour-skip",

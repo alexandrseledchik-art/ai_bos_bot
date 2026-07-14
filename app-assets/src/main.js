@@ -24,27 +24,27 @@ let platformTourAutoStarted = false;
 
 const PLATFORM_TOUR_STEPS = [
   {
-    target: "overview",
+    selector: '[data-tour-nav="overview"]',
     title: "Обзор",
     text: "Здесь находится текущий запрос, состояние работы и один следующий шаг. При первом входе здесь же можно выбрать удобную точку старта."
   },
   {
-    target: "architecture",
+    selector: '[data-tour-nav="architecture"]',
     title: "Архитектура",
     text: "Показывает, что в бизнесе уже собрано и подтверждено, а где знания пока существуют только в голове или требуют обновления."
   },
   {
-    target: "diagnostics",
+    selector: '[data-tour-nav="diagnostics"]',
     title: "Диагностика",
     text: "Помогает оценить состояние бизнеса и понять, какую часть стоит изучить глубже. Низкая оценка сама по себе ещё не означает главное ограничение."
   },
   {
-    target: "tools",
+    selector: '[data-tour-nav="tools"]',
     title: "Инструменты",
     text: "Здесь понимание превращается в рабочие правила, решения, документы и другие результаты по вашей компании."
   },
   {
-    target: "documents",
+    selector: '[data-tour-nav="documents"]',
     title: "Документы и память",
     text: "Хранит материалы и подтверждённый контекст компании, чтобы результаты работы не терялись между разговорами."
   },
@@ -180,12 +180,12 @@ function renderLogin() {
 
 function navigation(activePath) {
   const items = [
-    ["/app", "Обзор", "⌂"], ["/app/architecture", "Архитектура", "◇"],
-    ["/app/diagnostics", "Диагностика", "◫"], ["/app/tools", "Инструменты", "✦"],
-    ["/app/documents", "Документы", "▱"]
+    ["/app", "Обзор", "⌂", "overview"], ["/app/architecture", "Архитектура", "◇", "architecture"],
+    ["/app/diagnostics", "Диагностика", "◫", "diagnostics"], ["/app/tools", "Инструменты", "✦", "tools"],
+    ["/app/documents", "Документы", "▱", "documents"]
   ];
-  return items.map(([path, label, icon]) => `
-    <a href="${path}" class="nav-link ${activePath === path || (path !== "/app" && activePath.startsWith(`${path}/`)) ? "active" : ""}" data-link>
+  return items.map(([path, label, icon, tourKey]) => `
+    <a href="${path}" class="nav-link ${activePath === path || (path !== "/app" && activePath.startsWith(`${path}/`)) ? "active" : ""}" data-link data-tour-nav="${tourKey}">
       <span aria-hidden="true">${icon}</span>${label}
     </a>`).join("");
 }
@@ -270,10 +270,10 @@ function systemFlow({ compact = false } = {}) {
   return `<section class="system-flow ${compact ? "compact" : ""}">
     <div class="system-flow-head"><div><span class="eyebrow">Основные экраны платформы</span><h2>От общей картины — к собранному бизнесу</h2><p>Ниже — основные экраны AI-BOSS. Каждый решает свою задачу: используйте их отдельно или вместе, в зависимости от текущего запроса.</p></div><button type="button" class="tour-start-button" data-tour-start>Познакомиться с платформой <span>→</span></button></div>
     <div class="system-flow-grid">
-      <a href="/app/architecture" data-link data-tour-target="architecture"><b>Архитектура</b><p>Показывает, что в бизнесе уже собрано и подтверждено, а что пока хранится только в голове.</p><span>Открыть экран →</span></a>
-      <a href="/app/diagnostics" data-link data-tour-target="diagnostics"><b>Диагностика</b><p>Помогает оценить состояние бизнеса и понять, какую часть стоит изучить глубже.</p><span>Открыть экран →</span></a>
-      <a href="/app/tools" data-link data-tour-target="tools"><b>Инструменты</b><p>Помогают превратить понимание в рабочие правила, решения, документы и другие результаты.</p><span>Открыть экран →</span></a>
-      <a href="/app/documents" data-link data-tour-target="documents"><b>Документы и память</b><p>Сохраняют материалы и подтверждённый контекст компании между разговорами и рабочими циклами.</p><span>Открыть экран →</span></a>
+      <a href="/app/architecture" data-link><b>Архитектура</b><p>Показывает, что в бизнесе уже собрано и подтверждено, а что пока хранится только в голове.</p><span>Открыть экран →</span></a>
+      <a href="/app/diagnostics" data-link><b>Диагностика</b><p>Помогает оценить состояние бизнеса и понять, какую часть стоит изучить глубже.</p><span>Открыть экран →</span></a>
+      <a href="/app/tools" data-link><b>Инструменты</b><p>Помогают превратить понимание в рабочие правила, решения, документы и другие результаты.</p><span>Открыть экран →</span></a>
+      <a href="/app/documents" data-link><b>Документы и память</b><p>Сохраняют материалы и подтверждённый контекст компании между разговорами и рабочими циклами.</p><span>Открыть экран →</span></a>
     </div>
     <div class="system-assistant-note"><span>AI</span><p><b>AI-BOSS доступен на каждом экране.</b> Он помогает понять информацию, выбрать действие и продолжить работу.</p></div>
   </section>`;
@@ -283,7 +283,7 @@ function renderWelcomeDashboard(data) {
   const firstName = data.appUser?.first_name ? `, ${escapeHtml(data.appUser.first_name)}` : "";
   renderShell(`
     ${platformTourInvite()}
-    <section class="welcome-hero" data-tour-target="overview">
+    <section class="welcome-hero">
       <div class="welcome-copy"><p class="kicker">Добро пожаловать${firstName}</p><h1>Соберите бизнес как систему.</h1><p>AI-BOSS помогает вынести знания из головы, увидеть недостающие элементы, собрать их с помощью рабочих инструментов и определить, что делать дальше.</p></div>
       <div class="welcome-choice-title"><span class="eyebrow">Выберите точку входа</span><h2>С чего хотите начать?</h2><p>Оба варианта ведут к сборке архитектуры бизнеса. Выберите то, что полезнее сейчас — маршрут можно изменить позже.</p></div>
       <div class="welcome-entry-grid">
@@ -301,7 +301,7 @@ function renderReadyDashboard(data, workspace) {
   const request = data.companyProfile?.current_request || "Текущий запрос ещё не зафиксирован";
   renderShell(`
     ${platformTourInvite()}
-    <section class="dashboard-head ready-head" data-tour-target="overview"><div><p class="kicker">Контекст компании сохранён</p><h1>С чего начнём работу?</h1><p>Можно сначала увидеть бизнес целиком или начать с задачи, которая беспокоит прямо сейчас.</p></div></section>
+    <section class="dashboard-head ready-head"><div><p class="kicker">Контекст компании сохранён</p><h1>С чего начнём работу?</h1><p>Можно сначала увидеть бизнес целиком или начать с задачи, которая беспокоит прямо сейчас.</p></div></section>
     <section class="request-banner"><div><span>Текущий запрос</span><strong>${escapeHtml(request)}</strong></div><a href="/app/profile" data-link>Уточнить</a></section>
     <section class="ready-entry-grid">
       <article class="ready-entry"><span class="panel-icon">◇</span><div><p class="eyebrow">Общая сборка</p><h2>Увидеть бизнес как систему</h2><p>Начните с общей картины. Диагностика покажет состояние ключевых частей бизнеса, а архитектура поможет последовательно собирать пробелы.</p></div><a class="primary-action" href="/app/diagnostics/express" data-diagnostic-start="express">Получить общую картину <span>→</span></a></article>
@@ -329,7 +329,7 @@ function renderActiveDashboard(data, workspace) {
 
   renderShell(`
     ${platformTourInvite()}
-    <section class="dashboard-head" data-tour-target="overview"><div><p class="kicker">Текущая управленческая картина</p><h1>Продолжаем с того места, где остановились</h1></div><a class="primary-action" href="${continueHref}" data-link>${continueLabel} <span>→</span></a></section>
+    <section class="dashboard-head"><div><p class="kicker">Текущая управленческая картина</p><h1>Продолжаем с того места, где остановились</h1></div><a class="primary-action" href="${continueHref}" data-link>${continueLabel} <span>→</span></a></section>
     <section class="request-banner"><div><span>Текущий запрос</span><strong>${escapeHtml(request)}</strong></div><a href="/app/profile" data-link>${profileReady ? "Уточнить" : "Заполнить профиль"}</a></section>
     <div class="dashboard-grid">
       <section class="panel maturity-panel">
@@ -367,13 +367,13 @@ function removePlatformTour() {
 function finishPlatformTour() {
   platformTourStep = -1;
   removePlatformTour();
+  document.querySelector(".sidebar")?.classList.remove("tour-open");
   markPlatformTourSeen();
   document.querySelectorAll(".dashboard-tour-invite").forEach((element) => element.remove());
 }
 
 function platformTourTarget(step) {
-  if (step.selector) return document.querySelector(step.selector);
-  return document.querySelector(`[data-tour-target="${step.target}"]`);
+  return step?.selector ? document.querySelector(step.selector) : null;
 }
 
 function positionPlatformTour(target, spotlight, tooltip) {
@@ -419,6 +419,8 @@ function showPlatformTourStep() {
   removePlatformTour();
   const step = PLATFORM_TOUR_STEPS[platformTourStep];
   if (!step) return finishPlatformTour();
+  const sidebar = document.querySelector(".sidebar");
+  sidebar?.classList.toggle("tour-open", step.selector?.includes("data-tour-nav"));
   const target = platformTourTarget(step);
   if (!target) return finishPlatformTour();
 
@@ -461,7 +463,7 @@ function maybeAutoStartPlatformTour() {
   platformTourAutoStarted = true;
   window.requestAnimationFrame(() => {
     window.requestAnimationFrame(() => {
-      if (!platformTourSeen() && currentPath() === "/app" && document.querySelector('[data-tour-target="overview"]')) {
+      if (!platformTourSeen() && currentPath() === "/app" && document.querySelector('[data-tour-nav="overview"]')) {
         startPlatformTour();
       }
     });
