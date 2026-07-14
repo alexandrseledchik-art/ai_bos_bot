@@ -22,7 +22,7 @@ const state = {
 const DIAGNOSTIC_LEVEL_COPY = {
   express: {
     title: "Экспресс",
-    scope: "11 слоёв бизнеса",
+    scope: "Смотрим на бизнес целиком и определяем, где нужна более глубокая проверка",
     time: "10–15 минут",
     description: "Общий срез по 11 слоям бизнеса.",
     when: [
@@ -37,8 +37,8 @@ const DIAGNOSTIC_LEVEL_COPY = {
   },
   basic: {
     title: "Базовая",
-    scope: "Домены внутри выбранных слоёв",
-    time: "60–90 минут для всех 72 доменов",
+    scope: "Разбираем выбранную часть бизнеса и находим, из чего складывается проблема",
+    time: "60–90 минут",
     description: "Углубление по доменам выбранных слоёв.",
     when: [
       "уже понятно, какой слой связан с запросом",
@@ -47,13 +47,13 @@ const DIAGNOSTIC_LEVEL_COPY = {
       "хотите понять, из каких частей складывается проблема"
     ],
     result: "Более точную картину слоя, его сильные и слабые домены и рабочие гипотезы причины.",
-    note: "Базовую диагностику не обязательно проходить целиком по всем 72 доменам. Можно выбрать один или несколько релевантных слоёв.",
+    note: "Базовую диагностику не обязательно проходить целиком. Можно выбрать один или несколько релевантных слоёв.",
     action: "Разобрать выбранные слои"
   },
   deep: {
     title: "Расширенная",
-    scope: "Поддомены внутри выбранных доменов",
-    time: "4–6 часов для всех 288 поддоменов, обычно в несколько сессий",
+    scope: "Детально проверяем конкретную зону и собираем факты для изменений",
+    time: "4–6 часов, обычно в несколько сессий",
     description: "Подробная проверка поддоменов выбранных доменов.",
     when: [
       "нужно проверить конкретную гипотезу",
@@ -63,7 +63,7 @@ const DIAGNOSTIC_LEVEL_COPY = {
       "диагностика проводится с командой, документами и интервью"
     ],
     result: "Детальную картину конкретной зоны, подтверждающие факты, пробелы, связанные инструменты и основу для плана изменений.",
-    note: "Расширенную диагностику не нужно проходить по всем 288 поддоменам. AI-BOSS рекомендует только те ветки, которые помогут проверить текущее ограничение.",
+    note: "Расширенную диагностику также не нужно проходить целиком. AI-BOSS рекомендует только те ветки, которые помогут проверить текущее ограничение.",
     action: "Проверить причину детально"
   }
 };
@@ -275,7 +275,7 @@ function diagnosticLevelCard(level) {
     <div class="diagnostic-when"><b>Когда выбирать</b><ul>${copy.when.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div>
     <div class="diagnostic-result"><b>Что получите</b><p>${escapeHtml(copy.result)}</p></div>
     <p class="diagnostic-note"><b>Важно:</b> ${escapeHtml(copy.note)}</p>
-    <div class="diagnostic-card-progress"><span>${progress.answeredCount || 0} из ${progress.totalCount} пройдено</span><strong>Полное прохождение: ${escapeHtml(copy.time)}</strong><i><em style="width:${percent(progress.percent)}%"></em></i></div>
+    <div class="diagnostic-card-progress"><strong>Время прохождения: ${escapeHtml(copy.time)}</strong>${started ? `<i title="Прогресс ${percent(progress.percent)}%"><em style="width:${percent(progress.percent)}%"></em></i>` : ""}</div>
     <a class="diagnostic-start" href="/app/diagnostics/${level}" data-diagnostic-start="${level}">${started ? "Продолжить" : escapeHtml(copy.action)} <span>→</span></a>
   </article>`;
 }
@@ -376,8 +376,8 @@ function renderDiagnostics() {
   const answers = diagnostics.answers || {};
   const answered = diagnostics.progress?.answeredCount || 0;
   renderShell(`
-    ${sectionHero(state.bootstrap.company?.name || "Компания", "Диагностика бизнеса", "Выберите глубину проверки в зависимости от того, насколько хорошо вы уже понимаете ситуацию. Начать можно с общей картины, а затем углубить только связанные с запросом части бизнеса.")}
-    <section class="diagnostic-principle panel"><span class="panel-icon">?</span><div><h2>Как выбрать глубину диагностики</h2><p><b>Неясно, где проблема</b> — начните с экспресс-диагностики. <b>Понятен слой, но не причина внутри</b> — выирайте базовую. <b>Есть конкретная гипотеза, которую нужно проверить</b> — переходите к расширенной.</p><small>Глубина определяется не количеством вопросов, а точностью управленческого решения, которое вам сейчас требуется.</small></div></section>
+    ${sectionHero(state.bootstrap.company?.name || "Компания", "Диагностика бизнеса", "Диагностика помогает оценить, насколько собраны разные части бизнеса.")}
+    <section class="diagnostic-principle panel"><span class="panel-icon">?</span><div><h2>Как выбрать глубину диагностики</h2><p>Выберите глубину: быстрый обзор всей системы или подробный разбор конкретной зоны. Результаты можно уточнять постепенно — проходить всё за один раз не нужно.</p></div></section>
     <section class="diagnostic-level-grid">${["express", "basic", "deep"].map(diagnosticLevelCard).join("")}</section>
     <section class="diagnostic-results-head"><div><span class="eyebrow">Текущая картина</span><h2>Результаты по слоям</h2><p>Самый низкий балл не обязательно является главным ограничением. Матрица показывает состояние, а причина определяется отдельно.</p></div>${answered ? `<a href="/app/diagnostics/express" data-diagnostic-start="express">Уточнить оценки →</a>` : ""}</section>
     ${answered ? `<section class="diagnostic-list">${(diagnostics.layers || []).map((layer) => {
