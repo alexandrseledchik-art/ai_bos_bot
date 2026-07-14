@@ -10,6 +10,8 @@ import {
   looksLikeAdminCommand
 } from "../src/application/access-admin-commands.js";
 import { MiniAppDiagnosticsService } from "../src/application/mini-app-diagnostics-service.js";
+import { MiniAppBootstrapService } from "../src/application/mini-app-bootstrap-service.js";
+import { ToolWorkflowService } from "../src/application/tool-workflow-service.js";
 import { MiniAppCompatSyncClient } from "../src/infrastructure/storage/mini-app-compat-sync.js";
 import { extractTelegramMessagePayload } from "../src/infrastructure/telegram/telegram-api.js";
 import { buildMiniAppReplyMarkup } from "../src/infrastructure/telegram/mini-app-webapp.js";
@@ -119,8 +121,33 @@ async function captureMiniAppChatHandoffFeedback({ config, payload, text }) {
   }
 }
 
+async function handleActiveToolChat({ config, googleDrive, payload, text }) {
+  if (!config.supabaseUrl || !config.supabaseServiceRoleKey || !text) return null;
+  try {
+    const syncClient = new MiniAppCompatSyncClient({
+      url: config.supabaseUrl,
+      serviceRoleKey: config.supabaseServiceRoleKey
+    });
+    const telegramUser = {
+      id: payload.userMeta?.telegramUserId || payload.userMeta?.id || payload.chatId,
+      username: payload.userMeta?.username || "",
+      firstName: payload.userMeta?.firstName || "",
+      lastName: payload.userMeta?.lastName || ""
+    };
+    const bootstrap = await new MiniAppBootstrapService({ syncClient }).bootstrap({ telegramUser });
+    return new ToolWorkflowService({ syncClient, googleDrive }).handleTelegramInput({
+      bootstrap,
+      text,
+      source: ["voice", "audio"].includes(payload.kind) ? "chat_voice" : "chat_text"
+    });
+  } catch (error) {
+    console.warn("Tool chat workflow skipped:", error.message);
+    return null;
+  }
+}
+
 async function handleTelegramWebhook(request) {
-  const { config, conversationService, telegramApi, audioTranscriber, accessControl } = getServices();
+  const { config, conversationService, telegramApi, audioTranscriber, accessControl, googleDrive } = getServices();
 
   if (!config.telegramToken) {
     return json({ ok: false, error: "TELEGRAM_BOT_TOKEN is missing" }, { status: 500 });
@@ -222,6 +249,23 @@ async function handleTelegramWebhook(request) {
         reply: buildFileCapabilityReply()
       });
       return json({ ok: true, handled: "file-capability-question" });
+    }
+
+    const toolChat = await handleActiveToolChat({
+      config,
+      googleDrive,
+      payload,
+      text: resolved.text
+    });
+    if (toolChat?.handled) {
+      await recordAndSendTelegramReply({
+        conversationService,
+        telegramApi,
+        payload,
+        userText: resolved.text,
+        reply: toolChat.reply
+      });
+      return json({ ok: true, handled: "tool-chat-workflow" });
     }
 
     const miniAppHandoff = await captureMiniAppChatHandoffFeedback({

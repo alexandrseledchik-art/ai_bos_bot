@@ -130,7 +130,7 @@ function progressRing(value) {
 }
 
 function statusLabel(code) {
-  return ({ covered: "подтверждено", review: "проверить", draft: "черновик", missing: "не начато", ready: "готово", in_progress: "в работе" })[code] || "не начато";
+  return ({ covered: "подтверждено", review: "проверить", draft: "черновик", missing: "не начато", ready: "готово", in_progress: "в работе", waiting_for_user: "ждёт ответа", submitted: "ответы собраны", analyzed: "проанализирован", completed: "завершён", needs_update: "нужно обновить" })[code] || "не начато";
 }
 
 function sectionHero(kicker, title, description) {
@@ -150,6 +150,7 @@ function renderDashboard() {
   const nextStep = workspace.nextStep;
   const toolCount = workspace.tools?.length || 0;
   const documentCount = workspace.documents?.length || 0;
+  const currentTool = (workspace.toolInstances || []).find((item) => ["in_progress", "waiting_for_user", "submitted", "needs_update"].includes(item.instance?.status));
 
   renderShell(`
     <section class="dashboard-head"><div><p class="kicker">Текущая управленческая картина</p><h1>${profileReady ? "Продолжаем собирать архитектуру" : "Начнём с контекста компании"}</h1></div><a class="primary-action" href="/app/architecture" data-link>Продолжить маршрут <span>→</span></a></section>
@@ -170,6 +171,7 @@ function renderDashboard() {
         <div class="panel-title"><div><span class="panel-icon">◫</span><h2>Рабочее состояние</h2></div><span class="status-tag">единый контекст</span></div>
         <div class="stat-strip"><div><b>${progress.answeredCount || 0}/11</b><span>экспресс-оценок</span></div><div><b>${assembly.completedLayers || 0}/11</b><span>собранных слоёв</span></div><div><b>${documentCount}</b><span>документов</span></div><div><b>${toolCount}</b><span>инструментов в каталоге</span></div></div>
       </section>
+      ${currentTool ? `<section class="panel current-tool-panel wide"><div><span class="eyebrow orange-text">Текущий инструмент</span><h2>${escapeHtml(currentTool.tool?.title || "Инструмент в работе")}</h2><p>${escapeHtml(currentTool.tool?.short_description || "Продолжи заполнение — ответы уже сохраняются в памяти компании.")}</p></div><div><b>${percent(currentTool.instance.progress_percent)}%</b><a class="text-action" href="/app/tools/${encodeURIComponent(currentTool.tool?.id || currentTool.instance.tool_id)}" data-link>Продолжить →</a></div></section>` : ""}
     </div>`);
 }
 
@@ -210,9 +212,44 @@ function renderTools() {
     ${sectionHero(state.bootstrap.company?.name || "Компания", "Инструменты", "Каталог рабочих шаблонов по архитектуре бизнеса. AI-BOSS помогает выбрать инструмент и сопровождает его заполнение.")}
     <section class="tool-toolbar"><label><span>Поиск по каталогу</span><input type="search" value="${escapeHtml(state.toolQuery)}" placeholder="Например: роли, стратегия, финансы" data-tool-search /></label><b>${matchingTools.length} найдено${matchingTools.length > tools.length ? ` · показано ${tools.length}` : ""}</b></section>
     <section class="tool-grid">${tools.length ? tools.map((tool) => {
-      const url = safeUrl(tool.templateUrl || tool.template_url);
-      return `<article class="tool-card"><div><span class="eyebrow">${escapeHtml(tool.layer || tool.domain || "Инструмент")}</span><h2>${escapeHtml(tool.title)}</h2><p>${escapeHtml(tool.short_description || "Рабочий инструмент для сборки этого участка бизнеса.")}</p></div><div class="tool-result"><b>Результат</b><span>${escapeHtml(tool.result || tool.when_to_use || "Зафиксированный управленческий артефакт.")}</span></div>${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" data-tool-open="${escapeHtml(tool.id)}">Открыть шаблон →</a>` : `<span class="tool-unavailable">Шаблон готовится</span>`}</article>`;
+      const active = (state.workspace?.toolInstances || []).find((item) => item.instance?.tool_id === tool.id);
+      return `<article class="tool-card"><div><span class="eyebrow">${escapeHtml(tool.layer || tool.domain || "Инструмент")}</span><h2>${escapeHtml(tool.title)}</h2><p>${escapeHtml(tool.short_description || "Рабочий инструмент для сборки этого участка бизнеса.")}</p></div><div class="tool-result"><b>Результат</b><span>${escapeHtml(tool.result || tool.when_to_use || "Зафиксированный управленческий артефакт.")}</span></div><a href="/app/tools/${encodeURIComponent(tool.id)}" data-link data-tool-open="${escapeHtml(tool.id)}">${active ? `Продолжить · ${percent(active.instance.progress_percent)}%` : "Открыть инструмент"} →</a></article>`;
     }).join("") : `<div class="empty-state"><h2>Ничего не найдено</h2><p>Измени поисковый запрос или попроси AI-BOSS подобрать инструмент по текущей задаче.</p></div>`}</section>`);
+}
+
+function toolByRoute() {
+  const match = currentPath().match(/^\/app\/tools\/([^/]+)$/);
+  if (!match) return null;
+  const id = decodeURIComponent(match[1]);
+  return (state.workspace?.tools || []).find((tool) => tool.id === id || tool.slug === id) || null;
+}
+
+function renderToolDetail() {
+  const tool = toolByRoute();
+  if (!tool) {
+    return renderShell(`${sectionHero("Инструменты", "Инструмент не найден", "Вернись в каталог и выбери доступный инструмент.")}<a class="primary-action" href="/app/tools" data-link>К каталогу <span>→</span></a>`);
+  }
+  const context = (state.workspace?.toolInstances || []).find((item) => item.instance?.tool_id === tool.id) || null;
+  const instance = context?.instance;
+  const document = context?.document;
+  const questions = context?.questions || [];
+  const answers = context?.answers || [];
+  const masterUrl = safeUrl(tool.templateUrl || tool.template_url);
+  const chatUrl = instance?.telegram_start_token
+    ? `${TELEGRAM_CHAT_URL}?start=tool_${instance.telegram_start_token}`
+    : TELEGRAM_CHAT_URL;
+  renderShell(`
+    ${sectionHero("Инструмент архитектуры", tool.title, tool.short_description || "AI-BOSS проведёт по инструменту, сохранит ответы и добавит результат в память компании.")}
+    <section class="tool-workspace-grid">
+      <article class="panel tool-purpose"><span class="eyebrow">Зачем сейчас</span><h2>${escapeHtml(tool.when_to_use || "Структурировать этот участок бизнеса и получить рабочий результат.")}</h2><p><b>Результат:</b> ${escapeHtml(tool.result || "Заполненный управленческий артефакт, связанный с контекстом компании.")}</p></article>
+      <article class="panel tool-progress-panel"><span class="eyebrow">Состояние</span><div class="tool-progress-number">${percent(instance?.progress_percent)}%</div><p>${instance ? `Статус: ${escapeHtml(statusLabel(instance.status))}. Сохранено ответов: ${answers.length} из ${questions.length || "—"}.` : "Инструмент ещё не начат. Выбери удобный способ работы."}</p></article>
+    </section>
+    <section class="fill-mode-grid">
+      <article class="fill-mode-card"><span>01</span><h2>Пройти с AI-BOSS</h2><p>Бот задаёт по одному вопросу, принимает текст и голос, сохраняет ответы и после завершения добавляет выводы в память компании.</p>${instance?.fill_mode === "chat" ? `<a class="primary-action" href="${escapeHtml(chatUrl)}" target="_blank" rel="noopener">Продолжить в Telegram <span>→</span></a>` : `<button class="primary-action" type="button" data-start-tool="${escapeHtml(tool.id)}" data-mode="chat">Начать в чате <span>→</span></button>`}</article>
+      <article class="fill-mode-card"><span>02</span><h2>Заполнить документ</h2><p>AI-BOSS создаёт личную копию Google-шаблона. Если копирование ещё не подключено, можно добавить собственную копию ссылкой.</p>${document?.google_file_url ? `<a class="primary-action secondary" href="${escapeHtml(safeUrl(document.google_file_url))}" target="_blank" rel="noopener">Открыть личный документ <span>↗</span></a>` : `<button class="primary-action secondary" type="button" data-copy-tool="${escapeHtml(tool.id)}">Создать личную копию <span>→</span></button>`}${masterUrl ? `<a class="quiet-link" href="${escapeHtml(masterUrl)}" target="_blank" rel="noopener">Посмотреть исходный шаблон ↗</a>` : ""}</article>
+    </section>
+    <form class="panel document-link-form" data-document-link-form data-tool-id="${escapeHtml(tool.id)}"><div><span class="eyebrow">Уже сделали копию?</span><h2>Привязать свой документ</h2><p>Ссылка сохранится в компании и будет доступна AI-BOSS как источник актуального контекста.</p></div><label><input type="url" name="url" required placeholder="https://docs.google.com/..." value="${escapeHtml(document?.google_file_url || "")}" /><button type="submit">Сохранить ссылку</button></label><small data-document-status></small></form>
+    ${answers.length ? `<section class="panel saved-answers"><span class="eyebrow">Сохранённые ответы</span><h2>${answers.length} из ${questions.length}</h2>${answers.map((answer) => `<div><b>${escapeHtml(answer.question_text || answer.question_key)}</b><p>${escapeHtml(answer.answer_text)}</p></div>`).join("")}</section>` : ""}`);
 }
 
 function renderDocuments() {
@@ -250,6 +287,7 @@ function render() {
   if (path === "/app/architecture") return renderArchitecture();
   if (path === "/app/diagnostics") return renderDiagnostics();
   if (path === "/app/tools") return renderTools();
+  if (path.startsWith("/app/tools/")) return renderToolDetail();
   if (path === "/app/documents") return renderDocuments();
   if (path === "/app/profile") return renderProfile();
   return renderDashboard();
@@ -266,6 +304,7 @@ document.addEventListener("click", async (event) => {
   const link = event.target.closest("[data-link]");
   if (link) {
     event.preventDefault();
+    if (link.dataset.toolOpen) api.markToolOpened(link.dataset.toolOpen).catch(() => null);
     navigate(link.getAttribute("href"));
     document.querySelector(".sidebar")?.classList.remove("open");
     return;
@@ -277,6 +316,35 @@ document.addEventListener("click", async (event) => {
   const toolLink = event.target.closest("[data-tool-open]");
   if (toolLink) {
     api.markToolOpened(toolLink.dataset.toolOpen).catch(() => null);
+    return;
+  }
+  const startButton = event.target.closest("[data-start-tool]");
+  if (startButton) {
+    startButton.disabled = true;
+    try {
+      const context = await api.startTool(startButton.dataset.startTool, startButton.dataset.mode || "chat");
+      state.workspace.toolInstances = [context, ...(state.workspace.toolInstances || []).filter((item) => item.instance?.id !== context.instance.id)];
+      state.notice = "Инструмент запущен. Открой Telegram — AI-BOSS начнёт с первого вопроса.";
+      renderToolDetail();
+    } catch (error) {
+      state.notice = error.message;
+      renderToolDetail();
+    }
+    return;
+  }
+  const copyButton = event.target.closest("[data-copy-tool]");
+  if (copyButton) {
+    copyButton.disabled = true;
+    try {
+      let context = (state.workspace.toolInstances || []).find((item) => item.instance?.tool_id === copyButton.dataset.copyTool);
+      if (!context) context = await api.startTool(copyButton.dataset.copyTool, "document");
+      context = await api.createToolDocument(context.instance.id);
+      state.workspace.toolInstances = [context, ...(state.workspace.toolInstances || []).filter((item) => item.instance?.id !== context.instance.id)];
+      state.notice = "Личная копия создана и привязана к компании.";
+    } catch (error) {
+      state.notice = error.message;
+    }
+    renderToolDetail();
     return;
   }
   if (event.target.closest("[data-logout]")) {
@@ -297,6 +365,24 @@ document.addEventListener("input", (event) => {
 });
 
 document.addEventListener("submit", async (event) => {
+  const documentForm = event.target.closest("[data-document-link-form]");
+  if (documentForm) {
+    event.preventDefault();
+    const status = documentForm.querySelector("[data-document-status]");
+    status.textContent = "Сохраняю...";
+    try {
+      const toolId = documentForm.dataset.toolId;
+      let context = (state.workspace.toolInstances || []).find((item) => item.instance?.tool_id === toolId);
+      if (!context) context = await api.startTool(toolId, "document");
+      context = await api.attachToolDocument(context.instance.id, new FormData(documentForm).get("url"));
+      state.workspace.toolInstances = [context, ...(state.workspace.toolInstances || []).filter((item) => item.instance?.id !== context.instance.id)];
+      state.notice = "Документ привязан к инструменту и компании.";
+      renderToolDetail();
+    } catch (error) {
+      status.textContent = error.message;
+    }
+    return;
+  }
   const form = event.target.closest("[data-profile-form]");
   if (!form) return;
   event.preventDefault();

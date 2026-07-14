@@ -45,6 +45,7 @@
     "miniapp:phase8": "node src/scripts/check-mini-app-phase8.js",
     "miniapp:chat-bridge": "node src/scripts/check-mini-app-chat-bridge.js",
     "platform:phase1": "node src/scripts/check-web-platform-phase1.js",
-    "platform:phase2": "node src/scripts/check-web-platform-phase2.js"
+    "platform:phase2": "node src/scripts/check-web-platform-phase2.js",
+    "platform:tools": "node src/scripts/check-tool-workflow-platform.js"
   }
 }

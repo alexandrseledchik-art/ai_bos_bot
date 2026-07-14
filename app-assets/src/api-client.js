@@ -42,6 +42,30 @@ export class PlatformApiClient {
     });
   }
 
+  getTool(toolId) {
+    return this.request(`/api/platform/tools/${encodeURIComponent(toolId)}`);
+  }
+
+  startTool(toolId, mode = "chat") {
+    return this.request(`/api/platform/tools/${encodeURIComponent(toolId)}/start`, {
+      method: "POST",
+      body: JSON.stringify({ mode })
+    });
+  }
+
+  createToolDocument(instanceId) {
+    return this.request(`/api/platform/tool-instances/${encodeURIComponent(instanceId)}/document-copy`, {
+      method: "POST"
+    });
+  }
+
+  attachToolDocument(instanceId, url) {
+    return this.request(`/api/platform/tool-instances/${encodeURIComponent(instanceId)}/document-link`, {
+      method: "POST",
+      body: JSON.stringify({ url })
+    });
+  }
+
   logout() {
     return this.request("/api/platform/auth/logout", { method: "POST" });
   }

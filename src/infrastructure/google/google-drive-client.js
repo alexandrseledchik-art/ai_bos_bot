@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const DRIVE_API_BASE_URL = "https://www.googleapis.com/drive/v3";
-const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
 const GOOGLE_FOLDER_MIME_TYPE = "application/vnd.google-apps.folder";
 
 const GOOGLE_EXPORT_MIME_TYPES = {
@@ -153,7 +153,7 @@ export class GoogleDriveClient {
     return this.cachedToken.accessToken;
   }
 
-  async request(pathname, { query = {}, headers = {} } = {}) {
+  async request(pathname, { method = "GET", query = {}, headers = {}, body } = {}) {
     const accessToken = await this.getAccessToken();
     const url = new URL(`${this.driveApiBaseUrl}${pathname}`);
 
@@ -164,10 +164,13 @@ export class GoogleDriveClient {
     }
 
     const response = await fetch(url, {
+      method,
       headers: {
         authorization: `Bearer ${accessToken}`,
+        ...(body ? { "content-type": "application/json" } : {}),
         ...headers
-      }
+      },
+      ...(body ? { body: JSON.stringify(body) } : {})
     });
 
     if (!response.ok) {
@@ -175,6 +178,37 @@ export class GoogleDriveClient {
     }
 
     return response;
+  }
+
+  async findOrCreateFolder({ name, parentId = this.rootFolderId }) {
+    this.assertEnabled();
+    const files = await this.listFilesInFolder(parentId);
+    const existing = files.find((file) => isFolder(file) && normalizeName(file.name) === normalizeName(name));
+    if (existing) return existing;
+
+    const response = await this.request("/files", {
+      method: "POST",
+      query: { fields: "id,name,mimeType,webViewLink,modifiedTime" },
+      body: {
+        name,
+        mimeType: GOOGLE_FOLDER_MIME_TYPE,
+        parents: [parentId]
+      }
+    });
+    return response.json();
+  }
+
+  async copyFile({ fileId, name, parentId }) {
+    this.assertEnabled();
+    const response = await this.request(`/files/${encodeURIComponent(fileId)}/copy`, {
+      method: "POST",
+      query: { fields: "id,name,mimeType,webViewLink,modifiedTime,parents" },
+      body: {
+        ...(name ? { name } : {}),
+        ...(parentId ? { parents: [parentId] } : {})
+      }
+    });
+    return response.json();
   }
 
   async listFilesInFolder(folderId = this.rootFolderId) {

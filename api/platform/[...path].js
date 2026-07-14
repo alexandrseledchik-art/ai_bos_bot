@@ -2,7 +2,9 @@ import { AccessControlService } from "../../src/application/access-control-servi
 import { handlePlatformRoute, platformJson } from "../../src/application/platform-api-context.js";
 import { MiniAppBootstrapService } from "../../src/application/mini-app-bootstrap-service.js";
 import { MiniAppDiagnosticsService } from "../../src/application/mini-app-diagnostics-service.js";
+import { ToolWorkflowService } from "../../src/application/tool-workflow-service.js";
 import { loadConfig } from "../../src/config.js";
+import { GoogleDriveClient } from "../../src/infrastructure/google/google-drive-client.js";
 import {
   clearWebSessionCookie,
   createWebSessionToken,
@@ -43,6 +45,18 @@ async function readJsonBody(request) {
 
 function createWorkspaceService(syncClient) {
   return new MiniAppDiagnosticsService({ syncClient });
+}
+
+function createToolWorkflowService(syncClient, config) {
+  return new ToolWorkflowService({
+    syncClient,
+    googleDrive: new GoogleDriveClient({
+      serviceAccountEmail: config.googleDriveServiceAccountEmail,
+      privateKey: config.googleDrivePrivateKey,
+      rootFolderId: config.googleDriveFolderId,
+      maxTextChars: config.googleDriveMaxTextChars
+    })
+  });
 }
 
 async function exchangeLoginToken(request) {
@@ -108,8 +122,9 @@ async function dispatch(request) {
   }
 
   if (path === "workspace") {
-    return handlePlatformRoute(request, ["GET"], async ({ bootstrap, syncClient }) => {
+    return handlePlatformRoute(request, ["GET"], async ({ bootstrap, syncClient, config }) => {
       const service = createWorkspaceService(syncClient);
+      const toolWorkflow = createToolWorkflowService(syncClient, config);
       // Resolve the diagnostic run once before assembly reads the same run.
       const diagnostics = await service.getExpressDiagnostics({ bootstrap });
       const [assemblyResult, toolsResult, documentsResult, constraintRow, nextStep] = await Promise.all([
@@ -123,6 +138,7 @@ async function dispatch(request) {
         ? service.decorateConstraintHypothesis(constraintRow)
         : null;
 
+      const toolInstances = await toolWorkflow.listInstances({ bootstrap });
       return platformJson({
         ok: true,
         assembly: assemblyResult.assembly,
@@ -130,6 +146,7 @@ async function dispatch(request) {
         tools: toolsResult.tools || [],
         documents: documentsResult.documents || [],
         artifacts: documentsResult.artifacts || [],
+        toolInstances,
         constraintHypothesis,
         nextStep
       });
@@ -154,6 +171,55 @@ async function dispatch(request) {
         toolId: decodeURIComponent(toolOpenedMatch[1])
       });
       return platformJson({ ok: true, ...result });
+    });
+  }
+
+  const toolDetailMatch = path.match(/^tools\/([^/]+)$/);
+  if (toolDetailMatch && request.method === "GET") {
+    return handlePlatformRoute(request, ["GET"], async ({ bootstrap, syncClient, config }) => {
+      const workflow = createToolWorkflowService(syncClient, config);
+      const tool = await workflow.getTool(decodeURIComponent(toolDetailMatch[1]));
+      if (!tool) return platformJson({ ok: false, error: "Инструмент не найден." }, { status: 404 });
+      const instances = await workflow.listInstances({ bootstrap });
+      const instance = instances.find((item) => item.instance.tool_id === tool.id) || null;
+      return platformJson({ ok: true, tool, instance });
+    });
+  }
+
+  const toolStartMatch = path.match(/^tools\/([^/]+)\/start$/);
+  if (toolStartMatch) {
+    return handlePlatformRoute(request, ["POST"], async ({ bootstrap, syncClient, config }) => {
+      const payload = await readJsonBody(request);
+      const context = await createToolWorkflowService(syncClient, config).startTool({
+        bootstrap,
+        toolId: decodeURIComponent(toolStartMatch[1]),
+        mode: payload.mode === "document" ? "document" : "chat"
+      });
+      return platformJson({ ok: true, ...context });
+    });
+  }
+
+  const toolCopyMatch = path.match(/^tool-instances\/([^/]+)\/document-copy$/);
+  if (toolCopyMatch) {
+    return handlePlatformRoute(request, ["POST"], async ({ bootstrap, syncClient, config }) => {
+      const context = await createToolWorkflowService(syncClient, config).createPersonalCopy({
+        bootstrap,
+        instanceId: decodeURIComponent(toolCopyMatch[1])
+      });
+      return platformJson({ ok: true, ...context });
+    });
+  }
+
+  const toolLinkMatch = path.match(/^tool-instances\/([^/]+)\/document-link$/);
+  if (toolLinkMatch) {
+    return handlePlatformRoute(request, ["POST"], async ({ bootstrap, syncClient, config }) => {
+      const payload = await readJsonBody(request);
+      const context = await createToolWorkflowService(syncClient, config).attachDocumentLink({
+        bootstrap,
+        instanceId: decodeURIComponent(toolLinkMatch[1]),
+        url: payload.url
+      });
+      return platformJson({ ok: true, ...context });
     });
   }
 
