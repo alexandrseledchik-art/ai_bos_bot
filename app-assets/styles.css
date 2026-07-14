@@ -180,18 +180,24 @@ button { font: inherit; }
 .diagnostic-principle p b { color: var(--ink); }
 .diagnostic-principle small { display: block; margin-top: 10px; color: #87928e; line-height: 1.5; }
 .diagnostic-level-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 20px; }
-.diagnostic-level-card { min-height: 510px; padding: 24px; display: flex; flex-direction: column; gap: 20px; border: 1px solid var(--line); border-radius: 20px; background: white; box-shadow: 0 12px 35px rgba(24,53,50,.05); }
+.diagnostic-level-card { min-height: 720px; padding: 24px; display: flex; flex-direction: column; gap: 20px; border: 1px solid var(--line); border-radius: 20px; background: white; box-shadow: 0 12px 35px rgba(24,53,50,.05); }
 .diagnostic-level-card.basic { background: linear-gradient(160deg, white 55%, #f4faf8); }
 .diagnostic-level-card.deep { background: linear-gradient(160deg, white 55%, #fff7ef); }
 .diagnostic-level-top { display: flex; justify-content: space-between; align-items: center; }
 .diagnostic-level-mark { color: #cfd9d5; font-family: "Prata", serif; font-size: 36px; }
 .diagnostic-level-card h2 { margin: 8px 0 10px; font-family: "Prata", serif; font-size: 27px; font-weight: 400; line-height: 1.2; }
 .diagnostic-level-card > div > p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.diagnostic-scope-copy b { color: var(--ink); }
 .diagnostic-when, .diagnostic-result { padding-top: 15px; border-top: 1px solid var(--line); }
 .diagnostic-when b, .diagnostic-result b { color: var(--teal); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
 .diagnostic-when p, .diagnostic-result p { margin: 7px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.diagnostic-when ul { margin: 9px 0 0; padding-left: 17px; color: var(--muted); font-size: 11px; line-height: 1.48; }
+.diagnostic-when li + li { margin-top: 5px; }
+.diagnostic-note { margin: 0; padding: 12px; border-radius: 11px; color: #6f7774; background: #f2f5f3; font-size: 10px; line-height: 1.5; }
+.diagnostic-note b { color: var(--ink); }
 .diagnostic-card-progress { margin-top: auto; display: grid; gap: 8px; }
 .diagnostic-card-progress span { color: var(--muted); font-size: 10px; }
+.diagnostic-card-progress strong { color: var(--ink); font-size: 10px; line-height: 1.45; }
 .diagnostic-card-progress i { height: 5px; overflow: hidden; border-radius: 99px; background: #edf1ef; }
 .diagnostic-card-progress em { display: block; height: 100%; border-radius: inherit; background: var(--orange); }
 .diagnostic-start { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-radius: 12px; color: white; background: var(--teal); font-size: 12px; font-weight: 800; }
