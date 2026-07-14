@@ -665,7 +665,6 @@ function renderNativeToolWorkspace(context) {
   const answerMap = nativeAnswerMap(context.answers);
   const completed = context.instance?.status === "completed";
   return `
-    <section class="native-tool-intro panel"><div><span class="eyebrow orange-text">Рабочая область AI-BOSS</span><h2>${escapeHtml(definition.title)}</h2><p>${escapeHtml(definition.description)}</p></div><div><b>${percent(context.instance?.progress_percent)}%</b><span>${completed ? "результат подтверждён" : "обязательных полей заполнено"}</span></div></section>
     ${completed && context.latestSnapshot ? `<section class="native-tool-result"><span class="eyebrow">Сохранённый результат</span><h2>Критерии успеха стали частью контекста компании</h2><p>${escapeHtml(context.latestSnapshot.summary)}</p><div><button type="button" data-edit-native-tool>Уточнить ответы</button><a href="/app/architecture" data-link>Посмотреть архитектуру →</a></div></section>` : ""}
     <form class="native-tool-form ${completed ? "is-completed" : ""}" data-native-tool-form data-instance-id="${escapeHtml(context.instance.id)}">
       ${(definition.sections || []).map((section, index) => `<section class="native-tool-section"><header><span>0${index + 1}</span><div><h2>${escapeHtml(section.title)}</h2><p>${escapeHtml(section.description || "")}</p></div></header><div class="native-tool-fields">${(context.questions || []).filter((field) => field.sectionKey === section.key).map((field) => renderNativeField(field, answerMap)).join("")}</div></section>`).join("")}
@@ -689,10 +688,16 @@ function renderToolDetail() {
     : TELEGRAM_CHAT_URL;
   const nativePilot = isOwnerSuccessPilot(tool);
   const displayTitle = nativePilot ? "Канва критериев успеха собственника" : tool.title;
+  const displayDescription = nativePilot
+    ? "Помогает определить, что лично для собственника будет означать победу в бизнесе через 3–10 лет."
+    : tool.short_description || "AI-BOSS проведёт по инструменту, сохранит ответы и добавит результат в память компании.";
+  const displayResult = nativePilot
+    ? "Согласованные критерии успеха, красные линии и ориентиры для решений по бизнесу."
+    : tool.result || "Заполненный управленческий артефакт, связанный с контекстом компании.";
   renderShell(`
-    ${sectionHero("Инструмент архитектуры", displayTitle, tool.short_description || "AI-BOSS проведёт по инструменту, сохранит ответы и добавит результат в память компании.")}
+    ${sectionHero("Инструмент архитектуры", displayTitle, displayDescription)}
     <section class="tool-workspace-grid">
-      <article class="panel tool-purpose"><span class="eyebrow">Зачем сейчас</span><h2>${escapeHtml(tool.when_to_use || "Структурировать этот участок бизнеса и получить рабочий результат.")}</h2><p><b>Результат:</b> ${escapeHtml(tool.result || "Заполненный управленческий артефакт, связанный с контекстом компании.")}</p></article>
+      <article class="panel tool-purpose"><span class="eyebrow">Зачем сейчас</span><h2>${escapeHtml(tool.when_to_use || "Структурировать этот участок бизнеса и получить рабочий результат.")}</h2><p><b>Результат:</b> ${escapeHtml(displayResult)}</p></article>
       <article class="panel tool-progress-panel"><span class="eyebrow">Состояние</span><div class="tool-progress-number">${percent(instance?.progress_percent)}%</div><p>${instance ? `Статус: ${escapeHtml(statusLabel(instance.status))}. Сохранено ответов: ${answers.length} из ${questions.length || "—"}.` : "Инструмент ещё не начат. Выбери удобный способ работы."}</p></article>
     </section>
     ${nativePilot && context?.nativeWorkspace ? renderNativeToolWorkspace(context) : `<section class="fill-mode-grid">
