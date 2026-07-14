@@ -121,6 +121,7 @@ button { font: inherit; }
 .system-assistant-note p { margin: 0; font-size: 12px; line-height: 1.5; }
 .system-assistant-note b { color: white; }
 .tour-invite { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 14px; padding: 15px 17px; border: 1px dashed #9dbcb5; border-radius: 13px; background: rgba(255,255,255,.72); }
+.dashboard-tour-invite { margin-top: 24px; background: white; box-shadow: 0 10px 30px rgba(24,53,50,.04); }
 .tour-invite > div:first-child { display: grid; gap: 3px; }
 .tour-invite span { color: var(--muted); font-size: 12px; }
 .tour-invite button { padding: 9px 13px; border: 0; border-radius: 9px; color: white; background: var(--teal); font-weight: 800; cursor: pointer; }

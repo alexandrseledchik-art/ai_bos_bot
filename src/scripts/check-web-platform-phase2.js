@@ -59,6 +59,7 @@ for (const className of [
   "welcome-entry-grid",
   "welcome-choice-title",
   "entry-or",
+  "dashboard-tour-invite",
   "system-flow-grid",
   "system-assistant-note",
   "tour-start-button",
