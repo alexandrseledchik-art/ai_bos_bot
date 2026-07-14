@@ -151,7 +151,7 @@ async function dispatchAdminRoute(request) {
               token: config.telegramToken,
               apiBaseUrl: config.telegramApiBaseUrl
             });
-            await telegramApi.sendMessage(user.telegram_user_id, buildAccessApprovedUserMessage(), {
+            await telegramApi.sendMessage(user.telegram_user_id, buildAccessApprovedUserMessage(user), {
               replyMarkup: buildMiniAppReplyMarkup(buildAccessApprovedMiniAppInvite(), {
                 appBaseUrl: config.appBaseUrl,
                 telegramUser: user,

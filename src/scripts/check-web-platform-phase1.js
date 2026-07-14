@@ -70,6 +70,19 @@ assert.equal(replyMarkup.inline_keyboard[0][0].web_app.url, "https://aibosbot.te
 assert.equal(replyMarkup.inline_keyboard[1][0].text, "Открыть в браузере");
 assert.match(replyMarkup.inline_keyboard[1][0].url, /\/api\/platform\/auth\/exchange/);
 
+const onboardingMarkup = buildMiniAppReplyMarkup(
+  { route: "/mini-app", label: "Открыть кабинет", preferWebCabinet: true, miniAppLabel: "Открыть внутри Telegram" },
+  {
+    appBaseUrl: "https://aibosbot.test",
+    telegramUser,
+    webSessionSecret: secret
+  }
+);
+assert.equal(onboardingMarkup.inline_keyboard[0][0].text, "Открыть кабинет");
+assert.match(onboardingMarkup.inline_keyboard[0][0].url, /\/api\/platform\/auth\/exchange/);
+assert.equal(onboardingMarkup.inline_keyboard[1][0].text, "Открыть внутри Telegram");
+assert.equal(onboardingMarkup.inline_keyboard[1][0].web_app.url, "https://aibosbot.test/mini-app");
+
 process.env.WEB_SESSION_SECRET = secret;
 process.env.TELEGRAM_WEBHOOK_SECRET = secret;
 process.env.SUPABASE_URL = "https://example.supabase.co";

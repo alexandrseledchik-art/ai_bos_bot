@@ -170,7 +170,7 @@ async function handleTelegramWebhook(request) {
       fromTelegramUserId: payload.userMeta?.telegramUserId || payload.userMeta?.id || payload.chatId,
       accessControl,
       onUserApproved: async (user) => {
-        await telegramApi.sendMessage(user.telegram_user_id, buildAccessApprovedUserMessage(), {
+        await telegramApi.sendMessage(user.telegram_user_id, buildAccessApprovedUserMessage(user), {
           replyMarkup: buildMiniAppReplyMarkup(buildAccessApprovedMiniAppInvite(), {
             appBaseUrl: config.appBaseUrl,
             telegramUser: user,

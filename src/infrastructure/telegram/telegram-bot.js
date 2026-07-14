@@ -97,7 +97,7 @@ export class TelegramBotRunner {
               fromTelegramUserId: payload.userMeta?.telegramUserId || payload.userMeta?.id || payload.chatId,
               accessControl: this.accessControl,
               onUserApproved: async (user) => {
-                await this.sendMessage(user.telegram_user_id, buildAccessApprovedUserMessage(), {
+                await this.sendMessage(user.telegram_user_id, buildAccessApprovedUserMessage(user), {
                   replyMarkup: buildMiniAppReplyMarkup(buildAccessApprovedMiniAppInvite(), {
                     appBaseUrl: this.appBaseUrl,
                     telegramUser: user,

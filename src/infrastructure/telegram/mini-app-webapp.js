@@ -37,19 +37,23 @@ export function buildMiniAppReplyMarkup(invite, {
         ttlSeconds: webLoginTtlSeconds
       })
     : "";
-  const inlineKeyboard = [
-      [
-        {
-          text: invite.label || "Открыть Кабинет AI-BOSS",
-          web_app: {
-            url
-          }
-        }
-      ]
-    ];
+  const miniAppButton = {
+    text: invite.miniAppLabel || invite.label || "Открыть Кабинет AI-BOSS",
+    web_app: { url }
+  };
+  const webCabinetButton = webCabinetUrl
+    ? {
+        text: invite.label || "Открыть кабинет",
+        url: webCabinetUrl
+      }
+    : null;
+  const inlineKeyboard = [];
 
-  if (webCabinetUrl) {
-    inlineKeyboard.push([
+  if (invite.preferWebCabinet && webCabinetButton) {
+    inlineKeyboard.push([webCabinetButton], [miniAppButton]);
+  } else {
+    inlineKeyboard.push([miniAppButton]);
+    if (webCabinetButton) inlineKeyboard.push([
       {
         text: "Открыть в браузере",
         url: webCabinetUrl
