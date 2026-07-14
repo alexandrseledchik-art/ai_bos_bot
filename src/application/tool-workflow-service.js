@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { nativeToolDefinition, nativeToolFields, ownerSuccessSummary } from "../domain/native-tool-definitions.js";
 
 const ACTIVE_STATUSES = new Set(["in_progress", "waiting_for_user"]);
 
@@ -40,6 +41,21 @@ function fallbackQuestions(tool) {
 }
 
 function toolQuestions(tool) {
+  const nativeDefinition = nativeToolDefinition(tool);
+  if (nativeDefinition) {
+    return nativeToolFields(nativeDefinition).map((field) => ({
+      key: field.key,
+      question: field.question,
+      label: field.label,
+      type: field.type,
+      help: field.help || "",
+      placeholder: field.placeholder || "",
+      options: field.options || [],
+      required: field.required !== false,
+      sectionKey: field.sectionKey,
+      sectionTitle: field.sectionTitle
+    }));
+  }
   const metadata = tool?.metadata && typeof tool.metadata === "object" ? tool.metadata : {};
   const candidates = asArray(metadata.questions).length
     ? metadata.questions
@@ -128,6 +144,7 @@ export class ToolWorkflowService {
       answers,
       document,
       latestSnapshot: snapshots?.[0] || null,
+      nativeWorkspace: nativeToolDefinition(tool),
       googleCopyAvailable: Boolean(this.googleDrive?.enabled && templateFileId(tool?.template_url))
     };
   }
@@ -166,6 +183,10 @@ export class ToolWorkflowService {
   async startTool({ bootstrap, toolId, mode = "chat" }) {
     const tool = await this.getTool(toolId);
     if (!tool) throw Object.assign(new Error("Инструмент не найден."), { status: 404 });
+    // The current production schema distinguishes conversation from a linked
+    // workspace. Native web forms use the latter until the broader tool model
+    // is migrated without making this pilot depend on a production DDL change.
+    const storedMode = mode === "web" ? "document" : mode;
     const ids = this.contextIds(bootstrap);
     let instance = await this.findOne("tool_instances", {
       case_id: `eq.${ids.case_id}`,
@@ -179,15 +200,15 @@ export class ToolWorkflowService {
         ...ids,
         tool_id: tool.id,
         status: mode === "chat" ? "waiting_for_user" : "in_progress",
-        fill_mode: mode,
+        fill_mode: storedMode,
         current_step: 0,
         progress_percent: 0,
         telegram_start_token: instanceToken(),
         started_at: new Date().toISOString(),
         version: 1
       });
-    } else if (mode && instance.fill_mode !== mode) {
-      instance = await this.patchOne("tool_instances", instance.id, { fill_mode: mode });
+    } else if (storedMode && instance.fill_mode !== storedMode) {
+      instance = await this.patchOne("tool_instances", instance.id, { fill_mode: storedMode });
     }
     const journey = await this.getOrCreateJourney({ bootstrap });
     await this.patchOne("tool_journeys", journey.id, {
@@ -292,10 +313,13 @@ export class ToolWorkflowService {
       const answer = context.answers.find((item) => item.question_key === question.key);
       return `${question.question}\n${text(answer?.answer_text) || "Нет ответа"}`;
     }).join("\n\n");
+    const nativeDefinition = nativeToolDefinition(context.tool);
     await this.upsertOne("tool_snapshots", {
       ...this.contextIds(bootstrap),
       tool_instance_id: context.instance.id,
-      summary: `Инструмент «${context.tool.title}» заполнен через диалог.`,
+      summary: nativeDefinition
+        ? ownerSuccessSummary(context.answers)
+        : `Инструмент «${context.tool.title}» заполнен через диалог.`,
       key_findings: context.answers.map((item) => item.answer_text).filter(Boolean),
       risks: [],
       open_questions: [],
@@ -322,6 +346,56 @@ export class ToolWorkflowService {
       completed_at: new Date().toISOString()
     });
     return `Инструмент «${context.tool.title}» заполнен. Я сохранил ответы в памяти компании и буду учитывать их дальше. Результат уже виден в веб-кабинете.`;
+  }
+
+  async saveWebAnswers({ bootstrap, instanceId, answers = {}, complete = false }) {
+    let context = await this.getInstanceContext({ bootstrap, instanceId });
+    if (!context.nativeWorkspace) {
+      throw Object.assign(new Error("Заполнение в кабинете пока недоступно для этого инструмента."), { status: 409 });
+    }
+
+    const fields = context.questions;
+    const allowedKeys = new Set(fields.map((field) => field.key));
+    for (const [key, value] of Object.entries(answers || {})) {
+      const answerText = text(value);
+      if (!allowedKeys.has(key)) continue;
+      const field = fields.find((item) => item.key === key);
+      await this.upsertOne("tool_answers", {
+        ...this.contextIds(bootstrap),
+        tool_instance_id: context.instance.id,
+        question_key: key,
+        question_text: field.question,
+        answer_text: answerText,
+        source: "web_form",
+        confidence: 1,
+        status: "confirmed",
+        updated_by: "user"
+      }, "tool_instance_id,question_key");
+    }
+
+    context = await this.getInstanceContext({ bootstrap, instanceId });
+    const answeredKeys = new Set(context.answers.filter((item) => text(item.answer_text)).map((item) => item.question_key));
+    const requiredFields = fields.filter((field) => field.required !== false);
+    const missing = requiredFields.filter((field) => !answeredKeys.has(field.key));
+    const progress = Math.round((requiredFields.length - missing.length) / Math.max(1, requiredFields.length) * 100);
+
+    await this.patchOne("tool_instances", context.instance.id, {
+      fill_mode: "document",
+      status: complete && !missing.length ? "submitted" : "in_progress",
+      current_step: answeredKeys.size,
+      progress_percent: progress
+    });
+
+    context = await this.getInstanceContext({ bootstrap, instanceId });
+    if (complete) {
+      if (missing.length) {
+        throw Object.assign(new Error(`Чтобы завершить инструмент, заполните: ${missing.map((field) => field.label).join(", ")}.`), { status: 400 });
+      }
+      await this.completeChatTool({ bootstrap, context });
+      context = await this.getInstanceContext({ bootstrap, instanceId });
+    }
+
+    return context;
   }
 
   async handleTelegramInput({ bootstrap, text: input, source = "chat_text" }) {

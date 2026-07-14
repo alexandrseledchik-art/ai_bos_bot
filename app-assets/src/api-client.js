@@ -70,6 +70,13 @@ export class PlatformApiClient {
     });
   }
 
+  saveToolAnswers(instanceId, answers, { complete = false } = {}) {
+    return this.request(`/api/platform/tool-instances/${encodeURIComponent(instanceId)}/answers`, {
+      method: "POST",
+      body: JSON.stringify({ answers, complete })
+    });
+  }
+
   attachToolDocument(instanceId, url) {
     return this.request(`/api/platform/tool-instances/${encodeURIComponent(instanceId)}/document-link`, {
       method: "POST",

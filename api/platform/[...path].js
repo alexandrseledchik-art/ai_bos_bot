@@ -220,7 +220,21 @@ async function dispatch(request) {
       const context = await createToolWorkflowService(syncClient, config).startTool({
         bootstrap,
         toolId: decodeURIComponent(toolStartMatch[1]),
-        mode: payload.mode === "document" ? "document" : "chat"
+        mode: ["document", "web"].includes(payload.mode) ? payload.mode : "chat"
+      });
+      return platformJson({ ok: true, ...context });
+    });
+  }
+
+  const toolAnswersMatch = path.match(/^tool-instances\/([^/]+)\/answers$/);
+  if (toolAnswersMatch) {
+    return handlePlatformRoute(request, ["POST"], async ({ bootstrap, syncClient, config }) => {
+      const payload = await readJsonBody(request);
+      const context = await createToolWorkflowService(syncClient, config).saveWebAnswers({
+        bootstrap,
+        instanceId: decodeURIComponent(toolAnswersMatch[1]),
+        answers: payload.answers || {},
+        complete: payload.complete === true
       });
       return platformJson({ ok: true, ...context });
     });
