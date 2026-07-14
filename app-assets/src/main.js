@@ -245,11 +245,6 @@ function markPlatformTourSeen() {
   }
 }
 
-function platformTourInvite() {
-  if (platformTourSeen()) return "";
-  return `<section class="tour-invite dashboard-tour-invite"><div><b>Хотите за минуту посмотреть, как устроена платформа?</b><span>Подсветим основные элементы прямо на экране.</span></div><div><button type="button" data-tour-start>Показать</button><button type="button" class="quiet" data-tour-dismiss-invite>Разберусь сам</button></div></section>`;
-}
-
 function hasStartedWorkspace(data, workspace) {
   const bootstrapProgress = data.dashboardSummary?.expressProgress || {};
   const workspaceProgress = workspace.diagnostics?.progress || {};
@@ -268,7 +263,7 @@ function hasStartedWorkspace(data, workspace) {
 
 function systemFlow({ compact = false } = {}) {
   return `<section class="system-flow ${compact ? "compact" : ""}">
-    <div class="system-flow-head"><div><span class="eyebrow">Основные экраны платформы</span><h2>От общей картины — к собранному бизнесу</h2><p>Ниже — основные экраны AI-BOSS. Каждый решает свою задачу: используйте их отдельно или вместе, в зависимости от текущего запроса.</p></div><button type="button" class="tour-start-button" data-tour-start>Познакомиться с платформой <span>→</span></button></div>
+    <div class="system-flow-head"><div><span class="eyebrow">Основные экраны платформы</span><h2>От общей картины — к собранному бизнесу</h2><p>Ниже — основные экраны AI-BOSS. Каждый решает свою задачу: используйте их отдельно или вместе, в зависимости от текущего запроса.</p></div>${compact ? `<button type="button" class="tour-start-button" data-tour-start>Познакомиться с платформой <span>→</span></button>` : ""}</div>
     <div class="system-flow-grid">
       <a href="/app/architecture" data-link><b>Архитектура</b><p>Показывает, что в бизнесе уже собрано и подтверждено, а что пока хранится только в голове.</p><span>Открыть экран →</span></a>
       <a href="/app/diagnostics" data-link><b>Диагностика</b><p>Помогает оценить состояние бизнеса и понять, какую часть стоит изучить глубже.</p><span>Открыть экран →</span></a>
@@ -282,9 +277,8 @@ function systemFlow({ compact = false } = {}) {
 function renderWelcomeDashboard(data) {
   const firstName = data.appUser?.first_name ? `, ${escapeHtml(data.appUser.first_name)}` : "";
   renderShell(`
-    ${platformTourInvite()}
     <section class="welcome-hero">
-      <div class="welcome-copy"><p class="kicker">Добро пожаловать${firstName}</p><h1>Соберите бизнес как систему.</h1><p>AI-BOSS помогает вынести знания из головы, увидеть недостающие элементы, собрать их с помощью рабочих инструментов и определить, что делать дальше.</p></div>
+      <div class="welcome-copy"><p class="kicker">Добро пожаловать${firstName}</p><h1>Соберите бизнес как систему.</h1><div class="welcome-intro-row"><p class="welcome-lead">AI-BOSS помогает вынести знания из головы, увидеть недостающие элементы, собрать их с помощью рабочих инструментов и определить, что делать дальше.</p><button type="button" class="tour-start-button welcome-tour-button" data-tour-start>Познакомиться с платформой <span>→</span></button></div></div>
       <div class="welcome-choice-title"><span class="eyebrow">Выберите точку входа</span><h2>С чего хотите начать?</h2><p>Оба варианта ведут к сборке архитектуры бизнеса. Выберите то, что полезнее сейчас — маршрут можно изменить позже.</p></div>
       <div class="welcome-entry-grid">
         <article class="welcome-entry"><div class="entry-kind"><span>◇</span><b>Общая картина</b></div><h2>Собрать бизнес как систему</h2><p>Увидеть компанию целиком, последовательно зафиксировать важные договорённости и собрать управляемую архитектуру.</p><a href="/app/profile?mode=system" data-link>Увидеть бизнес целиком <b>→</b></a></article>
@@ -300,7 +294,6 @@ function renderWelcomeDashboard(data) {
 function renderReadyDashboard(data, workspace) {
   const request = data.companyProfile?.current_request || "Текущий запрос ещё не зафиксирован";
   renderShell(`
-    ${platformTourInvite()}
     <section class="dashboard-head ready-head"><div><p class="kicker">Контекст компании сохранён</p><h1>С чего начнём работу?</h1><p>Можно сначала увидеть бизнес целиком или начать с задачи, которая беспокоит прямо сейчас.</p></div></section>
     <section class="request-banner"><div><span>Текущий запрос</span><strong>${escapeHtml(request)}</strong></div><a href="/app/profile" data-link>Уточнить</a></section>
     <section class="ready-entry-grid">
@@ -328,7 +321,6 @@ function renderActiveDashboard(data, workspace) {
   const continueLabel = currentTool ? "Продолжить инструмент" : "Продолжить маршрут";
 
   renderShell(`
-    ${platformTourInvite()}
     <section class="dashboard-head"><div><p class="kicker">Текущая управленческая картина</p><h1>Продолжаем с того места, где остановились</h1></div><a class="primary-action" href="${continueHref}" data-link>${continueLabel} <span>→</span></a></section>
     <section class="request-banner"><div><span>Текущий запрос</span><strong>${escapeHtml(request)}</strong></div><a href="/app/profile" data-link>${profileReady ? "Уточнить" : "Заполнить профиль"}</a></section>
     <div class="dashboard-grid">
@@ -369,7 +361,6 @@ function finishPlatformTour() {
   removePlatformTour();
   document.querySelector(".sidebar")?.classList.remove("tour-open");
   markPlatformTourSeen();
-  document.querySelectorAll(".dashboard-tour-invite").forEach((element) => element.remove());
 }
 
 function platformTourTarget(step) {
