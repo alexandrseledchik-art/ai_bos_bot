@@ -13,6 +13,11 @@ import { assertBusinessLayerKey, BUSINESS_LAYERS_V1, getBusinessLayerByKey } fro
 import { MINI_APP_TOOL_CATALOG } from "../domain/mini-app-tools-catalog.js";
 import { buildBusinessArchitectureSnapshot } from "./company-architecture-snapshot.js";
 import { classifyConsultantSource } from "./company-analysis-core.js";
+import {
+  assertDiagnosticLevel,
+  buildDiagnosticCatalog,
+  diagnosticCatalogSummary
+} from "../domain/diagnostic-catalog.js";
 
 const OFFICIAL_ANSWER_SOURCES = new Set([
   "user_explicit",
@@ -1043,6 +1048,246 @@ export class MiniAppDiagnosticsService {
       completion_percent: 0,
       version: 1
     });
+  }
+
+  async resolveDiagnosticRun({ bootstrap, level }) {
+    assertDiagnosticLevel(level);
+    if (level === "express") {
+      return this.resolveExpressDiagnosticRun({ bootstrap });
+    }
+
+    const contextIds = this.buildContextIds(bootstrap);
+    const existing = await this.findOne("diagnostic_runs", {
+      case_id: `eq.${contextIds.case_id}`,
+      level: `eq.${level}`,
+      order: "updated_at.desc",
+      select: "*"
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    return this.insertOne("diagnostic_runs", {
+      ...contextIds,
+      level,
+      status: "draft",
+      completion_percent: 0,
+      version: 1
+    });
+  }
+
+  async getDiagnosticAnswers({ runId, level, subjectType }) {
+    return this.findMany("diagnostic_answers", {
+      diagnostic_run_id: `eq.${runId}`,
+      level: `eq.${level}`,
+      subject_type: `eq.${subjectType}`,
+      order: "updated_at.desc",
+      select: "*"
+    });
+  }
+
+  buildDiagnosticAnswerMap(answers = []) {
+    return Object.fromEntries(
+      answers.filter(isOfficialAnswer).map((answer) => [
+        answer.subject_key,
+        {
+          id: answer.id,
+          subjectKey: answer.subject_key,
+          score: Number(answer.score) || null,
+          selectedDescription: answer.selected_description || "",
+          source: answer.source,
+          status: answer.status,
+          confidence: Number(answer.confidence ?? 1)
+        }
+      ])
+    );
+  }
+
+  async refreshDiagnosticLevelProgress({ bootstrap, run, catalog }) {
+    const answers = await this.getDiagnosticAnswers({
+      runId: run.id,
+      level: catalog.key,
+      subjectType: catalog.subjectType
+    });
+    const answerMap = this.buildDiagnosticAnswerMap(answers);
+    const answeredCount = catalog.items.filter((item) => answerMap[item.subjectKey]).length;
+    const totalCount = catalog.items.length;
+    const completionPercent = totalCount
+      ? Number(((answeredCount / totalCount) * 100).toFixed(2))
+      : 0;
+    const status = completionPercent >= 100 ? "completed" : "draft";
+    const updatedRun = await this.patchOne("diagnostic_runs", run.id, {
+      completion_percent: completionPercent,
+      status
+    });
+
+    if (status === "completed" && run.status !== "completed") {
+      await this.logMiniAppEvent({
+        bootstrap,
+        eventName: "diagnostics_completed",
+        metadata: { level: catalog.key, answeredCount, totalCount }
+      });
+    }
+
+    return {
+      run: updatedRun || run,
+      answers,
+      answerMap,
+      progress: { answeredCount, totalCount, percent: completionPercent }
+    };
+  }
+
+  async saveDirectMaturityScore({ bootstrap, run, catalog, item, answer }) {
+    const contextIds = this.buildContextIds(bootstrap);
+    return this.upsertOne(
+      "maturity_scores",
+      {
+        ...contextIds,
+        diagnostic_run_id: run.id,
+        subject_type: catalog.subjectType,
+        subject_key: item.subjectKey,
+        score: Number(answer.score),
+        source_level: catalog.key,
+        confidence: Number(answer.confidence ?? 1),
+        calculated_from: [{ diagnostic_answer_id: answer.id }],
+        version: 1
+      },
+      { onConflict: "diagnostic_run_id,subject_type,subject_key,version" }
+    );
+  }
+
+  async getDiagnosticLevel({ bootstrap, level }) {
+    const catalog = buildDiagnosticCatalog(level);
+    const run = await this.resolveDiagnosticRun({ bootstrap, level });
+    const refreshed = await this.refreshDiagnosticLevelProgress({ bootstrap, run, catalog });
+
+    await this.logMiniAppEvent({
+      bootstrap,
+      eventName: "diagnostics_started",
+      metadata: { level }
+    });
+
+    return {
+      level,
+      label: catalog.label,
+      subjectType: catalog.subjectType,
+      unitLabel: catalog.unitLabel,
+      items: catalog.items,
+      run: refreshed.run,
+      answers: refreshed.answerMap,
+      progress: refreshed.progress
+    };
+  }
+
+  async saveDiagnosticLevelAnswer({ bootstrap, level, payload }) {
+    if (level === "express") {
+      await this.saveExpressAnswer({
+        bootstrap,
+        payload: {
+          layerKey: payload.subjectKey || payload.layerKey,
+          score: payload.score,
+          selectedDescription: payload.selectedDescription
+        }
+      });
+      return this.getDiagnosticLevel({ bootstrap, level });
+    }
+
+    const catalog = buildDiagnosticCatalog(level);
+    const item = catalog.items.find((candidate) => candidate.subjectKey === trimString(payload.subjectKey));
+    if (!item) {
+      throw new Error("Элемент диагностики не найден в канонической архитектуре.");
+    }
+
+    const score = Number(payload.score);
+    if (!Number.isInteger(score) || score < 1 || score > 5) {
+      throw new Error("Оценка зрелости должна быть целым числом от 1 до 5.");
+    }
+
+    const run = await this.resolveDiagnosticRun({ bootstrap, level });
+    const contextIds = this.buildContextIds(bootstrap);
+    const answer = await this.upsertOne(
+      "diagnostic_answers",
+      {
+        ...contextIds,
+        diagnostic_run_id: run.id,
+        level,
+        subject_type: catalog.subjectType,
+        subject_key: item.subjectKey,
+        score,
+        selected_description: trimString(payload.selectedDescription) || item.levels[score - 1] || "",
+        source: "user_explicit",
+        status: "confirmed",
+        confidence: 1,
+        evidence_observation_ids: [],
+        confirmed_at: new Date().toISOString(),
+        version: 1
+      },
+      { onConflict: "diagnostic_run_id,subject_type,subject_key,version" }
+    );
+
+    await this.saveDirectMaturityScore({ bootstrap, run, catalog, item, answer });
+    const refreshed = await this.refreshDiagnosticLevelProgress({ bootstrap, run, catalog });
+
+    return {
+      level,
+      label: catalog.label,
+      subjectType: catalog.subjectType,
+      unitLabel: catalog.unitLabel,
+      items: catalog.items,
+      run: refreshed.run,
+      answers: refreshed.answerMap,
+      progress: refreshed.progress
+    };
+  }
+
+  async getDiagnosticOverview({ bootstrap, expressDiagnostics = null }) {
+    const summary = diagnosticCatalogSummary();
+    const result = {};
+
+    for (const level of Object.keys(summary)) {
+      if (level === "express" && expressDiagnostics) {
+        result[level] = {
+          ...summary[level],
+          progress: expressDiagnostics.progress
+        };
+        continue;
+      }
+
+      const run = await this.findOne("diagnostic_runs", {
+        case_id: `eq.${bootstrap.activeCase.id}`,
+        level: `eq.${level}`,
+        order: "updated_at.desc",
+        select: "*"
+      });
+      result[level] = {
+        ...summary[level],
+        progress: {
+          answeredCount: 0,
+          totalCount: summary[level].totalCount,
+          percent: 0
+        }
+      };
+
+      if (!run) continue;
+      const catalog = buildDiagnosticCatalog(level);
+      const answers = await this.getDiagnosticAnswers({
+        runId: run.id,
+        level,
+        subjectType: catalog.subjectType
+      });
+      const answerMap = this.buildDiagnosticAnswerMap(answers);
+      const answeredCount = catalog.items.filter((item) => answerMap[item.subjectKey]).length;
+      result[level].progress = {
+        answeredCount,
+        totalCount: catalog.items.length,
+        percent: catalog.items.length
+          ? Number(((answeredCount / catalog.items.length) * 100).toFixed(2))
+          : 0
+      };
+    }
+
+    return result;
   }
 
   async getExpressAnswers(runId) {

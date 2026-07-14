@@ -10,14 +10,29 @@ const cssSource = fs.readFileSync("app-assets/styles.css", "utf8");
 assert.match(routeSource, /path === "workspace"/);
 assert.match(routeSource, /path === "profile"/);
 assert.match(routeSource, /toolOpenedMatch/);
+assert.equal(routeSource.includes("diagnostics\\/(express|basic|deep)"), true);
+assert.match(routeSource, /saveDiagnosticLevelAnswer/);
 
-for (const method of ["workspace()", "saveProfile(payload)", "markToolOpened(toolId)"]) {
+for (const method of [
+  "workspace()",
+  "saveProfile(payload)",
+  "getDiagnosticLevel(level)",
+  "saveDiagnosticAnswer(level, payload)",
+  "markToolOpened(toolId)"
+]) {
   assert.equal(apiSource.includes(method), true, `API client must expose ${method}`);
 }
 
 for (const screenText of [
   "Архитектура бизнеса",
   "Экспресс-диагностика",
+  "Базовая диагностика",
+  "Расширенная диагностика",
+  "11 слоёв бизнеса",
+  "72 домена внутри слоёв",
+  "288 поддоменов внутри доменов",
+  "Когда имеет смысл",
+  "Самый низкий балл не обязательно является главным ограничением",
   "Поиск по каталогу",
   "Документы и память",
   "Профиль компании",
@@ -26,7 +41,17 @@ for (const screenText of [
   assert.equal(mainSource.includes(screenText), true, `Platform UI must include: ${screenText}`);
 }
 
-for (const className of ["layer-grid", "diagnostic-list", "tool-grid", "document-list", "profile-form"]) {
+for (const className of [
+  "layer-grid",
+  "diagnostic-list",
+  "diagnostic-level-grid",
+  "diagnostic-question-list",
+  "scope-tabs",
+  "domain-tab",
+  "tool-grid",
+  "document-list",
+  "profile-form"
+]) {
   assert.match(cssSource, new RegExp(`\\.${className}`));
 }
 

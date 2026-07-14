@@ -1,4 +1,5 @@
-// Generated from the business architecture workbooks; tools map refreshed from Google Sheets on 2026-05-31.
+// Canonical source: Google Sheet 1ub9feLgp31fSygIA7qcfjGJeiwSJZXEQKWc_jbKIj7U.
+// Architecture tab: gid=2125697161. Tools map refreshed from Google Sheets on 2026-05-31.
 // Treat this as an orientation map for reasoning, not as a response template.
 
 export const BUSINESS_ARCHITECTURE_LAYER_CLASSES = [

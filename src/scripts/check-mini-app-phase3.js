@@ -6,6 +6,7 @@ import { MiniAppBootstrapService } from "../application/mini-app-bootstrap-servi
 import { MiniAppDiagnosticsService } from "../application/mini-app-diagnostics-service.js";
 import { calculateExpressMaturity } from "../application/maturity-calculator.js";
 import { BUSINESS_LAYER_KEYS_V1, BUSINESS_LAYERS_V1 } from "../domain/business-layers.js";
+import { buildDiagnosticCatalog } from "../domain/diagnostic-catalog.js";
 
 const EXPECTED_LAYER_KEYS = [
   "owner_context",
@@ -157,6 +158,14 @@ function assertBusinessLayers() {
     assert.equal(layer.levels.length, 5, `${layer.key} should have 5 maturity descriptions`);
     assert.equal(layer.levels.every((description) => description.length > 20), true);
   }
+
+  const express = buildDiagnosticCatalog("express");
+  const basic = buildDiagnosticCatalog("basic");
+  const deep = buildDiagnosticCatalog("deep");
+  assert.equal(express.items.length, 11);
+  assert.equal(basic.items.length, 72);
+  assert.equal(deep.items.length, 288);
+  assert.equal([...express.items, ...basic.items, ...deep.items].every((item) => item.levels.length === 5 && item.levels.every(Boolean)), true);
 }
 
 function assertMaturityCalculator() {
@@ -224,6 +233,28 @@ async function assertDiagnosticsService() {
   assert.equal(express.layers.length, 11);
   assert.equal(express.progress.answeredCount, 0);
 
+  const basic = await service.getDiagnosticLevel({ bootstrap, level: "basic" });
+  assert.equal(basic.items.length, 72);
+  assert.equal(basic.progress.answeredCount, 0);
+  const basicAnswer = await service.saveDiagnosticLevelAnswer({
+    bootstrap,
+    level: "basic",
+    payload: { subjectKey: basic.items[0].subjectKey, score: 3 }
+  });
+  assert.equal(basicAnswer.progress.answeredCount, 1);
+  assert.equal(basicAnswer.answers[basic.items[0].subjectKey].score, 3);
+
+  const deep = await service.getDiagnosticLevel({ bootstrap, level: "deep" });
+  assert.equal(deep.items.length, 288);
+  assert.equal(deep.progress.answeredCount, 0);
+  const deepAnswer = await service.saveDiagnosticLevelAnswer({
+    bootstrap,
+    level: "deep",
+    payload: { subjectKey: deep.items[0].subjectKey, score: 2 }
+  });
+  assert.equal(deepAnswer.progress.answeredCount, 1);
+  assert.equal(deepAnswer.answers[deep.items[0].subjectKey].score, 2);
+
   for (let index = 0; index < BUSINESS_LAYERS_V1.length; index += 1) {
     await service.saveExpressAnswer({
       bootstrap,
@@ -238,7 +269,7 @@ async function assertDiagnosticsService() {
   assert.equal(maturity.maturity.answeredCount, 11);
   assert.equal(maturity.maturity.progressPercent, 100);
   assert.equal(maturity.run.status, "completed");
-  assert.equal(syncClient.getTable("maturity_scores").length, 11);
+  assert.equal(syncClient.getTable("maturity_scores").length, 13);
 
   const refreshedBootstrap = await bootstrapService.bootstrap({ telegramUser });
   assert.equal(refreshedBootstrap.onboardingStatus, "completed");

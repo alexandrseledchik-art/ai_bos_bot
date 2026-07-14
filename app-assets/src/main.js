@@ -9,7 +9,44 @@ const state = {
   loading: true,
   error: null,
   toolQuery: "",
-  notice: ""
+  notice: "",
+  diagnosticsByLevel: {},
+  diagnosticLoading: "",
+  diagnosticError: "",
+  diagnosticFilters: {
+    basic: { layerKey: "" },
+    deep: { layerKey: "", parentKey: "" }
+  }
+};
+
+const DIAGNOSTIC_LEVEL_COPY = {
+  express: {
+    title: "Экспресс-диагностика",
+    scope: "11 слоёв бизнеса",
+    time: "Обычно 5–10 минут",
+    description: "Быстро показывает общую картину и помогает понять, какую часть бизнеса стоит изучить глубже.",
+    when: "Выбирайте, если проходите диагностику впервые, запрос сформулирован широко или пока непонятно, где искать причину.",
+    result: "Предварительная карта зрелости и направление дальнейшей проверки.",
+    action: "Получить общую картину"
+  },
+  basic: {
+    title: "Базовая диагностика",
+    scope: "72 домена внутри слоёв",
+    time: "Проходится по выбранным слоям",
+    description: "Показывает, из каких частей складывается состояние конкретного слоя и где внутри него находится разрыв.",
+    when: "Выбирайте, если слой уже понятен, но нужно отделить несколько возможных причин внутри него.",
+    result: "Карта сильных и слабых доменов выбранного слоя.",
+    action: "Разобрать выбранные слои"
+  },
+  deep: {
+    title: "Расширенная диагностика",
+    scope: "288 поддоменов внутри доменов",
+    time: "Проходится по выбранным доменам",
+    description: "Помогает проверить конкретную гипотезу, собрать доказательства и понять, что именно требуется менять.",
+    when: "Выбирайте для подготовки изменений, масштабирования, продажи бизнеса или подробного разбора конкретной причины.",
+    result: "Детальная картина зоны, подтверждающие факты и пробелы для дальнейшей работы.",
+    action: "Проверить причину детально"
+  }
 };
 
 function escapeHtml(value) {
@@ -93,7 +130,7 @@ function navigation(activePath) {
     ["/app/documents", "Документы", "▱"]
   ];
   return items.map(([path, label, icon]) => `
-    <a href="${path}" class="nav-link ${activePath === path ? "active" : ""}" data-link>
+    <a href="${path}" class="nav-link ${activePath === path || (path !== "/app" && activePath.startsWith(`${path}/`)) ? "active" : ""}" data-link>
       <span aria-hidden="true">${icon}</span>${label}
     </a>`).join("");
 }
@@ -191,17 +228,143 @@ function renderArchitecture() {
       </article>`).join("")}</section>`);
 }
 
+function diagnosticLevelFromPath(path = currentPath()) {
+  return path.match(/^\/app\/diagnostics\/(express|basic|deep)$/)?.[1] || "";
+}
+
+function diagnosticProgress(level) {
+  return state.workspace?.diagnostics?.depthOptions?.[level]?.progress || {
+    answeredCount: 0,
+    totalCount: level === "express" ? 11 : level === "basic" ? 72 : 288,
+    percent: 0
+  };
+}
+
+function diagnosticGroupStats(items, answers, key, value) {
+  const grouped = items.filter((item) => item[key] === value);
+  const answered = grouped.filter((item) => answers[item.subjectKey]).length;
+  return { answered, total: grouped.length, percent: grouped.length ? Math.round((answered / grouped.length) * 100) : 0 };
+}
+
+function diagnosticLevelCard(level) {
+  const copy = DIAGNOSTIC_LEVEL_COPY[level];
+  const progress = diagnosticProgress(level);
+  const started = progress.answeredCount > 0;
+  return `<article class="diagnostic-level-card ${level}">
+    <div class="diagnostic-level-top"><span class="diagnostic-level-mark">${level === "express" ? "01" : level === "basic" ? "02" : "03"}</span><span class="status-pill ${started ? "in_progress" : ""}">${started ? "в работе" : "не начато"}</span></div>
+    <div><span class="eyebrow">${escapeHtml(copy.scope)}</span><h2>${escapeHtml(copy.title)}</h2><p>${escapeHtml(copy.description)}</p></div>
+    <div class="diagnostic-when"><b>Когда имеет смысл</b><p>${escapeHtml(copy.when)}</p></div>
+    <div class="diagnostic-result"><b>Что получите</b><p>${escapeHtml(copy.result)}</p></div>
+    <div class="diagnostic-card-progress"><span>${progress.answeredCount || 0} из ${progress.totalCount} · ${escapeHtml(copy.time)}</span><i><em style="width:${percent(progress.percent)}%"></em></i></div>
+    <a class="diagnostic-start" href="/app/diagnostics/${level}" data-diagnostic-start="${level}">${started ? "Продолжить" : escapeHtml(copy.action)} <span>→</span></a>
+  </article>`;
+}
+
+function renderDiagnosticQuestion(item, answer, level) {
+  const score = Number(answer?.score) || 0;
+  return `<details class="diagnostic-question ${score ? "answered" : ""}">
+    <summary>
+      <div><span class="question-number">${String(item.order).padStart(2, "0")}</span><span><b>${escapeHtml(item.title)}</b><small>${escapeHtml(item.description || "Выберите описание, которое ближе всего к текущей реальности.")}</small></span></div>
+      <span class="question-score">${score ? `${score}/5` : "Оценить"}</span>
+    </summary>
+    <div class="maturity-options">
+      <p>Выберите не желаемое состояние, а описание, которое лучше всего подтверждается текущими фактами.</p>
+      ${(item.levels || []).map((description, index) => {
+        const optionScore = index + 1;
+        return `<button type="button" class="maturity-option ${score === optionScore ? "selected" : ""}" data-diagnostic-answer data-level="${level}" data-subject-key="${escapeHtml(item.subjectKey)}" data-score="${optionScore}"><span>${optionScore}</span><p>${escapeHtml(description)}</p>${score === optionScore ? "<b>Выбрано</b>" : ""}</button>`;
+      }).join("")}
+    </div>
+  </details>`;
+}
+
+function uniqueDiagnosticLayers(items) {
+  const seen = new Set();
+  return items.filter((item) => {
+    if (seen.has(item.layerKey)) return false;
+    seen.add(item.layerKey);
+    return true;
+  }).map((item) => ({ key: item.layerKey, title: item.layerTitle, classKey: item.classKey }));
+}
+
+function renderDiagnosticLayerSelector(level, data) {
+  const answers = data.answers || {};
+  const layers = uniqueDiagnosticLayers(data.items || []);
+  const filter = state.diagnosticFilters[level];
+  if (!filter.layerKey || !layers.some((layer) => layer.key === filter.layerKey)) {
+    const firstIncomplete = layers.find((layer) => diagnosticGroupStats(data.items, answers, "layerKey", layer.key).percent < 100);
+    filter.layerKey = firstIncomplete?.key || layers[0]?.key || "";
+  }
+
+  return `<section class="diagnostic-scope"><div class="scope-heading"><span class="eyebrow">Выберите слой</span><h2>${level === "basic" ? "Какой слой разобрать по доменам" : "В каком слое искать нужный домен"}</h2><p>Проходить всю диагностику сразу не нужно. Выберите ветку, связанную с текущим запросом.</p></div><div class="scope-tabs">${layers.map((layer) => {
+    const stats = diagnosticGroupStats(data.items, answers, "layerKey", layer.key);
+    return `<button type="button" class="scope-tab ${filter.layerKey === layer.key ? "active" : ""}" data-diagnostic-layer="${escapeHtml(layer.key)}" data-level="${level}"><span>${escapeHtml(layer.classKey)}</span><b>${escapeHtml(layer.title)}</b><small>${stats.answered}/${stats.total}</small></button>`;
+  }).join("")}</div></section>`;
+}
+
+function renderDiagnosticDomainSelector(data) {
+  const filter = state.diagnosticFilters.deep;
+  const layerItems = (data.items || []).filter((item) => item.layerKey === filter.layerKey);
+  const seen = new Set();
+  const domains = layerItems.filter((item) => {
+    if (seen.has(item.parentKey)) return false;
+    seen.add(item.parentKey);
+    return true;
+  }).map((item) => ({ key: item.parentKey, title: item.parentTitle }));
+  if (!filter.parentKey || !domains.some((domain) => domain.key === filter.parentKey)) {
+    const firstIncomplete = domains.find((domain) => diagnosticGroupStats(data.items, data.answers || {}, "parentKey", domain.key).percent < 100);
+    filter.parentKey = firstIncomplete?.key || domains[0]?.key || "";
+  }
+
+  return `<section class="diagnostic-domain-picker"><span class="eyebrow">Выберите домен</span><div>${domains.map((domain) => {
+    const stats = diagnosticGroupStats(data.items, data.answers || {}, "parentKey", domain.key);
+    return `<button type="button" class="domain-tab ${filter.parentKey === domain.key ? "active" : ""}" data-diagnostic-domain="${escapeHtml(domain.key)}"><b>${escapeHtml(domain.title)}</b><span>${stats.answered}/${stats.total}</span></button>`;
+  }).join("")}</div></section>`;
+}
+
+function renderDiagnosticLevel(level) {
+  const copy = DIAGNOSTIC_LEVEL_COPY[level];
+  const data = state.diagnosticsByLevel[level];
+  if (state.diagnosticLoading === level || !data) {
+    return renderShell(`${sectionHero("Диагностика", copy.title, copy.description)}<section class="panel diagnostic-loading"><h2>Готовим вопросы</h2><p>Загружаю актуальную структуру архитектуры и сохранённые ответы.</p></section>`);
+  }
+  if (state.diagnosticError) {
+    return renderShell(`${sectionHero("Диагностика", copy.title, copy.description)}<section class="panel empty-state"><h2>Не удалось открыть диагностику</h2><p>${escapeHtml(state.diagnosticError)}</p><a href="/app/diagnostics" data-link>Вернуться к выбору</a></section>`);
+  }
+
+  const answers = data.answers || {};
+  let visibleItems = data.items || [];
+  let selectors = "";
+  if (level !== "express") {
+    selectors += renderDiagnosticLayerSelector(level, data);
+    visibleItems = visibleItems.filter((item) => item.layerKey === state.diagnosticFilters[level].layerKey);
+  }
+  if (level === "deep") {
+    selectors += renderDiagnosticDomainSelector(data);
+    visibleItems = visibleItems.filter((item) => item.parentKey === state.diagnosticFilters.deep.parentKey);
+  }
+
+  renderShell(`
+    <section class="section-hero diagnostic-detail-hero"><a href="/app/diagnostics" data-link>← Ко всем вариантам</a><p class="kicker">${escapeHtml(copy.scope)}</p><h1>${escapeHtml(copy.title)}</h1><p>${escapeHtml(copy.when)}</p></section>
+    <section class="panel diagnostic-level-progress"><div>${progressRing(data.progress?.percent)}</div><div><span class="eyebrow">Текущий прогресс</span><h2>${data.progress?.answeredCount || 0} из ${data.progress?.totalCount || 0} оценено</h2><p>Ответ сохраняется сразу. В любой момент можно вернуться, уточнить оценку или продолжить другую ветку.</p></div></section>
+    ${selectors}
+    <section class="diagnostic-question-list">${visibleItems.map((item) => renderDiagnosticQuestion(item, answers[item.subjectKey], level)).join("")}</section>
+    <section class="diagnostic-help panel"><div><span class="eyebrow">Сложно выбрать описание?</span><h2>Попросите AI-BOSS разобрать факты</h2><p>Опишите ситуацию своими словами. Бот поможет сопоставить факты с уровнями, но не будет выбирать ответ за вас.</p></div><a class="primary-action" href="${TELEGRAM_CHAT_URL}" target="_blank" rel="noopener">Спросить AI-BOSS <span>→</span></a></section>`);
+}
+
 function renderDiagnostics() {
   const diagnostics = state.workspace?.diagnostics || {};
   const answers = diagnostics.answers || {};
+  const answered = diagnostics.progress?.answeredCount || 0;
   renderShell(`
-    ${sectionHero(state.bootstrap.company?.name || "Компания", "Диагностика", "Экспресс-срез помогает увидеть зрелость по слоям. Самый низкий балл не обязательно является главным ограничением.")}
-    <section class="panel diagnostic-intro"><div>${progressRing(diagnostics.progress?.percent)}</div><div><span class="eyebrow">Экспресс-диагностика</span><h2>${diagnostics.progress?.answeredCount || 0} из ${diagnostics.progress?.totalCount || 11} слоёв оценено</h2><p>Официальная матрица учитывает только ответы, которые пользователь подтвердил или исправил.</p></div></section>
-    <section class="diagnostic-list">${(diagnostics.layers || []).map((layer) => {
+    ${sectionHero(state.bootstrap.company?.name || "Компания", "Диагностика бизнеса", "Выберите глубину проверки в зависимости от того, насколько хорошо вы уже понимаете ситуацию. Начать можно с общей картины, а затем углубить только связанные с запросом части бизнеса.")}
+    <section class="diagnostic-principle panel"><span class="panel-icon">?</span><div><h2>Чем отличаются три варианта</h2><p><b>Неясно, где проблема</b> — начните с экспресс-диагностики. <b>Понятен слой, но не причина внутри</b> — выбирайте базовую. <b>Есть конкретная гипотеза, которую нужно проверить</b> — переходите к расширенной.</p><small>Глубина определяется не количеством вопросов, а точностью управленческого решения, которое вам сейчас требуется.</small></div></section>
+    <section class="diagnostic-level-grid">${["express", "basic", "deep"].map(diagnosticLevelCard).join("")}</section>
+    <section class="diagnostic-results-head"><div><span class="eyebrow">Текущая картина</span><h2>Результаты по слоям</h2><p>Самый низкий балл не обязательно является главным ограничением. Матрица показывает состояние, а причина определяется отдельно.</p></div>${answered ? `<a href="/app/diagnostics/express" data-diagnostic-start="express">Уточнить оценки →</a>` : ""}</section>
+    ${answered ? `<section class="diagnostic-list">${(diagnostics.layers || []).map((layer) => {
       const answer = answers[layer.key];
       const score = Number(answer?.score) || 0;
       return `<article class="diagnostic-row"><div><span class="class-badge">${escapeHtml(layer.classKey)}</span><h3>${escapeHtml(layer.title)}</h3><p>${escapeHtml(answer?.selectedDescription || layer.shortDescription)}</p></div><div class="score-block"><b>${score ? `${score}/5` : "—"}</b><i><em style="width:${score * 20}%"></em></i><span>${score ? "подтверждено" : "нет оценки"}</span></div></article>`;
-    }).join("")}</section>`);
+    }).join("")}</section>` : `<section class="empty-diagnostic"><h2>Оценок пока нет</h2><p>Для первого знакомства с системой обычно достаточно экспресс-диагностики по 11 слоям.</p><a class="primary-action" href="/app/diagnostics/express" data-diagnostic-start="express">Начать экспресс-диагностику <span>→</span></a></section>`}`);
 }
 
 function renderTools() {
@@ -286,6 +449,7 @@ function render() {
   const path = currentPath();
   if (path === "/app/architecture") return renderArchitecture();
   if (path === "/app/diagnostics") return renderDiagnostics();
+  if (diagnosticLevelFromPath(path)) return renderDiagnosticLevel(diagnosticLevelFromPath(path));
   if (path === "/app/tools") return renderTools();
   if (path.startsWith("/app/tools/")) return renderToolDetail();
   if (path === "/app/documents") return renderDocuments();
@@ -300,7 +464,70 @@ function navigate(path) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+async function openDiagnosticLevel(level, path = `/app/diagnostics/${level}`) {
+  if (!state.diagnosticsByLevel[level]) {
+    state.diagnosticLoading = level;
+    state.diagnosticError = "";
+    navigate(path);
+    try {
+      state.diagnosticsByLevel[level] = await api.getDiagnosticLevel(level);
+    } catch (error) {
+      state.diagnosticError = error.message;
+    } finally {
+      state.diagnosticLoading = "";
+    }
+  } else if (currentPath() !== path) {
+    navigate(path);
+  }
+  render();
+}
+
 document.addEventListener("click", async (event) => {
+  const diagnosticStart = event.target.closest("[data-diagnostic-start]");
+  if (diagnosticStart) {
+    event.preventDefault();
+    await openDiagnosticLevel(diagnosticStart.dataset.diagnosticStart, diagnosticStart.getAttribute("href"));
+    return;
+  }
+  const diagnosticLayer = event.target.closest("[data-diagnostic-layer]");
+  if (diagnosticLayer) {
+    state.diagnosticFilters[diagnosticLayer.dataset.level].layerKey = diagnosticLayer.dataset.diagnosticLayer;
+    if (diagnosticLayer.dataset.level === "deep") state.diagnosticFilters.deep.parentKey = "";
+    renderDiagnosticLevel(diagnosticLayer.dataset.level);
+    return;
+  }
+  const diagnosticDomain = event.target.closest("[data-diagnostic-domain]");
+  if (diagnosticDomain) {
+    state.diagnosticFilters.deep.parentKey = diagnosticDomain.dataset.diagnosticDomain;
+    renderDiagnosticLevel("deep");
+    return;
+  }
+  const diagnosticAnswer = event.target.closest("[data-diagnostic-answer]");
+  if (diagnosticAnswer) {
+    const level = diagnosticAnswer.dataset.level;
+    const subjectKey = diagnosticAnswer.dataset.subjectKey;
+    diagnosticAnswer.disabled = true;
+    try {
+      const result = await api.saveDiagnosticAnswer(level, {
+        subjectKey,
+        layerKey: level === "express" ? subjectKey : undefined,
+        score: Number(diagnosticAnswer.dataset.score)
+      });
+      state.diagnosticsByLevel[level] = result;
+      if (state.workspace?.diagnostics?.depthOptions?.[level]) {
+        state.workspace.diagnostics.depthOptions[level].progress = result.progress;
+      }
+      if (level === "express") {
+        state.workspace.diagnostics.answers = result.answers;
+        state.workspace.diagnostics.progress = result.progress;
+      }
+      state.notice = "Оценка сохранена.";
+    } catch (error) {
+      state.notice = error.message;
+    }
+    renderDiagnosticLevel(level);
+    return;
+  }
   const link = event.target.closest("[data-link]");
   if (link) {
     event.preventDefault();
@@ -411,6 +638,17 @@ async function start() {
   try {
     state.bootstrap = await api.bootstrap();
     state.workspace = await api.workspace();
+    const initialDiagnosticLevel = diagnosticLevelFromPath();
+    if (initialDiagnosticLevel) {
+      state.diagnosticLoading = initialDiagnosticLevel;
+      try {
+        state.diagnosticsByLevel[initialDiagnosticLevel] = await api.getDiagnosticLevel(initialDiagnosticLevel);
+      } catch (error) {
+        state.diagnosticError = error.message;
+      } finally {
+        state.diagnosticLoading = "";
+      }
+    }
   } catch (error) {
     state.error = error;
   } finally {

@@ -127,7 +127,8 @@ async function dispatch(request) {
       const toolWorkflow = createToolWorkflowService(syncClient, config);
       // Resolve the diagnostic run once before assembly reads the same run.
       const diagnostics = await service.getExpressDiagnostics({ bootstrap });
-      const [assemblyResult, toolsResult, documentsResult, constraintRow, nextStep] = await Promise.all([
+      const [diagnosticOverview, assemblyResult, toolsResult, documentsResult, constraintRow, nextStep] = await Promise.all([
+        service.getDiagnosticOverview({ bootstrap, expressDiagnostics: diagnostics }),
         service.getBusinessAssemblyPlan({ bootstrap }),
         service.getTools({ bootstrap }),
         service.getDocuments({ bootstrap }),
@@ -142,7 +143,7 @@ async function dispatch(request) {
       return platformJson({
         ok: true,
         assembly: assemblyResult.assembly,
-        diagnostics,
+        diagnostics: { ...diagnostics, depthOptions: diagnosticOverview },
         tools: toolsResult.tools || [],
         documents: documentsResult.documents || [],
         artifacts: documentsResult.artifacts || [],
@@ -159,6 +160,32 @@ async function dispatch(request) {
       const payload = await readJsonBody(request);
       const onboarding = await service.saveOnboarding({ bootstrap, payload });
       return platformJson({ ok: true, ...onboarding });
+    });
+  }
+
+  const diagnosticLevelMatch = path.match(/^diagnostics\/(express|basic|deep)$/);
+  if (diagnosticLevelMatch && request.method === "GET") {
+    return handlePlatformRoute(request, ["GET"], async ({ bootstrap, syncClient }) => {
+      const service = createWorkspaceService(syncClient);
+      const result = await service.getDiagnosticLevel({
+        bootstrap,
+        level: diagnosticLevelMatch[1]
+      });
+      return platformJson({ ok: true, ...result });
+    });
+  }
+
+  const diagnosticAnswerMatch = path.match(/^diagnostics\/(express|basic|deep)\/answer$/);
+  if (diagnosticAnswerMatch && request.method === "POST") {
+    return handlePlatformRoute(request, ["POST"], async ({ bootstrap, syncClient }) => {
+      const service = createWorkspaceService(syncClient);
+      const payload = await readJsonBody(request);
+      const result = await service.saveDiagnosticLevelAnswer({
+        bootstrap,
+        level: diagnosticAnswerMatch[1],
+        payload
+      });
+      return platformJson({ ok: true, ...result });
     });
   }
 

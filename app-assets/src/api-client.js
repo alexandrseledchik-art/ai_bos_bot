@@ -36,6 +36,17 @@ export class PlatformApiClient {
     });
   }
 
+  getDiagnosticLevel(level) {
+    return this.request(`/api/platform/diagnostics/${encodeURIComponent(level)}`);
+  }
+
+  saveDiagnosticAnswer(level, payload) {
+    return this.request(`/api/platform/diagnostics/${encodeURIComponent(level)}/answer`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  }
+
   markToolOpened(toolId) {
     return this.request(`/api/platform/tools/${encodeURIComponent(toolId)}/opened`, {
       method: "POST"
