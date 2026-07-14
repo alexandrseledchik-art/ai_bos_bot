@@ -82,6 +82,8 @@ for (const className of [
 for (const tourContract of [
   "PLATFORM_TOUR_STEPS",
   "startPlatformTour",
+  "maybeAutoStartPlatformTour",
+  "platformTourAutoStarted",
   "data-tour-target",
   "data-tour-next",
   "data-tour-prev",

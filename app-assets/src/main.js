@@ -20,6 +20,7 @@ const state = {
   }
 };
 let platformTourStep = -1;
+let platformTourAutoStarted = false;
 
 const PLATFORM_TOUR_STEPS = [
   {
@@ -439,6 +440,24 @@ function startPlatformTour() {
   if (guide) guide.open = true;
   platformTourStep = 0;
   showPlatformTourStep();
+}
+
+function maybeAutoStartPlatformTour() {
+  if (
+    platformTourAutoStarted
+    || platformTourSeen()
+    || state.error
+    || currentPath() !== "/app"
+  ) return;
+
+  platformTourAutoStarted = true;
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      if (!platformTourSeen() && currentPath() === "/app" && document.querySelector('[data-tour-target="overview"]')) {
+        startPlatformTour();
+      }
+    });
+  });
 }
 
 function renderArchitecture() {
@@ -939,7 +958,12 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-window.addEventListener("popstate", () => { state.notice = ""; finishPlatformTour(); render(); });
+window.addEventListener("popstate", () => {
+  state.notice = "";
+  if (platformTourStep >= 0) finishPlatformTour();
+  render();
+  maybeAutoStartPlatformTour();
+});
 
 async function start() {
   try {
@@ -961,6 +985,7 @@ async function start() {
   } finally {
     state.loading = false;
     render();
+    maybeAutoStartPlatformTour();
   }
 }
 
