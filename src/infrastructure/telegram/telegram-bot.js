@@ -18,6 +18,7 @@ import {
   isVoiceCapabilityQuestion
 } from "./telegram-meta.js";
 import { resolveTelegramPayloadToText } from "./resolve-telegram-input.js";
+import { DEFAULT_WEB_ACCESS_TTL_SECONDS } from "../auth/web-session.js";
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -31,7 +32,7 @@ export class TelegramBotRunner {
     audioTranscriber = null,
     appBaseUrl = "",
     webSessionSecret = "",
-    webLoginTtlSeconds = 600,
+    webLoginTtlSeconds = DEFAULT_WEB_ACCESS_TTL_SECONDS,
     accessControl = null,
     accessRequestNotifyChatId = ""
   }) {

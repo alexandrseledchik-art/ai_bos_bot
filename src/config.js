@@ -96,7 +96,7 @@ export function loadConfig() {
     telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET || "",
     telegramWebAppAuthMaxAgeSeconds: Number(process.env.TELEGRAM_WEBAPP_AUTH_MAX_AGE_SECONDS || 86400),
     webSessionSecret: process.env.WEB_SESSION_SECRET || process.env.TELEGRAM_WEBHOOK_SECRET || "",
-    webLoginTtlSeconds: Number(process.env.WEB_LOGIN_TTL_SECONDS || 600),
+    webLoginTtlSeconds: Number(process.env.WEB_LOGIN_TTL_SECONDS || 2592000),
     webSessionTtlSeconds: Number(process.env.WEB_SESSION_TTL_SECONDS || 2592000),
     telegramApiBaseUrl: process.env.TELEGRAM_API_BASE_URL || "https://api.telegram.org",
     accessControlEnabled,

@@ -149,7 +149,7 @@ function authMessage() {
   const auth = new URLSearchParams(window.location.search).get("auth");
   if (auth === "pending") return "Заявка уже есть. Кабинет откроется после подтверждения доступа.";
   if (auth === "blocked") return "Доступ к кабинету закрыт. Если это ошибка, напиши Александру в Telegram.";
-  if (auth === "invalid") return "Ссылка устарела или уже недействительна. Запроси новую кнопку в чате AI-BOSS.";
+  if (auth === "invalid") return "Эта кнопка уже не подходит для входа. Вернись в Telegram и нажми свежую кнопку «Открыть в браузере». После входа кабинет запомнит это устройство.";
   if (auth === "unavailable") return "Веб-вход пока не настроен на сервере. Telegram-бот продолжает работать.";
   return "Открой чат AI-BOSS в Telegram и нажми кнопку «Открыть в браузере». Она безопасно привяжет кабинет к твоей компании.";
 }

@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 
 export const WEB_SESSION_COOKIE = "aiboss_web_session";
+export const DEFAULT_WEB_ACCESS_TTL_SECONDS = 2592000;
 
 function requireSecret(secret) {
   const normalized = String(secret || "").trim();
@@ -80,7 +81,7 @@ function verifyToken(token, { type, secret, now = Date.now() }) {
   };
 }
 
-export function createWebLoginToken({ telegramUser, secret, ttlSeconds = 600, now } = {}) {
+export function createWebLoginToken({ telegramUser, secret, ttlSeconds = DEFAULT_WEB_ACCESS_TTL_SECONDS, now } = {}) {
   return createToken({ type: "login", telegramUser, secret, ttlSeconds, now });
 }
 
@@ -88,7 +89,7 @@ export function verifyWebLoginToken(token, { secret, now } = {}) {
   return verifyToken(token, { type: "login", secret, now });
 }
 
-export function createWebSessionToken({ telegramUser, secret, ttlSeconds = 2592000, now } = {}) {
+export function createWebSessionToken({ telegramUser, secret, ttlSeconds = DEFAULT_WEB_ACCESS_TTL_SECONDS, now } = {}) {
   return createToken({ type: "session", telegramUser, secret, ttlSeconds, now });
 }
 
@@ -111,7 +112,7 @@ export function readCookie(request, name = WEB_SESSION_COOKIE) {
   return "";
 }
 
-export function serializeWebSessionCookie(token, { maxAgeSeconds = 2592000 } = {}) {
+export function serializeWebSessionCookie(token, { maxAgeSeconds = DEFAULT_WEB_ACCESS_TTL_SECONDS } = {}) {
   return [
     `${WEB_SESSION_COOKIE}=${encodeURIComponent(token)}`,
     "Path=/",
@@ -126,7 +127,7 @@ export function clearWebSessionCookie() {
   return serializeWebSessionCookie("", { maxAgeSeconds: 0 });
 }
 
-export function buildWebCabinetLoginUrl({ appBaseUrl, telegramUser, secret, ttlSeconds = 600 } = {}) {
+export function buildWebCabinetLoginUrl({ appBaseUrl, telegramUser, secret, ttlSeconds = DEFAULT_WEB_ACCESS_TTL_SECONDS } = {}) {
   const base = String(appBaseUrl || "").trim().replace(/\/+$/, "");
   if (!/^https:\/\//i.test(base) || !String(secret || "").trim()) {
     return "";

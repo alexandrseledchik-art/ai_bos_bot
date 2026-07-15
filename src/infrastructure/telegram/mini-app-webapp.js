@@ -1,4 +1,4 @@
-import { buildWebCabinetLoginUrl } from "../auth/web-session.js";
+import { buildWebCabinetLoginUrl, DEFAULT_WEB_ACCESS_TTL_SECONDS } from "../auth/web-session.js";
 
 function normalizeRoute(route) {
   const value = String(route || "/mini-app").trim();
@@ -18,7 +18,7 @@ export function buildMiniAppReplyMarkup(invite, {
   appBaseUrl,
   telegramUser = null,
   webSessionSecret = "",
-  webLoginTtlSeconds = 600
+  webLoginTtlSeconds = DEFAULT_WEB_ACCESS_TTL_SECONDS
 } = {}) {
   if (!invite?.route) {
     return null;

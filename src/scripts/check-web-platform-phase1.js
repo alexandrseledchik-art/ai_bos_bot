@@ -6,6 +6,7 @@ import {
   clearWebSessionCookie,
   createWebLoginToken,
   createWebSessionToken,
+  DEFAULT_WEB_ACCESS_TTL_SECONDS,
   readCookie,
   serializeWebSessionCookie,
   verifyWebLoginToken,
@@ -33,6 +34,16 @@ assert.throws(
 );
 assert.throws(
   () => verifyWebLoginToken(loginToken, { secret, now: now + 601000 }),
+  /expired/
+);
+
+const defaultLoginToken = createWebLoginToken({ telegramUser, secret, now });
+assert.equal(
+  verifyWebLoginToken(defaultLoginToken, { secret, now: now + 1200000 }).user.id,
+  telegramUser.id
+);
+assert.throws(
+  () => verifyWebLoginToken(defaultLoginToken, { secret, now: now + (DEFAULT_WEB_ACCESS_TTL_SECONDS + 1) * 1000 }),
   /expired/
 );
 
