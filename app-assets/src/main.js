@@ -282,7 +282,17 @@ function navigation(activePath) {
     </a>`).join("");
 }
 
+function closeMobileMenu({ restoreFocus = false } = {}) {
+  document.querySelector(".sidebar")?.classList.remove("open");
+  document.querySelector(".sidebar-backdrop")?.classList.remove("open");
+  const menuButton = document.querySelector("[data-menu]");
+  menuButton?.setAttribute("aria-expanded", "false");
+  document.body.classList.remove("menu-open");
+  if (restoreFocus) menuButton?.focus();
+}
+
 function renderShell(content) {
+  document.body.classList.remove("menu-open");
   const data = state.bootstrap;
   const activePath = currentPath();
   const company = data.company?.name || "Компания";
@@ -1084,6 +1094,7 @@ function render() {
 
 function navigate(path) {
   if (platformTourStep >= 0) finishPlatformTour();
+  closeMobileMenu();
   window.history.pushState({}, "", path);
   state.notice = "";
   render();
@@ -1270,9 +1281,7 @@ document.addEventListener("click", async (event) => {
     event.preventDefault();
     if (link.dataset.toolOpen) api.markToolOpened(link.dataset.toolOpen).catch(() => null);
     await openPlatformPath(link.getAttribute("href"));
-    document.querySelector(".sidebar")?.classList.remove("open");
-    document.querySelector(".sidebar-backdrop")?.classList.remove("open");
-    document.querySelector("[data-menu]")?.setAttribute("aria-expanded", "false");
+    closeMobileMenu();
     return;
   }
   if (event.target.closest("[data-menu]")) {
@@ -1286,10 +1295,7 @@ document.addEventListener("click", async (event) => {
     return;
   }
   if (event.target.closest("[data-menu-close]")) {
-    document.querySelector(".sidebar")?.classList.remove("open");
-    document.querySelector(".sidebar-backdrop")?.classList.remove("open");
-    document.querySelector("[data-menu]")?.setAttribute("aria-expanded", "false");
-    document.body.classList.remove("menu-open");
+    closeMobileMenu({ restoreFocus: true });
     return;
   }
   const toolLink = event.target.closest("[data-tool-open]");
@@ -1412,11 +1418,7 @@ window.addEventListener("resize", () => {
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && document.querySelector(".sidebar.open")) {
-    document.querySelector(".sidebar")?.classList.remove("open");
-    document.querySelector(".sidebar-backdrop")?.classList.remove("open");
-    document.querySelector("[data-menu]")?.setAttribute("aria-expanded", "false");
-    document.body.classList.remove("menu-open");
-    document.querySelector("[data-menu]")?.focus();
+    closeMobileMenu({ restoreFocus: true });
     return;
   }
   if (platformTourStep < 0) return;
@@ -1433,6 +1435,7 @@ document.addEventListener("keydown", (event) => {
 });
 
 window.addEventListener("popstate", () => {
+  closeMobileMenu();
   state.notice = "";
   if (platformTourStep >= 0) finishPlatformTour();
   if (currentPath() === "/app/tools" && !state.toolsLoaded) {

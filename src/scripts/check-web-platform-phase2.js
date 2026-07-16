@@ -134,6 +134,8 @@ for (const tourContract of [
 for (const uxContract of [
   "ensureToolsLoaded",
   "ensureToolDetailLoaded",
+  "closeMobileMenu",
+  'document.body.classList.remove("menu-open")',
   "data-architecture-layer",
   "Свернуть структуру",
   "Этот этап завершён",
