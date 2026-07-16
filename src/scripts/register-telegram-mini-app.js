@@ -1,5 +1,4 @@
 import { loadConfig } from "../config.js";
-import { buildMiniAppMenuButton } from "../infrastructure/telegram/mini-app-webapp.js";
 import { TelegramApiClient } from "../infrastructure/telegram/telegram-api.js";
 
 async function main() {
@@ -9,18 +8,7 @@ async function main() {
     throw new Error("TELEGRAM_BOT_TOKEN is missing.");
   }
 
-  if (!config.appBaseUrl) {
-    throw new Error("APP_BASE_URL is missing.");
-  }
-
-  const menuButton = buildMiniAppMenuButton(config.appBaseUrl, {
-    route: "/mini-app",
-    text: "Кабинет"
-  });
-
-  if (!menuButton) {
-    throw new Error("Mini App menu button URL is invalid. APP_BASE_URL must be HTTPS.");
-  }
+  const menuButton = { type: "default" };
 
   const telegramApi = new TelegramApiClient({
     token: config.telegramToken,
@@ -32,8 +20,8 @@ async function main() {
   console.log(JSON.stringify({
     ok: true,
     action: "setChatMenuButton",
-    text: menuButton.text,
-    url: menuButton.web_app.url
+    type: menuButton.type,
+    note: "Telegram Web App menu button removed; cabinet opens from signed message links."
   }, null, 2));
 }
 

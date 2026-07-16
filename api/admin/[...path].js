@@ -10,7 +10,6 @@ import {
 import { answerWorkspaceQuestion } from "../../src/application/workspace-chat-service.js";
 import { getServices } from "../../src/create-services.js";
 import {
-  buildMiniAppMenuButton,
   buildMiniAppReplyMarkup
 } from "../../src/infrastructure/telegram/mini-app-webapp.js";
 import { TelegramApiClient } from "../../src/infrastructure/telegram/telegram-api.js";
@@ -71,7 +70,7 @@ async function dispatchAdminRoute(request) {
     });
   }
 
-  if (path === "telegram/miniapp-menu") {
+  if (path === "telegram/miniapp-menu" || path === "telegram/menu-reset") {
     return handleAdminRoute(request, ["POST"], async ({ config }) => {
       if (!config.telegramToken) {
         return adminJsonResponse(
@@ -83,21 +82,7 @@ async function dispatchAdminRoute(request) {
         );
       }
 
-      const payload = await readAdminJsonBody(request);
-      const menuButton = buildMiniAppMenuButton(config.appBaseUrl, {
-        route: payload.route || "/mini-app",
-        text: payload.text || "Кабинет"
-      });
-
-      if (!menuButton) {
-        return adminJsonResponse(
-          {
-            ok: false,
-            error: "APP_BASE_URL must be configured as HTTPS."
-          },
-          { status: 503 }
-        );
-      }
+      const menuButton = { type: "default" };
 
       const telegramApi = new TelegramApiClient({
         token: config.telegramToken,
@@ -108,10 +93,8 @@ async function dispatchAdminRoute(request) {
 
       return adminJsonResponse({
         ok: true,
-        menuButton: {
-          text: menuButton.text,
-          url: menuButton.web_app.url
-        }
+        menuButton,
+        message: "Telegram Web App menu button removed. Use the signed web-cabinet button in bot messages."
       });
     });
   }
