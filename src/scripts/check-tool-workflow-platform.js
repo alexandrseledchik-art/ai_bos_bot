@@ -81,14 +81,6 @@ async function run() {
           { key: "role", question: "Какова роль собственника?" }
         ]
       }
-    }, {
-      id: "tool-2",
-      slug: "owner-success-canvas",
-      title: "Канва критериев успеха собственника (Owner Success Criteria Canvas — что для собственника означает «победа»)",
-      short_description: "Фиксирует личные критерии успеха собственника.",
-      result: "Критерии успеха и красные линии",
-      layer_keys: ["owner_context"],
-      metadata: {}
     }]
   });
   const googleDrive = {
@@ -123,45 +115,6 @@ async function run() {
   const copied = await service.createPersonalCopy({ bootstrap, instanceId: started.instance.id });
   assert.equal(copied.document.copy_status, "created");
   assert.equal(copied.document.google_file_id, "copy-1");
-
-  const nativeStarted = await service.startTool({ bootstrap, toolId: "tool-2", mode: "web" });
-  assert.ok(nativeStarted.nativeWorkspace);
-  assert.equal(nativeStarted.questions.length, 10);
-  assert.equal(nativeStarted.instance.fill_mode, "document");
-
-  const draft = await service.saveWebAnswers({
-    bootstrap,
-    instanceId: nativeStarted.instance.id,
-    answers: { horizon: "5 лет", contradictions: "Рост может конфликтовать со свободой." }
-  });
-  assert.equal(draft.instance.status, "in_progress");
-  assert.equal(draft.answers.length, 2);
-  assert.ok(draft.instance.progress_percent > 0);
-  await assert.rejects(
-    service.saveWebAnswers({ bootstrap, instanceId: nativeStarted.instance.id, complete: true }),
-    /Чтобы завершить инструмент, заполните/
-  );
-
-  const nativeCompleted = await service.saveWebAnswers({
-    bootstrap,
-    instanceId: nativeStarted.instance.id,
-    complete: true,
-    answers: {
-      financial_success: "3 млн рублей чистой прибыли в месяц к 2030 году.",
-      freedom_success: "Не более двух дней в неделю в роли архитектора.",
-      legacy_success: "Методология, которая работает без моего постоянного участия.",
-      relationships_success: "Сильная команда и время для семьи.",
-      red_lines: "Не жертвовать здоровьем и репутацией.",
-      top_priority: "Личная свобода",
-      anchor_criteria: "3 млн прибыли\n2 дня в неделю\n80% решений без собственника",
-      first_decision: "Пересмотреть личное участие в клиентской работе."
-    }
-  });
-  assert.equal(nativeCompleted.instance.status, "completed");
-  assert.equal(nativeCompleted.instance.progress_percent, 100);
-  assert.equal(nativeCompleted.answers.length, 10);
-  assert.match(nativeCompleted.latestSnapshot.summary, /Главный приоритет: Личная свобода/);
-  assert.equal(syncClient.tables.observations.length, 12);
 
   console.log("Tool workflow platform checks passed.");
 }

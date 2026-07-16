@@ -619,18 +619,14 @@ function renderDiagnostics() {
 
 function renderTools() {
   const query = state.toolQuery.trim().toLowerCase();
-  const matchingTools = (state.workspace?.tools || [])
-    .filter((tool) => !query || [tool.title, tool.short_description, tool.layer, tool.domain].join(" ").toLowerCase().includes(query))
-    .sort((left, right) => Number(isOwnerSuccessPilot(right)) - Number(isOwnerSuccessPilot(left)));
+  const matchingTools = (state.workspace?.tools || []).filter((tool) => !query || [tool.title, tool.short_description, tool.layer, tool.domain].join(" ").toLowerCase().includes(query));
   const tools = matchingTools.slice(0, 60);
   renderShell(`
     ${sectionHero(state.bootstrap.company?.name || "Компания", "Инструменты", "Каталог рабочих шаблонов по архитектуре бизнеса. AI-BOSS помогает выбрать инструмент и сопровождает его заполнение.")}
     <section class="tool-toolbar"><label><span>Поиск по каталогу</span><input type="search" value="${escapeHtml(state.toolQuery)}" placeholder="Например: роли, стратегия, финансы" data-tool-search /></label><b>${matchingTools.length} найдено${matchingTools.length > tools.length ? ` · показано ${tools.length}` : ""}</b></section>
     <section class="tool-grid">${tools.length ? tools.map((tool) => {
       const active = (state.workspace?.toolInstances || []).find((item) => item.instance?.tool_id === tool.id);
-      const nativePilot = isOwnerSuccessPilot(tool);
-      const title = nativePilot ? "Канва критериев успеха собственника" : tool.title;
-      return `<article class="tool-card ${nativePilot ? "is-native-tool" : ""}"><div><span class="eyebrow">${escapeHtml(tool.layer || tool.domain || "Инструмент")}</span>${nativePilot ? `<span class="native-tool-badge">Заполняется в кабинете</span>` : ""}<h2>${escapeHtml(title)}</h2><p>${escapeHtml(tool.short_description || "Рабочий инструмент для сборки этого участка бизнеса.")}</p></div><div class="tool-result"><b>Результат</b><span>${escapeHtml(tool.result || tool.when_to_use || "Зафиксированный управленческий артефакт.")}</span></div><a href="/app/tools/${encodeURIComponent(tool.id)}" data-link data-tool-open="${escapeHtml(tool.id)}">${active ? `Продолжить · ${percent(active.instance.progress_percent)}%` : "Открыть инструмент"} →</a></article>`;
+      return `<article class="tool-card"><div><span class="eyebrow">${escapeHtml(tool.layer || tool.domain || "Инструмент")}</span><h2>${escapeHtml(tool.title)}</h2><p>${escapeHtml(tool.short_description || "Рабочий инструмент для сборки этого участка бизнеса.")}</p></div><div class="tool-result"><b>Результат</b><span>${escapeHtml(tool.result || tool.when_to_use || "Зафиксированный управленческий артефакт.")}</span></div><a href="/app/tools/${encodeURIComponent(tool.id)}" data-link data-tool-open="${escapeHtml(tool.id)}">${active ? `Продолжить · ${percent(active.instance.progress_percent)}%` : "Открыть инструмент"} →</a></article>`;
     }).join("") : `<div class="empty-state"><h2>Ничего не найдено</h2><p>Измени поисковый запрос или попроси AI-BOSS подобрать инструмент по текущей задаче.</p></div>`}</section>`);
 }
 
@@ -639,37 +635,6 @@ function toolByRoute() {
   if (!match) return null;
   const id = decodeURIComponent(match[1]);
   return (state.workspace?.tools || []).find((tool) => tool.id === id || tool.slug === id) || null;
-}
-
-function isOwnerSuccessPilot(tool) {
-  const slug = String(tool?.slug || "").toLowerCase();
-  return ["ba-tool-0007", "owner-success-canvas"].includes(slug)
-    || String(tool?.title || "").toLowerCase().includes("канва критериев успеха собственника");
-}
-
-function nativeAnswerMap(answers = []) {
-  return new Map(answers.map((answer) => [answer.question_key, answer.answer_text || ""]));
-}
-
-function renderNativeField(field, answerMap) {
-  const value = answerMap.get(field.key) || "";
-  const common = `name="${escapeHtml(field.key)}" ${field.required ? "required" : ""}`;
-  const control = field.type === "select"
-    ? `<select ${common}><option value="">Выберите вариант</option>${(field.options || []).map((option) => `<option value="${escapeHtml(option)}" ${value === option ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select>`
-    : `<textarea ${common} rows="5" placeholder="${escapeHtml(field.placeholder || "Напишите своими словами")}">${escapeHtml(value)}</textarea>`;
-  return `<label class="native-tool-field"><span>${escapeHtml(field.label)}${field.required ? " <i>обязательно</i>" : ""}</span><p>${escapeHtml(field.question)}</p>${control}${field.help ? `<small>${escapeHtml(field.help)}</small>` : ""}</label>`;
-}
-
-function renderNativeToolWorkspace(context) {
-  const definition = context.nativeWorkspace;
-  const answerMap = nativeAnswerMap(context.answers);
-  const completed = context.instance?.status === "completed";
-  return `
-    ${completed && context.latestSnapshot ? `<section class="native-tool-result"><span class="eyebrow">Сохранённый результат</span><h2>Критерии успеха стали частью контекста компании</h2><p>${escapeHtml(context.latestSnapshot.summary)}</p><div><button type="button" data-edit-native-tool>Уточнить ответы</button><a href="/app/architecture" data-link>Посмотреть архитектуру →</a></div></section>` : ""}
-    <form class="native-tool-form ${completed ? "is-completed" : ""}" data-native-tool-form data-instance-id="${escapeHtml(context.instance.id)}">
-      ${(definition.sections || []).map((section, index) => `<section class="native-tool-section"><header><span>0${index + 1}</span><div><h2>${escapeHtml(section.title)}</h2><p>${escapeHtml(section.description || "")}</p></div></header><div class="native-tool-fields">${(context.questions || []).filter((field) => field.sectionKey === section.key).map((field) => renderNativeField(field, answerMap)).join("")}</div></section>`).join("")}
-      <footer class="native-tool-actions"><div><b>Ответы сохраняются в контексте компании</b><span>Можно сохранить черновик и продолжить позже или в разговоре с AI-BOSS.</span></div><button type="submit" name="action" value="draft" formnovalidate class="secondary-action">Сохранить черновик</button><button type="submit" name="action" value="complete" class="primary-action">Подтвердить результат <span>→</span></button><small data-native-tool-status></small></footer>
-    </form>`;
 }
 
 function renderToolDetail() {
@@ -686,26 +651,18 @@ function renderToolDetail() {
   const chatUrl = instance?.telegram_start_token
     ? `${TELEGRAM_CHAT_URL}?start=tool_${instance.telegram_start_token}`
     : TELEGRAM_CHAT_URL;
-  const nativePilot = isOwnerSuccessPilot(tool);
-  const displayTitle = nativePilot ? "Канва критериев успеха собственника" : tool.title;
-  const displayDescription = nativePilot
-    ? "Помогает определить, что лично для собственника будет означать победу в бизнесе через 3–10 лет."
-    : tool.short_description || "AI-BOSS проведёт по инструменту, сохранит ответы и добавит результат в память компании.";
-  const displayResult = nativePilot
-    ? "Согласованные критерии успеха, красные линии и ориентиры для решений по бизнесу."
-    : tool.result || "Заполненный управленческий артефакт, связанный с контекстом компании.";
   renderShell(`
-    ${sectionHero("Инструмент архитектуры", displayTitle, displayDescription)}
+    ${sectionHero("Инструмент архитектуры", tool.title, tool.short_description || "AI-BOSS проведёт по инструменту, сохранит ответы и добавит результат в память компании.")}
     <section class="tool-workspace-grid">
-      <article class="panel tool-purpose"><span class="eyebrow">Зачем сейчас</span><h2>${escapeHtml(tool.when_to_use || "Структурировать этот участок бизнеса и получить рабочий результат.")}</h2><p><b>Результат:</b> ${escapeHtml(displayResult)}</p></article>
+      <article class="panel tool-purpose"><span class="eyebrow">Зачем сейчас</span><h2>${escapeHtml(tool.when_to_use || "Структурировать этот участок бизнеса и получить рабочий результат.")}</h2><p><b>Результат:</b> ${escapeHtml(tool.result || "Заполненный управленческий артефакт, связанный с контекстом компании.")}</p></article>
       <article class="panel tool-progress-panel"><span class="eyebrow">Состояние</span><div class="tool-progress-number">${percent(instance?.progress_percent)}%</div><p>${instance ? `Статус: ${escapeHtml(statusLabel(instance.status))}. Сохранено ответов: ${answers.length} из ${questions.length || "—"}.` : "Инструмент ещё не начат. Выбери удобный способ работы."}</p></article>
     </section>
-    ${nativePilot && context?.nativeWorkspace ? renderNativeToolWorkspace(context) : `<section class="fill-mode-grid">
+    <section class="fill-mode-grid">
       <article class="fill-mode-card"><span>01</span><h2>Пройти с AI-BOSS</h2><p>Бот задаёт по одному вопросу, принимает текст и голос, сохраняет ответы и после завершения добавляет выводы в память компании.</p>${instance?.fill_mode === "chat" ? `<a class="primary-action" href="${escapeHtml(chatUrl)}" target="_blank" rel="noopener">Продолжить в Telegram <span>→</span></a>` : `<button class="primary-action" type="button" data-start-tool="${escapeHtml(tool.id)}" data-mode="chat">Начать в чате <span>→</span></button>`}</article>
-      ${nativePilot ? `<article class="fill-mode-card native-mode"><span>02</span><h2>Заполнить в кабинете</h2><p>Ответы сохраняются прямо в AI-BOSS. Можно начать в кабинете, продолжить в чате и не переносить данные между файлами.</p><button class="primary-action secondary" type="button" data-start-tool="${escapeHtml(tool.id)}" data-mode="web">Открыть рабочую область <span>→</span></button></article>` : `<article class="fill-mode-card"><span>02</span><h2>Заполнить рабочую копию</h2><p>Пока инструмент не перенесён в кабинет, можно использовать копию Google-шаблона или привязать уже созданный документ.</p>${document?.google_file_url ? `<a class="primary-action secondary" href="${escapeHtml(safeUrl(document.google_file_url))}" target="_blank" rel="noopener">Открыть рабочую копию <span>↗</span></a>` : `<button class="primary-action secondary" type="button" data-copy-tool="${escapeHtml(tool.id)}">Создать рабочую копию <span>→</span></button>`}${masterUrl ? `<a class="quiet-link" href="${escapeHtml(masterUrl)}" target="_blank" rel="noopener">Посмотреть исходный шаблон ↗</a>` : ""}</article>`}
+      <article class="fill-mode-card"><span>02</span><h2>Заполнить документ</h2><p>AI-BOSS создаёт личную копию Google-шаблона. Если копирование ещё не подключено, можно добавить собственную копию ссылкой.</p>${document?.google_file_url ? `<a class="primary-action secondary" href="${escapeHtml(safeUrl(document.google_file_url))}" target="_blank" rel="noopener">Открыть личный документ <span>↗</span></a>` : `<button class="primary-action secondary" type="button" data-copy-tool="${escapeHtml(tool.id)}">Создать личную копию <span>→</span></button>`}${masterUrl ? `<a class="quiet-link" href="${escapeHtml(masterUrl)}" target="_blank" rel="noopener">Посмотреть исходный шаблон ↗</a>` : ""}</article>
     </section>
-    ${nativePilot ? "" : `<form class="panel document-link-form" data-document-link-form data-tool-id="${escapeHtml(tool.id)}"><div><span class="eyebrow">Уже сделали копию?</span><h2>Привязать свой документ</h2><p>Ссылка сохранится в компании и будет доступна AI-BOSS как источник актуального контекста.</p></div><label><input type="url" name="url" required placeholder="https://docs.google.com/..." value="${escapeHtml(document?.google_file_url || "")}" /><button type="submit">Сохранить ссылку</button></label><small data-document-status></small></form>`}`}
-    ${answers.length && !nativePilot ? `<section class="panel saved-answers"><span class="eyebrow">Сохранённые ответы</span><h2>${answers.length} из ${questions.length}</h2>${answers.map((answer) => `<div><b>${escapeHtml(answer.question_text || answer.question_key)}</b><p>${escapeHtml(answer.answer_text)}</p></div>`).join("")}</section>` : ""}`);
+    <form class="panel document-link-form" data-document-link-form data-tool-id="${escapeHtml(tool.id)}"><div><span class="eyebrow">Уже сделали копию?</span><h2>Привязать свой документ</h2><p>Ссылка сохранится в компании и будет доступна AI-BOSS как источник актуального контекста.</p></div><label><input type="url" name="url" required placeholder="https://docs.google.com/..." value="${escapeHtml(document?.google_file_url || "")}" /><button type="submit">Сохранить ссылку</button></label><small data-document-status></small></form>
+    ${answers.length ? `<section class="panel saved-answers"><span class="eyebrow">Сохранённые ответы</span><h2>${answers.length} из ${questions.length}</h2>${answers.map((answer) => `<div><b>${escapeHtml(answer.question_text || answer.question_key)}</b><p>${escapeHtml(answer.answer_text)}</p></div>`).join("")}</section>` : ""}`);
 }
 
 function renderDocuments() {
@@ -887,18 +844,12 @@ document.addEventListener("click", async (event) => {
     try {
       const context = await api.startTool(startButton.dataset.startTool, startButton.dataset.mode || "chat");
       state.workspace.toolInstances = [context, ...(state.workspace.toolInstances || []).filter((item) => item.instance?.id !== context.instance.id)];
-      state.notice = startButton.dataset.mode === "web"
-        ? "Рабочая область создана. Ответы можно сохранять постепенно."
-        : "Инструмент запущен. Открой Telegram — AI-BOSS начнёт с первого вопроса.";
+      state.notice = "Инструмент запущен. Открой Telegram — AI-BOSS начнёт с первого вопроса.";
       renderToolDetail();
     } catch (error) {
       state.notice = error.message;
       renderToolDetail();
     }
-    return;
-  }
-  if (event.target.closest("[data-edit-native-tool]")) {
-    document.querySelector("[data-native-tool-form]")?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
   const copyButton = event.target.closest("[data-copy-tool]");
@@ -934,28 +885,6 @@ document.addEventListener("input", (event) => {
 });
 
 document.addEventListener("submit", async (event) => {
-  const nativeToolForm = event.target.closest("[data-native-tool-form]");
-  if (nativeToolForm) {
-    event.preventDefault();
-    const status = nativeToolForm.querySelector("[data-native-tool-status]");
-    const buttons = nativeToolForm.querySelectorAll("button[type=submit]");
-    const complete = event.submitter?.value === "complete";
-    status.textContent = complete ? "Проверяю и сохраняю результат..." : "Сохраняю черновик...";
-    buttons.forEach((button) => { button.disabled = true; });
-    try {
-      const values = Object.fromEntries([...new FormData(nativeToolForm).entries()].filter(([key]) => key !== "action"));
-      const context = await api.saveToolAnswers(nativeToolForm.dataset.instanceId, values, { complete });
-      state.workspace.toolInstances = [context, ...(state.workspace.toolInstances || []).filter((item) => item.instance?.id !== context.instance.id)];
-      state.notice = complete
-        ? "Результат подтверждён и добавлен в контекст компании."
-        : "Черновик сохранён. Можно продолжить позже или в Telegram.";
-      renderToolDetail();
-    } catch (error) {
-      status.textContent = error.message;
-      buttons.forEach((button) => { button.disabled = false; });
-    }
-    return;
-  }
   const documentForm = event.target.closest("[data-document-link-form]");
   if (documentForm) {
     event.preventDefault();
