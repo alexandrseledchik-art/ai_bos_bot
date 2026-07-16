@@ -10,6 +10,8 @@ const state = {
   loading: true,
   error: null,
   toolQuery: "",
+  toolStatusFilter: "all",
+  toolPath: { classKey: "", layerKey: "", domain: "", subdomain: "" },
   notice: "",
   diagnosticsByLevel: {},
   diagnosticLoading: "",
@@ -617,17 +619,214 @@ function renderDiagnostics() {
     }).join("")}</section>` : `<section class="empty-diagnostic"><h2>Оценок пока нет</h2><p>Для первого знакомства с системой обычно достаточно экспресс-диагностики по 11 слоям.</p><a class="primary-action" href="/app/diagnostics/express" data-diagnostic-start="express">Начать экспресс-диагностику <span>→</span></a></section>`}`);
 }
 
+const TOOL_CLASS_META = [
+  { key: "A", name: "Условия игры", description: "Чего хочет собственник и в какой внешней реальности работает бизнес." },
+  { key: "B", name: "Создание ценности и спроса", description: "Кому, что и почему бизнес продаёт и какой спрос создаёт." },
+  { key: "C", name: "Превращение спроса в результат", description: "Как спрос становится сделками, исполнением, деньгами и прибылью." },
+  { key: "D", name: "Устойчивость и масштабирование", description: "Как команда, управление, технологии и данные удерживают результат." }
+];
+
+const TOOL_LAYER_CLASS = {
+  owner_context: "A",
+  external_environment: "A",
+  strategy: "B",
+  product: "B",
+  commercial: "B",
+  operations: "C",
+  finance: "C",
+  team: "D",
+  governance: "D",
+  technology: "D",
+  data_analytics: "D"
+};
+
+const TOOL_LAYER_ALIASES = {
+  product_value_proposition: "product",
+  operating_model: "operations",
+  people_organization: "team",
+  governance_risks: "governance"
+};
+
+function normalizeToolText(value) {
+  return String(value || "").toLowerCase().replaceAll("ё", "е").replace(/\s+/g, " ").trim();
+}
+
+function canonicalToolLayer(value) {
+  const key = String(value || "").trim();
+  return TOOL_LAYER_ALIASES[key] || key;
+}
+
+function toolLocation(tool = {}) {
+  const layerKey = canonicalToolLayer(tool.layer_keys?.[0] || tool.layerKeys?.[0] || "");
+  const assemblyLayer = (state.workspace?.assembly?.layers || []).find((layer) => canonicalToolLayer(layer.layerKey) === layerKey);
+  return {
+    classKey: assemblyLayer?.classKey || TOOL_LAYER_CLASS[layerKey] || "D",
+    layerKey,
+    layer: tool.layer_title || tool.layer || assemblyLayer?.title || "Другие инструменты",
+    domain: tool.domain_title || tool.domain || "Общий контур",
+    subdomain: tool.subdomain_title || tool.subdomain || "Общие инструменты"
+  };
+}
+
+function toolPathLabel(tool) {
+  const location = toolLocation(tool);
+  return `<span>Класс ${escapeHtml(location.classKey)}</span><i>→</i><span>${escapeHtml(location.layer)}</span><i>→</i><span>${escapeHtml(location.domain)}</span><i>→</i><b>${escapeHtml(location.subdomain)}</b>`;
+}
+
+function toolInstanceFor(tool, instances = state.workspace?.toolInstances || []) {
+  return instances.find((item) => item.instance?.tool_id === tool.id) || null;
+}
+
+function workspaceToolStatus(status) {
+  return ({
+    in_progress: "в работе",
+    waiting_for_user: "ждёт ответа",
+    submitted: "ждёт подтверждения",
+    analyzed: "ждёт подтверждения",
+    completed: "завершён",
+    needs_update: "нужно обновить"
+  })[status] || "не начат";
+}
+
+function toolStatusCategory(tool, instances = state.workspace?.toolInstances || []) {
+  const status = toolInstanceFor(tool, instances)?.instance?.status;
+  if (!status || status === "archived") return "not_started";
+  if (status === "completed") return "completed";
+  if (status === "needs_update") return "needs_update";
+  return "in_progress";
+}
+
+function filterToolsByStatus(tools, status) {
+  if (!status || status === "all") return tools;
+  return tools.filter((tool) => toolStatusCategory(tool) === status);
+}
+
+function workspaceToolCard(tool, context = null, { recommended = false, primary = false, reason = "" } = {}) {
+  const status = context?.instance?.status || "not_started";
+  const action = status === "completed" ? "Открыть результат" : context ? "Продолжить" : "Начать";
+  const progress = context ? percent(context.instance.progress_percent) : 0;
+  return `<article class="tool-card workspace-card ${recommended ? "recommended" : ""} ${primary ? "primary" : ""}"><div><div class="tool-card-meta"><span class="eyebrow">${recommended ? (primary ? "Рекомендуется сейчас" : "Альтернатива") : `Класс ${escapeHtml(toolLocation(tool).classKey)}`}</span>${context ? `<span class="tool-state ${escapeHtml(toolStatusCategory(tool))}">${escapeHtml(workspaceToolStatus(status))}${status !== "completed" ? ` · ${progress}%` : ""}</span>` : ""}</div><h2>${escapeHtml(tool.title)}</h2><p>${escapeHtml(tool.short_description || "Рабочий инструмент для сборки этого участка бизнеса.")}</p>${recommended && reason ? `<div class="tool-reason"><b>Почему сейчас</b><span>${escapeHtml(reason)}</span></div>` : ""}<div class="tool-location compact">${toolPathLabel(tool)}</div></div><div class="tool-result"><b>Что получится</b><span>${escapeHtml(tool.result || tool.when_to_use || "Зафиксированный рабочий результат компании.")}</span></div><a href="/app/tools/${encodeURIComponent(tool.id)}" data-link data-tool-open="${escapeHtml(tool.id)}">${action} →</a></article>`;
+}
+
+function workspaceToolRow(context) {
+  const tool = context.tool;
+  const status = context.instance?.status || "not_started";
+  const progress = percent(context.instance?.progress_percent);
+  return `<a class="my-tool-row" href="/app/tools/${encodeURIComponent(tool.id)}" data-link><div><span class="tool-state ${escapeHtml(toolStatusCategory(tool))}">${escapeHtml(workspaceToolStatus(status))}</span><h3>${escapeHtml(tool.title)}</h3><div class="tool-location compact">${toolPathLabel(tool)}</div></div><div><b>${progress}%</b><i><em style="width:${progress}%"></em></i><span>${status === "completed" ? "Открыть результат" : "Продолжить"} →</span></div></a>`;
+}
+
+function recommendedWorkspaceTools(tools, instances, assembly = {}) {
+  const occupied = new Set(instances.filter((item) => ["in_progress", "waiting_for_user", "submitted", "analyzed", "completed"].includes(item.instance?.status)).map((item) => item.instance.tool_id));
+  const explicit = tools
+    .filter((tool) => tool.recommendation && tool.recommendation.status !== "rejected" && !occupied.has(tool.id))
+    .sort((left, right) => Number(left.recommendation?.priority || 99) - Number(right.recommendation?.priority || 99))
+    .map((tool) => ({ tool, reason: tool.recommendation?.reason || "Инструмент связан с текущим запросом и подтверждёнными данными компании." }));
+  const results = [...explicit];
+  const next = assembly?.nextRequest || {};
+  const target = normalizeToolText(next.architectureItem?.recommendedTool || "");
+  const location = {
+    layerKey: canonicalToolLayer(next.layer?.layerKey || ""),
+    domain: normalizeToolText(next.architectureItem?.domain || ""),
+    subdomain: normalizeToolText(next.architectureItem?.subdomain || "")
+  };
+  const candidates = tools.filter((tool) => {
+    if (occupied.has(tool.id) || results.some((item) => item.tool.id === tool.id)) return false;
+    const toolPlace = toolLocation(tool);
+    if (target && normalizeToolText(tool.title).includes(target)) return true;
+    return Boolean(location.layerKey && toolPlace.layerKey === location.layerKey
+      && (!location.domain || normalizeToolText(toolPlace.domain) === location.domain)
+      && (!location.subdomain || normalizeToolText(toolPlace.subdomain) === location.subdomain));
+  });
+  for (const tool of candidates.slice(0, Math.max(0, 3 - results.length))) {
+    results.push({ tool, reason: next.text || `Это следующий незаполненный участок последовательной сборки: ${toolLocation(tool).subdomain}.` });
+  }
+  return results;
+}
+
+function buildToolHierarchy(tools) {
+  const groups = TOOL_CLASS_META.map((meta) => ({ ...meta, tools: [], layers: [] }));
+  for (const tool of tools) {
+    const place = toolLocation(tool);
+    const classGroup = groups.find((item) => item.key === place.classKey) || groups[3];
+    classGroup.tools.push(tool);
+    let layer = classGroup.layers.find((item) => item.key === place.layerKey);
+    if (!layer) {
+      const assemblyLayer = (state.workspace?.assembly?.layers || []).find((item) => canonicalToolLayer(item.layerKey) === place.layerKey);
+      layer = { key: place.layerKey, title: assemblyLayer?.title || place.layer, order: Number(assemblyLayer?.order || classGroup.layers.length + 1), tools: [], domains: [] };
+      classGroup.layers.push(layer);
+    }
+    layer.tools.push(tool);
+    let domain = layer.domains.find((item) => normalizeToolText(item.title) === normalizeToolText(place.domain));
+    if (!domain) {
+      domain = { title: place.domain, tools: [], subdomains: [] };
+      layer.domains.push(domain);
+    }
+    domain.tools.push(tool);
+    let subdomain = domain.subdomains.find((item) => normalizeToolText(item.title) === normalizeToolText(place.subdomain));
+    if (!subdomain) {
+      subdomain = { title: place.subdomain, tools: [] };
+      domain.subdomains.push(subdomain);
+    }
+    subdomain.tools.push(tool);
+  }
+  groups.forEach((group) => group.layers.sort((left, right) => left.order - right.order));
+  return groups;
+}
+
+function ensureToolPath(hierarchy) {
+  const path = state.toolPath;
+  let classGroup = hierarchy.find((item) => item.key === path.classKey && item.tools.length) || hierarchy.find((item) => item.tools.length);
+  path.classKey = classGroup?.key || "A";
+  let layer = classGroup?.layers.find((item) => item.key === path.layerKey) || classGroup?.layers[0];
+  path.layerKey = layer?.key || "";
+  let domain = layer?.domains.find((item) => item.title === path.domain) || layer?.domains[0];
+  path.domain = domain?.title || "";
+  let subdomain = domain?.subdomains.find((item) => item.title === path.subdomain) || domain?.subdomains[0];
+  path.subdomain = subdomain?.title || "";
+  return { ...path };
+}
+
+function toolMatchesPath(tool, path) {
+  const place = toolLocation(tool);
+  return place.classKey === path.classKey && place.layerKey === path.layerKey
+    && normalizeToolText(place.domain) === normalizeToolText(path.domain)
+    && normalizeToolText(place.subdomain) === normalizeToolText(path.subdomain);
+}
+
 function renderTools() {
-  const query = state.toolQuery.trim().toLowerCase();
-  const matchingTools = (state.workspace?.tools || []).filter((tool) => !query || [tool.title, tool.short_description, tool.layer, tool.domain].join(" ").toLowerCase().includes(query));
-  const tools = matchingTools.slice(0, 60);
+  const allTools = state.workspace?.tools || [];
+  const instances = state.workspace?.toolInstances || [];
+  const query = normalizeToolText(state.toolQuery);
+  const activeInstances = instances.filter((item) => ["in_progress", "waiting_for_user", "submitted", "analyzed", "needs_update"].includes(item.instance?.status));
+  const current = activeInstances[0] || null;
+  const myTools = instances.filter((item) => item.tool && item.instance?.status !== "archived");
+  const recommendations = recommendedWorkspaceTools(allTools, instances, state.workspace?.assembly).slice(0, 3);
+  const hierarchy = buildToolHierarchy(allTools);
+  const selected = ensureToolPath(hierarchy);
+  const selectedTools = filterToolsByStatus(allTools.filter((tool) => toolMatchesPath(tool, selected)), state.toolStatusFilter);
+  const searchResults = query
+    ? filterToolsByStatus(allTools.filter((tool) => normalizeToolText([tool.title, tool.short_description, tool.when_to_use, tool.layer_title, tool.layer, tool.domain_title, tool.domain, tool.subdomain_title, tool.subdomain].join(" ")).includes(query)), state.toolStatusFilter).slice(0, 60)
+    : [];
+  const classMeta = TOOL_CLASS_META.find((item) => item.key === selected.classKey);
+  const selectedClass = hierarchy.find((item) => item.key === selected.classKey);
+  const selectedLayer = selectedClass?.layers.find((item) => item.key === selected.layerKey);
+  const selectedDomain = selectedLayer?.domains.find((item) => item.title === selected.domain);
+  const selectedSubdomain = selectedDomain?.subdomains.find((item) => item.title === selected.subdomain);
   renderShell(`
-    ${sectionHero(state.bootstrap.company?.name || "Компания", "Инструменты", "Каталог рабочих шаблонов по архитектуре бизнеса. AI-BOSS помогает выбрать инструмент и сопровождает его заполнение.")}
-    <section class="tool-toolbar"><label><span>Поиск по каталогу</span><input type="search" value="${escapeHtml(state.toolQuery)}" placeholder="Например: роли, стратегия, финансы" data-tool-search /></label><b>${matchingTools.length} найдено${matchingTools.length > tools.length ? ` · показано ${tools.length}` : ""}</b></section>
-    <section class="tool-grid">${tools.length ? tools.map((tool) => {
-      const active = (state.workspace?.toolInstances || []).find((item) => item.instance?.tool_id === tool.id);
-      return `<article class="tool-card"><div><span class="eyebrow">${escapeHtml(tool.layer || tool.domain || "Инструмент")}</span><h2>${escapeHtml(tool.title)}</h2><p>${escapeHtml(tool.short_description || "Рабочий инструмент для сборки этого участка бизнеса.")}</p></div><div class="tool-result"><b>Результат</b><span>${escapeHtml(tool.result || tool.when_to_use || "Зафиксированный управленческий артефакт.")}</span></div><a href="/app/tools/${encodeURIComponent(tool.id)}" data-link data-tool-open="${escapeHtml(tool.id)}">${active ? `Продолжить · ${percent(active.instance.progress_percent)}%` : "Открыть инструмент"} →</a></article>`;
-    }).join("") : `<div class="empty-state"><h2>Ничего не найдено</h2><p>Измени поисковый запрос или попроси AI-BOSS подобрать инструмент по текущей задаче.</p></div>`}</section>`);
+    ${sectionHero(state.bootstrap.company?.name || "Компания", "Инструменты", "Здесь понимание превращается в рабочие решения. AI-BOSS поможет выбрать инструмент, пройти его в чате или заполнить личный документ, а результат сохранит в контексте компании.")}
+    ${current ? `<section class="tool-continue panel"><div><span class="eyebrow orange-text">Продолжить работу</span><h2>${escapeHtml(current.tool.title)}</h2><p>${escapeHtml(current.tool.short_description || "Продолжите с того места, где остановились: сохранённые ответы и документ не потеряются.")}</p><div class="tool-location">${toolPathLabel(current.tool)}</div></div><div class="tool-continue-progress"><b>${percent(current.instance.progress_percent)}%</b><span>${escapeHtml(workspaceToolStatus(current.instance.status))}</span><a class="primary-action" href="/app/tools/${encodeURIComponent(current.tool.id)}" data-link>Продолжить <i>→</i></a></div></section>` : `<section class="tool-empty-start panel"><div><span class="eyebrow">Текущая работа</span><h2>Активных инструментов пока нет</h2><p>Начните с рекомендации AI-BOSS или выберите нужный участок архитектуры ниже.</p></div></section>`}
+    <section class="tool-recommendations"><div class="tools-section-head"><div><span class="eyebrow">Что имеет смысл сделать следующим</span><h2>Рекомендация, а не обязательный маршрут</h2><p>Вы можете начать с предложенного инструмента или выбрать другой участок бизнеса.</p></div></div><div class="tool-recommendation-grid">${recommendations.length ? recommendations.map((item, index) => workspaceToolCard(item.tool, toolInstanceFor(item.tool, instances), { recommended: true, primary: index === 0, reason: item.reason })).join("") : `<div class="empty-state"><h2>Для рекомендации пока мало контекста</h2><p>Зафиксируйте текущий запрос или пройдите экспресс-диагностику — тогда AI-BOSS сможет объяснить, какой инструмент полезнее сейчас.</p><a class="primary-action" href="/app/diagnostics" data-link>Перейти к диагностике <span>→</span></a></div>`}</div></section>
+    <section class="my-tools-section"><div class="tools-section-head"><div><span class="eyebrow">Мои инструменты</span><h2>Работа и подтверждённые результаты</h2><p>Завершённым считается инструмент, по которому сохранён результат компании, а не просто открыта карточка.</p></div><b>${myTools.length}</b></div>${myTools.length ? `<div class="my-tools-list">${myTools.slice(0, 8).map((item) => workspaceToolRow(item)).join("")}</div>` : `<div class="tool-empty-inline">Здесь появятся начатые инструменты, личные документы и завершённые результаты.</div>`}</section>
+    <section class="tool-library"><div class="tools-section-head"><div><span class="eyebrow">Все инструменты</span><h2>Карта сборки бизнеса</h2><p>Раскрывайте архитектуру последовательно: класс → слой → домен → поддомен → инструменты.</p></div><b>${allTools.length}</b></div>
+      <div class="tool-toolbar"><label><span>Найти инструмент или задачу</span><input type="search" value="${escapeHtml(state.toolQuery)}" placeholder="Например: роли, стратегия, финансы" data-tool-search /></label><label class="tool-status-filter"><span>Статус</span><select data-tool-status-filter><option value="all" ${state.toolStatusFilter === "all" ? "selected" : ""}>Все</option><option value="not_started" ${state.toolStatusFilter === "not_started" ? "selected" : ""}>Не начаты</option><option value="in_progress" ${state.toolStatusFilter === "in_progress" ? "selected" : ""}>В работе</option><option value="completed" ${state.toolStatusFilter === "completed" ? "selected" : ""}>Завершены</option><option value="needs_update" ${state.toolStatusFilter === "needs_update" ? "selected" : ""}>Нужно обновить</option></select></label></div>
+      ${query ? `<section class="tool-search-results"><div class="hierarchy-caption"><span>Результаты поиска</span><b>${searchResults.length}${searchResults.length === 60 ? "+" : ""}</b></div><div class="tool-grid">${searchResults.length ? searchResults.map((tool) => workspaceToolCard(tool, toolInstanceFor(tool, instances))).join("") : `<div class="empty-state"><h2>Ничего не найдено</h2><p>Измените запрос или раскройте карту бизнеса вручную.</p></div>`}</div></section>` : `
+      <div class="tool-breadcrumb"><span>${escapeHtml(classMeta?.name || "Класс")}</span><i>→</i><span>${escapeHtml(selectedLayer?.title || "Слой")}</span><i>→</i><span>${escapeHtml(selectedDomain?.title || "Домен")}</span><i>→</i><b>${escapeHtml(selectedSubdomain?.title || "Поддомен")}</b></div>
+      <section class="tool-hierarchy-level"><div class="hierarchy-caption"><span>1. Класс</span><p>Выберите крупную часть системы</p></div><div class="tool-class-grid">${hierarchy.map((group) => `<button type="button" class="tool-class-card ${group.key === selected.classKey ? "active" : ""}" data-tool-class="${group.key}"><span>${group.key}</span><div><b>${escapeHtml(group.name)}</b><p>${escapeHtml(group.description)}</p></div><small>${group.tools.length} инструментов</small></button>`).join("")}</div></section>
+      <section class="tool-hierarchy-level"><div class="hierarchy-caption"><span>2. Слой</span><p>Какая часть бизнеса собирается</p></div><div class="tool-layer-picker">${(selectedClass?.layers || []).map((layer) => `<button type="button" class="${layer.key === selected.layerKey ? "active" : ""}" data-tool-layer="${escapeHtml(layer.key)}"><b>${escapeHtml(layer.title)}</b><span>${layer.tools.length} инструментов</span></button>`).join("")}</div></section>
+      <section class="tool-hierarchy-level"><div class="hierarchy-caption"><span>3. Домен</span><p>Какой контур внутри слоя рассматриваем</p></div><div class="tool-domain-picker">${(selectedLayer?.domains || []).map((domain) => `<button type="button" class="${domain.title === selected.domain ? "active" : ""}" data-tool-domain="${escapeHtml(domain.title)}"><b>${escapeHtml(domain.title)}</b><span>${domain.tools.length}</span></button>`).join("")}</div></section>
+      <section class="tool-hierarchy-level"><div class="hierarchy-caption"><span>4. Поддомен</span><p>Какой конкретный участок нужно собрать</p></div><div class="tool-subdomain-picker">${(selectedDomain?.subdomains || []).map((subdomain) => `<button type="button" class="${subdomain.title === selected.subdomain ? "active" : ""}" data-tool-subdomain="${escapeHtml(subdomain.title)}"><b>${escapeHtml(subdomain.title)}</b><span>${subdomain.tools.length}</span></button>`).join("")}</div></section>
+      <section class="tool-selected-results"><div class="hierarchy-caption"><span>5. Инструменты</span><p>${escapeHtml(selectedSubdomain?.title || "Выбранный участок")}</p><b>${selectedTools.length}</b></div><div class="tool-grid">${selectedTools.length ? selectedTools.map((tool) => workspaceToolCard(tool, toolInstanceFor(tool, instances))).join("") : `<div class="empty-state"><h2>По выбранному фильтру инструментов нет</h2><p>Смените статус или выберите соседний поддомен.</p></div>`}</div></section>`}
+    </section>`);
 }
 
 function toolByRoute() {
@@ -821,6 +1020,31 @@ document.addEventListener("click", async (event) => {
     renderDiagnosticLevel(level);
     return;
   }
+  const toolClass = event.target.closest("[data-tool-class]");
+  if (toolClass) {
+    state.toolPath = { classKey: toolClass.dataset.toolClass, layerKey: "", domain: "", subdomain: "" };
+    renderTools();
+    document.querySelector(".tool-library")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  const toolLayer = event.target.closest("[data-tool-layer]");
+  if (toolLayer) {
+    state.toolPath = { ...state.toolPath, layerKey: toolLayer.dataset.toolLayer, domain: "", subdomain: "" };
+    renderTools();
+    return;
+  }
+  const toolDomain = event.target.closest("[data-tool-domain]");
+  if (toolDomain) {
+    state.toolPath = { ...state.toolPath, domain: toolDomain.dataset.toolDomain, subdomain: "" };
+    renderTools();
+    return;
+  }
+  const toolSubdomain = event.target.closest("[data-tool-subdomain]");
+  if (toolSubdomain) {
+    state.toolPath = { ...state.toolPath, subdomain: toolSubdomain.dataset.toolSubdomain };
+    renderTools();
+    return;
+  }
   const link = event.target.closest("[data-link]");
   if (link) {
     event.preventDefault();
@@ -882,6 +1106,12 @@ document.addEventListener("input", (event) => {
     input.focus();
     input.setSelectionRange(input.value.length, input.value.length);
   }
+});
+
+document.addEventListener("change", (event) => {
+  if (!event.target.matches("[data-tool-status-filter]")) return;
+  state.toolStatusFilter = event.target.value;
+  renderTools();
 });
 
 document.addEventListener("submit", async (event) => {
