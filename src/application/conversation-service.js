@@ -285,18 +285,36 @@ function looksStartCommand(text) {
   return /^\/start(?:@\w+)?$/i.test(String(text || "").trim());
 }
 
-function buildStartMiniAppInvite() {
-  const screen = MINI_APP_CABINET_SCREENS.dashboard;
-
+function buildStartCabinetInvite({ returning = false } = {}) {
   return {
-    screenId: screen.screenId,
-    route: screen.route,
-    label: "Открыть кабинет",
-    title: screen.title,
+    screenId: "web_cabinet",
+    route: "/app",
+    label: returning ? "Продолжить работу" : "Создать кабинет компании",
+    title: "Веб-кабинет AI-BOSS",
     stage: "start",
-    reason: "Пользователь запустил бота; нужно дать быстрый вход в личный кабинет AI-BOSS.",
-    purpose: screen.purpose
+    reason: "После старта пользователь должен перейти в веб-кабинет, где проходит основная работа.",
+    purpose: "Открыть рабочую платформу компании.",
+    preferWebCabinet: true,
+    webOnly: true
   };
+}
+
+function buildPlatformWelcomeMessage(userMeta = {}, { returning = false } = {}) {
+  const name = String(userMeta.firstName || userMeta.first_name || "").trim();
+  const greeting = name ? `Привет, ${name}.` : "Привет.";
+  const startLine = returning
+    ? "Продолжим работу в AI-BOSS."
+    : "Начните с создания кабинета компании.";
+
+  return [
+    `${greeting} Я AI-BOSS — управляющий помощник платформы для сборки бизнеса как системы. Я помогаю найти главное ограничение бизнеса, отделить симптом от причины и понять, что делать первым.`,
+    "",
+    "Здесь, в чате, мы общаемся: вы можете задавать вопросы, описывать ситуации, отправлять голосовые сообщения, файлы и ссылки. Я помогу разобраться в информации и подскажу следующий шаг.",
+    "",
+    "Основная работа проходит на платформе: там вы будете собирать архитектуру бизнеса, проходить диагностику, заполнять инструменты и видеть сохранённые результаты.",
+    "",
+    `${startLine} После входа я помогу выбрать первый маршрут и буду сопровождать вас на каждом этапе.`
+  ].join("\n");
 }
 
 function contextualizeClassification(classification, thread, history) {
@@ -766,6 +784,33 @@ export class ConversationService {
       const thread = ensureThread(state, telegramChatId);
       let company = ensureCompany(state, thread, userMeta);
       company = applyActiveCompanyContext(state, thread, telegramChatId, userMeta) || company;
+      if (looksStartCommand(text)) {
+        const returning = state.messages.some((message) => message.threadId === thread.id && message.role === "user" && !looksStartCommand(message.text));
+        const reply = buildPlatformWelcomeMessage(userMeta, { returning });
+        state.messages.push(
+          createMessage({ threadId: thread.id, role: "user", text }),
+          createMessage({ threadId: thread.id, role: "assistant", text: reply })
+        );
+        const offeredAt = nowIso();
+        const cabinetInvite = buildStartCabinetInvite({ returning });
+        thread.entryState = {
+          ...(thread.entryState || emptyEntryState()),
+          lastMiniAppInvite: createMiniAppInviteSnapshot(cabinetInvite, offeredAt),
+          lastUpdatedAt: offeredAt
+        };
+        thread.updatedAt = offeredAt;
+        company.updatedAt = offeredAt;
+        return {
+          reply,
+          miniAppInvite: cabinetInvite,
+          runtime: {
+            threadId: thread.id,
+            activeCompanyId: company.id,
+            returning,
+            webCabinetFirst: true
+          }
+        };
+      }
       const consultantResult = await this.consultantTelegramMode.handle({
         state,
         thread,
@@ -1131,9 +1176,7 @@ export class ConversationService {
         persistedMemory,
         decisionObject: decision.decisionObject || null
       };
-      const miniAppInvite = looksStartCommand(text)
-        ? buildStartMiniAppInvite()
-        : buildMiniAppInvite({
+      const miniAppInvite = buildMiniAppInvite({
             classification,
             decision,
             runtime,

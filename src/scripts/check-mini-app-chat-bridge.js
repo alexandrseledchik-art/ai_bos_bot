@@ -199,7 +199,9 @@ async function main() {
   await assertTelegramMarkup();
   const conversationService = fs.readFileSync("src/application/conversation-service.js", "utf8");
   const adminApi = fs.readFileSync("api/admin/[...path].js", "utf8");
-  assert.match(conversationService, /buildStartMiniAppInvite/);
+  assert.match(conversationService, /buildStartCabinetInvite/);
+  assert.match(conversationService, /buildPlatformWelcomeMessage/);
+  assert.match(conversationService, /webOnly: true/);
   assert.match(conversationService, /looksStartCommand\(text\)/);
   assert.match(adminApi, /telegram\/miniapp-menu/);
   assert.match(adminApi, /setChatMenuButton/);

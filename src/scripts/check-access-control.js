@@ -214,12 +214,12 @@ async function main() {
   assert.equal(approvalNotifications[0].user.telegram_user_id, 222);
   assert.equal(approvalNotifications[0].context.command, "/approve");
   assert.match(buildAccessApprovedUserMessage({ first_name: "Сергей" }), /Привет, Сергей/);
-  assert.match(buildAccessApprovedUserMessage(), /текстом, голосом, ссылками и файлами/i);
+  assert.match(buildAccessApprovedUserMessage(), /Основная работа проходит в веб-кабинете/i);
   assert.deepEqual(buildAccessApprovedMiniAppInvite(), {
-    route: "/mini-app",
-    label: "Открыть кабинет",
+    route: "/app",
+    label: "Создать кабинет компании",
     preferWebCabinet: true,
-    miniAppLabel: "Открыть внутри Telegram"
+    webOnly: true
   });
 
   const approvedDecision = await accessControl.checkTelegramAccess({

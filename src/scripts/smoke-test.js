@@ -187,6 +187,21 @@ async function run() {
     throw new Error("Direct Telegram replies should be persisted for admin analytics.");
   }
 
+  const startResult = await service.handleUserMessage({
+    telegramChatId: "new-platform-user",
+    text: "/start",
+    userMeta: { username: "new_platform_user", firstName: "Алексей" }
+  });
+  if (!/Здесь, в чате, мы общаемся/i.test(startResult.reply) || !/Основная работа проходит на платформе/i.test(startResult.reply)) {
+    throw new Error("Start must explain the roles of Telegram chat and web platform.");
+  }
+  if (startResult.miniAppInvite?.route !== "/app" || startResult.miniAppInvite?.webOnly !== true) {
+    throw new Error("Start must offer only the signed web cabinet entry.");
+  }
+  if (startResult.miniAppInvite?.label !== "Создать кабинет компании") {
+    throw new Error("A new user must see the cabinet creation action.");
+  }
+
   const inputs = [
     "Хочу разобрать бизнес",
     "Мне нужен RACI для ролей",

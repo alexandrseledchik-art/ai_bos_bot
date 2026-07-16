@@ -49,7 +49,10 @@ export function buildMiniAppReplyMarkup(invite, {
     : null;
   const inlineKeyboard = [];
 
-  if (invite.preferWebCabinet && webCabinetButton) {
+  if (invite.webOnly) {
+    if (!webCabinetButton) return null;
+    inlineKeyboard.push([webCabinetButton]);
+  } else if (invite.preferWebCabinet && webCabinetButton) {
     inlineKeyboard.push([webCabinetButton], [miniAppButton]);
   } else {
     inlineKeyboard.push([miniAppButton]);
