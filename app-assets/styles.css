@@ -199,6 +199,8 @@ button { font: inherit; }
 .section-hero > a { color: var(--teal); font-size: 13px; font-weight: 800; }
 .section-hero .kicker { margin-top: 35px; }
 .section-hero > p:last-child { max-width: 720px; color: var(--muted); line-height: 1.65; }
+.screen-tour-button { position: absolute; right: 0; top: 42px; display: inline-flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 999px; color: var(--teal); background: var(--panel); font-size: 12px; font-weight: 800; cursor: pointer; }
+.screen-tour-button span { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; color: #0b0c0c; background: var(--gold-bright); }
 .phase-panel { max-width: 900px; padding: 38px; background: linear-gradient(145deg, white, #f5faf7); }
 .phase-label { color: var(--orange); text-transform: uppercase; letter-spacing: .1em; font-size: 11px; font-weight: 800; }
 .phase-panel h2 { margin: 12px 0; font-family: "Prata", serif; font-size: 30px; font-weight: 400; }
@@ -840,7 +842,7 @@ textarea { font-family: "Inter", Arial, sans-serif; }
   box-shadow: 0 14px 34px rgba(155, 101, 26, .24);
 }
 
-.section-hero { max-width: 1040px; }
+.section-hero { position: relative; max-width: 1040px; padding-right: 210px; }
 
 .section-hero::after {
   content: "";
@@ -932,4 +934,6 @@ textarea:focus {
 
   .welcome-copy h1 { font-size: 46px; }
   .welcome-hero { border-radius: 16px; }
+  .section-hero { padding-right: 0; }
+  .screen-tour-button { position: static; margin-top: 18px; }
 }
