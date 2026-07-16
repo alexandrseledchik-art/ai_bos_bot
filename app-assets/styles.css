@@ -713,6 +713,17 @@ textarea { font-family: "Inter", Arial, sans-serif; }
   border-radius: 999px;
 }
 
+.tour-start-button.welcome-tour-button {
+  color: var(--cream);
+  border-color: var(--gold-bright);
+  background: rgba(215, 161, 74, .08);
+}
+
+.tour-start-button.welcome-tour-button:hover {
+  color: #0b0c0c;
+  background: var(--gold-bright);
+}
+
 .welcome-choice-title { border-color: rgba(215, 161, 74, .28); }
 
 .welcome-entry,
