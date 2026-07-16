@@ -125,12 +125,13 @@ async function dispatch(request) {
     return handlePlatformRoute(request, ["GET"], async ({ bootstrap, syncClient, config }) => {
       const service = createWorkspaceService(syncClient);
       const toolWorkflow = createToolWorkflowService(syncClient, config);
+      const includeTools = new URL(request.url).searchParams.get("includeTools") === "1";
       // Resolve the diagnostic run once before assembly reads the same run.
       const diagnostics = await service.getExpressDiagnostics({ bootstrap });
       const [diagnosticOverview, assemblyResult, toolsResult, documentsResult, constraintRow, nextStep] = await Promise.all([
         service.getDiagnosticOverview({ bootstrap, expressDiagnostics: diagnostics }),
         service.getBusinessAssemblyPlan({ bootstrap }),
-        service.getTools({ bootstrap }),
+        includeTools ? service.getTools({ bootstrap }) : Promise.resolve({ tools: [] }),
         service.getDocuments({ bootstrap }),
         service.findLatestConstraintHypothesis({ bootstrap, statuses: ["confirmed", "suggested"] }),
         service.findLatestNextStepAny({ bootstrap })
@@ -151,6 +152,13 @@ async function dispatch(request) {
         constraintHypothesis,
         nextStep
       });
+    });
+  }
+
+  if (path === "tools" && request.method === "GET") {
+    return handlePlatformRoute(request, ["GET"], async ({ bootstrap, syncClient }) => {
+      const result = await createWorkspaceService(syncClient).getTools({ bootstrap });
+      return platformJson({ ok: true, ...result });
     });
   }
 

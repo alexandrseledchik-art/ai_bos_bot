@@ -15,6 +15,8 @@ assert.match(routeSource, /saveDiagnosticLevelAnswer/);
 
 for (const method of [
   "workspace()",
+  "workspaceWithOptions({ includeTools = false } = {})",
+  "getTools()",
   "saveProfile(payload)",
   "getDiagnosticLevel(level)",
   "saveDiagnosticAnswer(level, payload)",
@@ -79,6 +81,9 @@ for (const className of [
   "ready-entry-grid",
   "dashboard-guide",
   "layer-grid",
+  "layer-toggle",
+  "architecture-domain",
+  "architecture-subdomain",
   "diagnostic-list",
   "diagnostic-level-grid",
   "diagnostic-question-list",
@@ -93,6 +98,9 @@ for (const className of [
   "tool-domain-picker",
   "tool-subdomain-picker",
   "document-list",
+  "artifact-list",
+  "sidebar-backdrop",
+  "sidebar-close",
   "profile-form"
 ]) {
   assert.match(cssSource, new RegExp(`\\.${className}`));
@@ -121,6 +129,18 @@ for (const tourContract of [
   "requestAnimationFrame"
 ]) {
   assert.equal(mainSource.includes(tourContract), true, `Platform tour must include: ${tourContract}`);
+}
+
+for (const uxContract of [
+  "ensureToolsLoaded",
+  "ensureToolDetailLoaded",
+  "data-architecture-layer",
+  "Свернуть структуру",
+  "Этот этап завершён",
+  "Посмотреть результаты",
+  "Ваша роль"
+]) {
+  assert.equal(mainSource.includes(uxContract), true, `Platform UX must include: ${uxContract}`);
 }
 
 process.env.WEB_SESSION_SECRET = "phase-two-platform-secret-123456";

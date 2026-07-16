@@ -17,6 +17,9 @@ const state = {
   diagnosticsByLevel: {},
   diagnosticLoading: "",
   diagnosticError: "",
+  toolsLoading: false,
+  toolsLoaded: false,
+  architectureLayerKey: "",
   diagnosticFilters: {
     basic: { layerKey: "" },
     deep: { layerKey: "", parentKey: "" }
@@ -197,6 +200,20 @@ function safeUrl(value) {
   }
 }
 
+function humanizeBusinessText(value) {
+  return String(value || "")
+    .replaceAll("Owner Success Criteria Canvas", "канва критериев успеха собственника")
+    .replaceAll("ICP", "профиль целевого клиента")
+    .replaceAll("routing", "маршрутизация")
+    .replaceAll("handoff", "передача ответственности")
+    .replaceAll("delivery", "исполнение")
+    .replaceAll("cashflow", "денежный поток");
+}
+
+function companySizeLabel(value) {
+  return ({ solo: "1 человек", micro: "2–10 человек", small: "11–50 человек", medium: "51–250 человек", large: "Более 250 человек" })[value] || value || "";
+}
+
 function initials(user = {}) {
   const parts = [user.first_name, user.last_name].filter(Boolean);
   return parts.map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "AI";
@@ -272,7 +289,9 @@ function renderShell(content) {
   const userName = [data.appUser?.first_name, data.appUser?.last_name].filter(Boolean).join(" ") || data.appUser?.username || "Пользователь";
   root.innerHTML = `
     <div class="platform-shell">
-      <aside class="sidebar">
+      <button class="sidebar-backdrop" type="button" data-menu-close aria-label="Закрыть меню"></button>
+      <aside class="sidebar" aria-label="Основная навигация">
+        <button class="sidebar-close" type="button" data-menu-close aria-label="Закрыть меню">×</button>
         <a class="wordmark inverse" href="/app" data-link><span class="brand-mark light">A</span><span>AI-BOSS</span></a>
         <p class="sidebar-caption">Операционный слой мышления над бизнесом</p>
         <nav>${navigation(activePath)}</nav>
@@ -280,14 +299,14 @@ function renderShell(content) {
       </aside>
       <main class="workspace">
         <header class="topbar">
-          <button class="mobile-menu" type="button" data-menu aria-label="Открыть меню">☰</button>
+          <button class="mobile-menu" type="button" data-menu aria-label="Открыть меню" aria-expanded="false">☰</button>
           <div><p>Кабинет компании</p><strong>${escapeHtml(company)}</strong></div>
           <a class="profile-chip" href="/app/profile" data-link><span>${escapeHtml(initials(data.appUser))}</span><div><b>${escapeHtml(userName)}</b><small>владелец пространства</small></div></a>
         </header>
         ${state.notice ? `<div class="notice" role="status">${escapeHtml(state.notice)}</div>` : ""}
         ${content}
       </main>
-      <a class="ai-assistant" href="${TELEGRAM_CHAT_URL}" target="_blank" rel="noopener"><span>AI</span><b>Спросить AI-BOSS</b></a>
+      <a class="ai-assistant" href="${TELEGRAM_CHAT_URL}" target="_blank" rel="noopener" aria-label="Спросить AI-BOSS" title="Спросить AI-BOSS"><span>AI</span><b>Спросить AI-BOSS</b></a>
     </div>`;
 }
 
@@ -395,7 +414,7 @@ function renderActiveDashboard(data, workspace) {
   const next = assembly.nextRequest || {};
   const constraint = workspace.constraintHypothesis;
   const nextStep = workspace.nextStep;
-  const toolCount = workspace.tools?.length || 0;
+  const toolCount = workspace.toolInstances?.filter((item) => item.instance?.status !== "archived").length || 0;
   const documentCount = workspace.documents?.length || 0;
   const currentTool = (workspace.toolInstances || []).find((item) => ["in_progress", "waiting_for_user", "submitted", "needs_update"].includes(item.instance?.status));
   const continueHref = currentTool
@@ -420,7 +439,7 @@ function renderActiveDashboard(data, workspace) {
       ${constraint ? `<section class="panel constraint-panel wide"><div><span class="eyebrow orange-text">Рабочая гипотеза, не окончательный диагноз</span><h2>${escapeHtml(constraint.title)}</h2><p>${escapeHtml(constraint.explanation || "Гипотеза собрана из текущего запроса, наблюдений и подтверждённых данных.")}</p></div><div class="constraint-score"><b>${Math.round((Number(constraint.confidence) || 0) * 100)}%</b><span>уверенность</span></div></section>` : ""}
       <section class="panel route-panel wide">
         <div class="panel-title"><div><span class="panel-icon">◫</span><h2>Рабочее состояние</h2></div><span class="status-tag">единый контекст</span></div>
-        <div class="stat-strip"><div><b>${progress.answeredCount || 0}/11</b><span>экспресс-оценок</span></div><div><b>${assembly.completedLayers || 0}/11</b><span>собранных слоёв</span></div><div><b>${documentCount}</b><span>документов</span></div><div><b>${toolCount}</b><span>инструментов в каталоге</span></div></div>
+        <div class="stat-strip"><div><b>${progress.answeredCount || 0}/11</b><span>экспресс-оценок</span></div><div><b>${assembly.completedLayers || 0}/11</b><span>собранных слоёв</span></div><div><b>${documentCount}</b><span>документов</span></div><div><b>${toolCount}</b><span>инструментов в работе</span></div></div>
       </section>
       ${currentTool ? `<section class="panel current-tool-panel wide"><div><span class="eyebrow orange-text">Текущий инструмент</span><h2>${escapeHtml(currentTool.tool?.title || "Инструмент в работе")}</h2><p>${escapeHtml(currentTool.tool?.short_description || "Продолжи заполнение — ответы уже сохраняются в памяти компании.")}</p></div><div><b>${percent(currentTool.instance.progress_percent)}%</b><a class="text-action" href="/app/tools/${encodeURIComponent(currentTool.tool?.id || currentTool.instance.tool_id)}" data-link>Продолжить →</a></div></section>` : ""}
     </div>
@@ -592,13 +611,19 @@ function renderArchitecture() {
   renderShell(`
     ${sectionHero(state.bootstrap.company?.name || "Компания", "Архитектура бизнеса", "11 слоёв показывают, что уже подтверждено фактами и инструментами, а где контекст ещё хранится только в голове.")}
     <section class="architecture-summary panel" data-screen-tour="architecture-summary"><div>${progressRing(assembly.architectureProgress?.percent)}</div><div><span class="eyebrow">Общий прогресс</span><h2>${assembly.architectureProgress?.confirmed || 0} из ${assembly.architectureProgress?.total || 0} участков</h2><p>${escapeHtml(assembly.nextRequest?.text || "Выбери первый слой и добавляй рабочие материалы последовательно.")}</p></div></section>
-    <section class="layer-grid" data-screen-tour="architecture-map">${layers.map((layer) => `
-      <article class="layer-card ${layer.layerKey === currentKey ? "current" : ""}">
+    <section class="layer-grid" data-screen-tour="architecture-map">${layers.map((layer) => {
+      const expanded = state.architectureLayerKey === layer.layerKey;
+      const domains = layer.architecture?.domains || [];
+      return `
+      <article class="layer-card ${layer.layerKey === currentKey ? "current" : ""} ${expanded ? "expanded" : ""}">
         <div class="layer-order">${String(layer.order || "").padStart(2, "0")}</div>
         <div class="layer-card-main"><span class="eyebrow">Класс ${escapeHtml(layer.classKey || "")}</span><h2>${escapeHtml(layer.title)}</h2><p>${escapeHtml(layer.shortDescription || layer.role || "")}</p></div>
         <div class="layer-progress"><b>${percent(layer.architectureProgress?.percent)}%</b><span>${layer.architectureProgress?.confirmed || 0}/${layer.architectureProgress?.total || 0} подтверждено</span><i><em style="width:${percent(layer.architectureProgress?.percent)}%"></em></i></div>
-        <div class="layer-meta"><span class="status-pill ${escapeHtml(layer.status)}">${escapeHtml(statusLabel(layer.status))}</span><span>${layer.toolCount || 0} инструментов</span></div>
-      </article>`).join("")}</section>`);
+        <div class="layer-meta"><span class="status-pill ${escapeHtml(layer.status)}">${escapeHtml(statusLabel(layer.status))}</span><span>${domains.length} доменов</span><span>${layer.toolCount || 0} инструментов</span></div>
+        <button class="layer-toggle" type="button" data-architecture-layer="${escapeHtml(layer.layerKey)}" aria-expanded="${expanded}">${expanded ? "Свернуть структуру" : "Открыть структуру"} <span>${expanded ? "↑" : "↓"}</span></button>
+        ${expanded ? `<div class="layer-details"><div class="layer-details-intro"><b>Что находится внутри</b><p>Раскройте домен, чтобы увидеть конкретные участки, собранные факты и пробелы.</p></div>${domains.map((domain) => `<details class="architecture-domain"><summary><span><b>${escapeHtml(domain.title)}</b><small>${domain.confirmed || 0}/${(domain.subdomains || []).length} подтверждено</small></span><strong>${percent(domain.percent)}%</strong></summary><div class="architecture-subdomains">${(domain.subdomains || []).map((subdomain) => `<div class="architecture-subdomain"><span class="status-pill ${escapeHtml(subdomain.coverageStatus)}">${escapeHtml(subdomain.coverageLabel || statusLabel(subdomain.coverageStatus))}</span><div><b>${escapeHtml(subdomain.title)}</b><p>${escapeHtml(subdomain.description || "Здесь должен появиться подтверждённый рабочий результат компании.")}</p></div>${(subdomain.recommendedTools || []).length ? `<small>Подходящий инструмент: ${escapeHtml(subdomain.recommendedTools[0])}</small>` : ""}</div>`).join("")}</div></details>`).join("")}<a class="layer-tools-link" href="/app/tools?layer=${encodeURIComponent(layer.layerKey)}" data-link>Перейти к инструментам слоя →</a></div>` : ""}
+      </article>`;
+    }).join("")}</section>`);
 }
 
 function diagnosticLevelFromPath(path = currentPath()) {
@@ -626,7 +651,7 @@ function diagnosticLevelCard(level) {
   return `<article class="diagnostic-level-card ${level}">
     <div class="diagnostic-level-top"><span class="diagnostic-level-mark">${level === "express" ? "01" : level === "basic" ? "02" : "03"}</span><span class="status-pill ${started ? "in_progress" : ""}">${started ? "в работе" : "не начато"}</span></div>
     <div><h2>${escapeHtml(copy.title)}</h2><p class="diagnostic-scope-copy"><b>Что проверяем:</b> ${escapeHtml(copy.scope)}.</p></div>
-    <div class="diagnostic-when"><b>Когда выбирать</b><ul>${copy.when.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div>
+    <details class="diagnostic-when"><summary>Когда выбирать <span>↓</span></summary><ul>${copy.when.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></details>
     <div class="diagnostic-result"><b>Что получите</b><p>${escapeHtml(copy.result)}</p></div>
     <p class="diagnostic-note"><b>Важно:</b> ${escapeHtml(copy.note)}</p>
     <div class="diagnostic-card-progress"><strong>Время прохождения: ${escapeHtml(copy.time)}</strong>${started ? `<i title="Прогресс ${percent(progress.percent)}%"><em style="width:${percent(progress.percent)}%"></em></i>` : ""}</div>
@@ -718,10 +743,11 @@ function renderDiagnosticLevel(level) {
   }
 
   renderShell(`
-    <section class="section-hero diagnostic-detail-hero"><a href="/app/diagnostics" data-link>← Ко всем вариантам</a><button type="button" class="screen-tour-button" data-screen-tour-start>Как устроен экран <span>?</span></button><p class="kicker">${escapeHtml(copy.scope)}</p><h1>${escapeHtml(copy.title)}</h1><p>${escapeHtml(copy.when)}</p></section>
+    <section class="section-hero diagnostic-detail-hero"><a href="/app/diagnostics" data-link>← Ко всем вариантам</a><button type="button" class="screen-tour-button" data-screen-tour-start>Как устроен экран <span>?</span></button><p class="kicker">${escapeHtml(copy.scope)}</p><h1>${escapeHtml(copy.title)}</h1><p>${escapeHtml(copy.when.join("; "))}.</p></section>
     <section class="panel diagnostic-level-progress" data-screen-tour="diagnostic-progress"><div>${progressRing(data.progress?.percent)}</div><div><span class="eyebrow">Текущий прогресс</span><h2>${data.progress?.answeredCount || 0} из ${data.progress?.totalCount || 0} оценено</h2><p>Ответ сохраняется сразу. В любой момент можно вернуться, уточнить оценку или продолжить другую ветку.</p></div></section>
     ${selectors}
     <section class="diagnostic-question-list" data-screen-tour="diagnostic-questions">${visibleItems.map((item) => renderDiagnosticQuestion(item, answers[item.subjectKey], level)).join("")}</section>
+    ${percent(data.progress?.percent) === 100 ? `<section class="diagnostic-complete panel"><div><span class="eyebrow orange-text">Этот этап завершён</span><h2>Оценки собраны — теперь используйте их как карту поиска</h2><p>Низкий балл ещё не равен главной причине. Посмотрите общую картину или выберите участок для более глубокого разбора.</p></div><div><a class="primary-action" href="/app/diagnostics" data-link>Посмотреть результаты <span>→</span></a><a class="quiet-link" href="/app/architecture" data-link>Открыть архитектуру</a></div></section>` : ""}
     <section class="diagnostic-help panel" data-screen-tour="diagnostic-help"><div><span class="eyebrow">Сложно выбрать описание?</span><h2>Попросите AI-BOSS разобрать факты</h2><p>Опишите ситуацию своими словами. Бот поможет сопоставить факты с уровнями, но не будет выбирать ответ за вас.</p></div><a class="primary-action" href="${TELEGRAM_CHAT_URL}" target="_blank" rel="noopener">Спросить AI-BOSS <span>→</span></a></section>`);
 }
 
@@ -922,6 +948,9 @@ function toolMatchesPath(tool, path) {
 }
 
 function renderTools() {
+  if (state.toolsLoading) {
+    return renderShell(`${sectionHero(state.bootstrap.company?.name || "Компания", "Инструменты", "Загружаю каталог и вашу текущую работу.")}<section class="panel diagnostic-loading"><h2>Собираю рабочую область</h2><p>Текущие инструменты появятся первыми, полный каталог — следом.</p></section>`);
+  }
   const allTools = state.workspace?.tools || [];
   const instances = state.workspace?.toolInstances || [];
   const query = normalizeToolText(state.toolQuery);
@@ -929,7 +958,13 @@ function renderTools() {
   const current = activeInstances[0] || null;
   const myTools = instances.filter((item) => item.tool && item.instance?.status !== "archived");
   const recommendations = recommendedWorkspaceTools(allTools, instances, state.workspace?.assembly).slice(0, 3);
+  const requestedLayer = new URLSearchParams(window.location.search).get("layer") || "";
   const hierarchy = buildToolHierarchy(allTools);
+  if (requestedLayer && !state.toolPath.layerKey) {
+    const requestedClass = hierarchy.find((group) => group.layers.some((layer) => layer.key === requestedLayer));
+    state.toolPath.classKey = requestedClass?.key || state.toolPath.classKey;
+    state.toolPath.layerKey = requestedLayer;
+  }
   const selected = ensureToolPath(hierarchy);
   const selectedTools = filterToolsByStatus(allTools.filter((tool) => toolMatchesPath(tool, selected)), state.toolStatusFilter);
   const searchResults = query
@@ -979,12 +1014,12 @@ function renderToolDetail() {
     ? `${TELEGRAM_CHAT_URL}?start=tool_${instance.telegram_start_token}`
     : TELEGRAM_CHAT_URL;
   renderShell(`
-    ${sectionHero("Инструмент архитектуры", toolDisplayTitle(tool), tool.short_description || "AI-BOSS проведёт по инструменту, сохранит ответы и добавит результат в память компании.")}
+    ${sectionHero("Инструмент архитектуры", toolDisplayTitle(tool), humanizeBusinessText(tool.short_description || "AI-BOSS проведёт по инструменту, сохранит ответы и добавит результат в память компании."))}
     <section class="tool-workspace-grid">
-      <article class="panel tool-purpose" data-screen-tour="tool-purpose"><span class="eyebrow">Зачем сейчас</span><h2>${escapeHtml(tool.when_to_use || "Структурировать этот участок бизнеса и получить рабочий результат.")}</h2><p><b>Результат:</b> ${escapeHtml(tool.result || "Заполненный управленческий артефакт, связанный с контекстом компании.")}</p></article>
+      <article class="panel tool-purpose" data-screen-tour="tool-purpose"><span class="eyebrow">Зачем сейчас</span><h2>${escapeHtml(humanizeBusinessText(tool.when_to_use || "Структурировать этот участок бизнеса и получить рабочий результат."))}</h2><p><b>Результат:</b> ${escapeHtml(humanizeBusinessText(tool.result || "Заполненный управленческий результат, связанный с контекстом компании."))}</p><a class="text-action" href="#fill-modes">Выбрать способ заполнения ↓</a></article>
       <article class="panel tool-progress-panel"><span class="eyebrow">Состояние</span><div class="tool-progress-number">${percent(instance?.progress_percent)}%</div><p>${instance ? `Статус: ${escapeHtml(statusLabel(instance.status))}. Сохранено ответов: ${answers.length} из ${questions.length || "—"}.` : "Инструмент ещё не начат. Выбери удобный способ работы."}</p></article>
     </section>
-    <section class="fill-mode-grid" data-screen-tour="fill-modes">
+    <section class="fill-mode-grid" id="fill-modes" data-screen-tour="fill-modes">
       <article class="fill-mode-card"><span>01</span><h2>Пройти с AI-BOSS</h2><p>Бот задаёт по одному вопросу, принимает текст и голос, сохраняет ответы и после завершения добавляет выводы в память компании.</p>${instance?.fill_mode === "chat" ? `<a class="primary-action" href="${escapeHtml(chatUrl)}" target="_blank" rel="noopener">Продолжить в Telegram <span>→</span></a>` : `<button class="primary-action" type="button" data-start-tool="${escapeHtml(tool.id)}" data-mode="chat">Начать в чате <span>→</span></button>`}</article>
       <article class="fill-mode-card"><span>02</span><h2>Заполнить документ</h2><p>AI-BOSS создаёт личную копию Google-шаблона. Если копирование ещё не подключено, можно добавить собственную копию ссылкой.</p>${document?.google_file_url ? `<a class="primary-action secondary" href="${escapeHtml(safeUrl(document.google_file_url))}" target="_blank" rel="noopener">Открыть личный документ <span>↗</span></a>` : `<button class="primary-action secondary" type="button" data-copy-tool="${escapeHtml(tool.id)}">Создать личную копию <span>→</span></button>`}${masterUrl ? `<a class="quiet-link" href="${escapeHtml(masterUrl)}" target="_blank" rel="noopener">Посмотреть исходный шаблон ↗</a>` : ""}</article>
     </section>
@@ -1001,7 +1036,8 @@ function renderDocuments() {
     <section class="document-list" data-screen-tour="document-list">${documents.length ? documents.map((doc) => {
       const url = safeUrl(doc.url);
       return `<article class="document-row"><span class="document-icon">▱</span><div><h3>${escapeHtml(doc.title || "Документ компании")}</h3><p>${escapeHtml(doc.latestSnapshot?.summary || (doc.status === "analyzed" ? "Документ проанализирован" : "Ссылка сохранена, анализ ещё не выполнен"))}</p><small>${escapeHtml(formatDate(doc.last_analyzed_at || doc.updated_at))}</small></div><span class="status-pill ${escapeHtml(doc.status)}">${escapeHtml(doc.status === "analyzed" ? "проанализирован" : "сохранён")}</span>${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">Открыть ↗</a>` : ""}</article>`;
-    }).join("") : `<div class="empty-state"><h2>Документов пока нет</h2><p>Пришли AI-BOSS ссылку или файл в Telegram. Он сохранит материал в кейсе и поможет разобрать его содержание.</p><a class="primary-action" href="${TELEGRAM_CHAT_URL}" target="_blank" rel="noopener">Отправить документ <span>→</span></a></div>`}</section>`);
+    }).join("") : `<div class="empty-state"><h2>Документов пока нет</h2><p>Пришлите AI-BOSS ссылку или файл в Telegram. Он сохранит материал в кейсе и поможет разобрать его содержание.</p><a class="primary-action" href="${TELEGRAM_CHAT_URL}" target="_blank" rel="noopener">Отправить документ <span>→</span></a></div>`}</section>
+    ${artifacts.length ? `<section class="artifact-section"><div class="tools-section-head"><div><span class="eyebrow">Сохранённые результаты</span><h2>Артефакты компании</h2><p>Выводы и рабочие результаты, которые уже стали частью контекста AI-BOSS.</p></div><b>${artifacts.length}</b></div><div class="artifact-list">${artifacts.map((artifact) => `<article class="artifact-row"><span class="document-icon">✓</span><div><h3>${escapeHtml(artifact.title || artifact.name || "Рабочий результат")}</h3><p>${escapeHtml(humanizeBusinessText(artifact.summary || artifact.content || artifact.description || "Результат сохранён в памяти компании."))}</p><small>${escapeHtml(formatDate(artifact.updated_at || artifact.created_at))}</small></div><span class="status-pill ready">сохранён</span></article>`).join("")}</div></section>` : ""}`);
 }
 
 function renderProfile() {
@@ -1024,9 +1060,9 @@ function renderProfile() {
     <form class="profile-form panel" data-screen-tour="profile-form" data-profile-form>
       <label><span>Название компании</span><input name="companyName" required value="${escapeHtml(company.name || "")}" /></label>
       <label><span>Отрасль</span><input name="industry" value="${escapeHtml(profile.industry || "")}" placeholder="Например: управленческий консалтинг" /></label>
-      <label><span>Размер компании</span><input name="companySize" value="${escapeHtml(profile.company_size || "")}" placeholder="Например: 1–10 человек" /></label>
+      <label><span>Размер компании</span><input name="companySize" value="${escapeHtml(companySizeLabel(profile.company_size))}" placeholder="Например: 1–10 человек" /></label>
       <label><span>Выручка / диапазон</span><input name="revenueRange" value="${escapeHtml(profile.revenue_range || "")}" placeholder="Можно указать диапазон" /></label>
-      <label><span>Твоя роль</span><input name="userRole" required value="${escapeHtml(profile.user_role || "")}" placeholder="Собственник" /></label>
+      <label><span>Ваша роль</span><input name="userRole" required value="${escapeHtml(profile.user_role || "")}" placeholder="Собственник" /></label>
       <label class="full"><span>${mode === "system" ? "Что хотите получить от сборки бизнеса" : "Текущий запрос"}</span><textarea name="currentRequest" required rows="5" placeholder="${mode === "system" ? "Например: увидеть бизнес целиком, перестать держать решения в голове и последовательно собрать систему" : "Опишите, что сейчас происходит и какой результат хотите получить"}">${escapeHtml(profile.current_request || "")}</textarea></label>
       <div class="form-actions full"><button class="primary-action" type="submit">${isFirstSetup ? "Продолжить" : "Сохранить профиль"} <span>→</span></button><span data-save-status></span></div>
     </form>`);
@@ -1053,6 +1089,45 @@ function navigate(path) {
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
   maybeAutoStartScreenTour();
+}
+
+async function ensureToolsLoaded() {
+  if (state.toolsLoaded || state.toolsLoading) return;
+  state.toolsLoading = true;
+  render();
+  try {
+    const result = await api.getTools();
+    state.workspace.tools = result.tools || [];
+    state.toolsLoaded = true;
+  } catch (error) {
+    state.notice = error.message;
+  } finally {
+    state.toolsLoading = false;
+  }
+}
+
+async function ensureToolDetailLoaded(path) {
+  const match = String(path || "").match(/^\/app\/tools\/([^/?]+)/);
+  if (!match || toolByRoute()) return;
+  state.toolsLoading = true;
+  render();
+  try {
+    const result = await api.getTool(decodeURIComponent(match[1]));
+    state.workspace.tools = [result.tool, ...(state.workspace.tools || []).filter((tool) => tool.id !== result.tool.id)];
+    if (result.instance) {
+      state.workspace.toolInstances = [result.instance, ...(state.workspace.toolInstances || []).filter((item) => item.instance?.id !== result.instance.instance?.id)];
+    }
+  } catch (error) {
+    state.notice = error.message;
+  } finally {
+    state.toolsLoading = false;
+  }
+}
+
+async function openPlatformPath(path) {
+  if (path === "/app/tools" || path.startsWith("/app/tools?")) await ensureToolsLoaded();
+  else if (path.startsWith("/app/tools/")) await ensureToolDetailLoaded(path);
+  navigate(path);
 }
 
 async function openDiagnosticLevel(level, path = `/app/diagnostics/${level}`) {
@@ -1182,16 +1257,39 @@ document.addEventListener("click", async (event) => {
     renderTools();
     return;
   }
+  const architectureLayer = event.target.closest("[data-architecture-layer]");
+  if (architectureLayer) {
+    state.architectureLayerKey = state.architectureLayerKey === architectureLayer.dataset.architectureLayer
+      ? ""
+      : architectureLayer.dataset.architectureLayer;
+    renderArchitecture();
+    return;
+  }
   const link = event.target.closest("[data-link]");
   if (link) {
     event.preventDefault();
     if (link.dataset.toolOpen) api.markToolOpened(link.dataset.toolOpen).catch(() => null);
-    navigate(link.getAttribute("href"));
+    await openPlatformPath(link.getAttribute("href"));
     document.querySelector(".sidebar")?.classList.remove("open");
+    document.querySelector(".sidebar-backdrop")?.classList.remove("open");
+    document.querySelector("[data-menu]")?.setAttribute("aria-expanded", "false");
     return;
   }
   if (event.target.closest("[data-menu]")) {
-    document.querySelector(".sidebar")?.classList.toggle("open");
+    const sidebar = document.querySelector(".sidebar");
+    const open = !sidebar?.classList.contains("open");
+    sidebar?.classList.toggle("open", open);
+    document.querySelector(".sidebar-backdrop")?.classList.toggle("open", open);
+    document.querySelector("[data-menu]")?.setAttribute("aria-expanded", String(open));
+    document.body.classList.toggle("menu-open", open);
+    if (open) document.querySelector(".sidebar-close")?.focus();
+    return;
+  }
+  if (event.target.closest("[data-menu-close]")) {
+    document.querySelector(".sidebar")?.classList.remove("open");
+    document.querySelector(".sidebar-backdrop")?.classList.remove("open");
+    document.querySelector("[data-menu]")?.setAttribute("aria-expanded", "false");
+    document.body.classList.remove("menu-open");
     return;
   }
   const toolLink = event.target.closest("[data-tool-open]");
@@ -1313,6 +1411,14 @@ window.addEventListener("resize", () => {
 });
 
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && document.querySelector(".sidebar.open")) {
+    document.querySelector(".sidebar")?.classList.remove("open");
+    document.querySelector(".sidebar-backdrop")?.classList.remove("open");
+    document.querySelector("[data-menu]")?.setAttribute("aria-expanded", "false");
+    document.body.classList.remove("menu-open");
+    document.querySelector("[data-menu]")?.focus();
+    return;
+  }
   if (platformTourStep < 0) return;
   if (event.key === "Escape") return finishPlatformTour();
   if (event.key === "ArrowLeft" && platformTourStep > 0) {
@@ -1329,15 +1435,31 @@ document.addEventListener("keydown", (event) => {
 window.addEventListener("popstate", () => {
   state.notice = "";
   if (platformTourStep >= 0) finishPlatformTour();
-  render();
-  maybeAutoStartPlatformTour();
-  maybeAutoStartScreenTour();
+  if (currentPath() === "/app/tools" && !state.toolsLoaded) {
+    ensureToolsLoaded().then(() => {
+      render();
+      maybeAutoStartScreenTour();
+    });
+  } else if (currentPath().startsWith("/app/tools/") && !toolByRoute()) {
+    ensureToolDetailLoaded(currentPath()).then(() => {
+      render();
+      maybeAutoStartScreenTour();
+    });
+  } else {
+    render();
+    maybeAutoStartPlatformTour();
+    maybeAutoStartScreenTour();
+  }
 });
 
 async function start() {
   try {
     state.bootstrap = await api.bootstrap();
-    state.workspace = await api.workspace();
+    const initialPath = currentPath();
+    const includeTools = initialPath === "/app/tools";
+    state.workspace = await api.workspaceWithOptions({ includeTools });
+    state.toolsLoaded = includeTools;
+    if (initialPath.startsWith("/app/tools/")) await ensureToolDetailLoaded(initialPath);
     const initialDiagnosticLevel = diagnosticLevelFromPath();
     if (initialDiagnosticLevel) {
       state.diagnosticLoading = initialDiagnosticLevel;

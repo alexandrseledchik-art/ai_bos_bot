@@ -26,7 +26,15 @@ export class PlatformApiClient {
   }
 
   workspace() {
-    return this.request("/api/platform/workspace");
+    return this.workspaceWithOptions();
+  }
+
+  workspaceWithOptions({ includeTools = false } = {}) {
+    return this.request(`/api/platform/workspace${includeTools ? "?includeTools=1" : ""}`);
+  }
+
+  getTools() {
+    return this.request("/api/platform/tools");
   }
 
   saveProfile(payload) {

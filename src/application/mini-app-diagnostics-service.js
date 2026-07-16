@@ -2631,7 +2631,9 @@ export class MiniAppDiagnosticsService {
         select: "*"
       })
     ]);
-    const catalogTools = await this.getRuntimeCatalogTools();
+    // Assembly needs taxonomy and tool hints, not the full persisted catalog.
+    // The bundled catalog avoids downloading roughly a thousand rows on every page load.
+    const catalogTools = this.getCatalogTools();
     const assembly = buildBusinessArchitectureSnapshot({
       sources: [
         ...(documents || []).map(toAssemblySource),
