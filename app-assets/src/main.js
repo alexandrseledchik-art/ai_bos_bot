@@ -651,6 +651,12 @@ function normalizeToolText(value) {
   return String(value || "").toLowerCase().replaceAll("ё", "е").replace(/\s+/g, " ").trim();
 }
 
+function toolDisplayTitle(tool = {}) {
+  const title = String(tool.title || "Инструмент").trim();
+  const translationStart = title.indexOf(" (");
+  return translationStart > 0 ? title.slice(0, translationStart) : title;
+}
+
 function canonicalToolLayer(value) {
   const key = String(value || "").trim();
   return TOOL_LAYER_ALIASES[key] || key;
@@ -705,14 +711,14 @@ function workspaceToolCard(tool, context = null, { recommended = false, primary 
   const status = context?.instance?.status || "not_started";
   const action = status === "completed" ? "Открыть результат" : context ? "Продолжить" : "Начать";
   const progress = context ? percent(context.instance.progress_percent) : 0;
-  return `<article class="tool-card workspace-card ${recommended ? "recommended" : ""} ${primary ? "primary" : ""}"><div><div class="tool-card-meta"><span class="eyebrow">${recommended ? (primary ? "Рекомендуется сейчас" : "Альтернатива") : `Класс ${escapeHtml(toolLocation(tool).classKey)}`}</span>${context ? `<span class="tool-state ${escapeHtml(toolStatusCategory(tool))}">${escapeHtml(workspaceToolStatus(status))}${status !== "completed" ? ` · ${progress}%` : ""}</span>` : ""}</div><h2>${escapeHtml(tool.title)}</h2><p>${escapeHtml(tool.short_description || "Рабочий инструмент для сборки этого участка бизнеса.")}</p>${recommended && reason ? `<div class="tool-reason"><b>Почему сейчас</b><span>${escapeHtml(reason)}</span></div>` : ""}<div class="tool-location compact">${toolPathLabel(tool)}</div></div><div class="tool-result"><b>Что получится</b><span>${escapeHtml(tool.result || tool.when_to_use || "Зафиксированный рабочий результат компании.")}</span></div><a href="/app/tools/${encodeURIComponent(tool.id)}" data-link data-tool-open="${escapeHtml(tool.id)}">${action} →</a></article>`;
+  return `<article class="tool-card workspace-card ${recommended ? "recommended" : ""} ${primary ? "primary" : ""}"><div><div class="tool-card-meta"><span class="eyebrow">${recommended ? (primary ? "Рекомендуется сейчас" : "Альтернатива") : `Класс ${escapeHtml(toolLocation(tool).classKey)}`}</span>${context ? `<span class="tool-state ${escapeHtml(toolStatusCategory(tool))}">${escapeHtml(workspaceToolStatus(status))}${status !== "completed" ? ` · ${progress}%` : ""}</span>` : ""}</div><h2>${escapeHtml(toolDisplayTitle(tool))}</h2><p>${escapeHtml(tool.short_description || "Рабочий инструмент для сборки этого участка бизнеса.")}</p>${recommended && reason ? `<div class="tool-reason"><b>Почему сейчас</b><span>${escapeHtml(reason)}</span></div>` : ""}<div class="tool-location compact">${toolPathLabel(tool)}</div></div><div class="tool-result"><b>Что получится</b><span>${escapeHtml(tool.result || tool.when_to_use || "Зафиксированный рабочий результат компании.")}</span></div><a href="/app/tools/${encodeURIComponent(tool.id)}" data-link data-tool-open="${escapeHtml(tool.id)}">${action} →</a></article>`;
 }
 
 function workspaceToolRow(context) {
   const tool = context.tool;
   const status = context.instance?.status || "not_started";
   const progress = percent(context.instance?.progress_percent);
-  return `<a class="my-tool-row" href="/app/tools/${encodeURIComponent(tool.id)}" data-link><div><span class="tool-state ${escapeHtml(toolStatusCategory(tool))}">${escapeHtml(workspaceToolStatus(status))}</span><h3>${escapeHtml(tool.title)}</h3><div class="tool-location compact">${toolPathLabel(tool)}</div></div><div><b>${progress}%</b><i><em style="width:${progress}%"></em></i><span>${status === "completed" ? "Открыть результат" : "Продолжить"} →</span></div></a>`;
+  return `<a class="my-tool-row" href="/app/tools/${encodeURIComponent(tool.id)}" data-link><div><span class="tool-state ${escapeHtml(toolStatusCategory(tool))}">${escapeHtml(workspaceToolStatus(status))}</span><h3>${escapeHtml(toolDisplayTitle(tool))}</h3><div class="tool-location compact">${toolPathLabel(tool)}</div></div><div><b>${progress}%</b><i><em style="width:${progress}%"></em></i><span>${status === "completed" ? "Открыть результат" : "Продолжить"} →</span></div></a>`;
 }
 
 function recommendedWorkspaceTools(tools, instances, assembly = {}) {
@@ -814,7 +820,7 @@ function renderTools() {
   const selectedSubdomain = selectedDomain?.subdomains.find((item) => item.title === selected.subdomain);
   renderShell(`
     ${sectionHero(state.bootstrap.company?.name || "Компания", "Инструменты", "Здесь понимание превращается в рабочие решения. AI-BOSS поможет выбрать инструмент, пройти его в чате или заполнить личный документ, а результат сохранит в контексте компании.")}
-    ${current ? `<section class="tool-continue panel"><div><span class="eyebrow orange-text">Продолжить работу</span><h2>${escapeHtml(current.tool.title)}</h2><p>${escapeHtml(current.tool.short_description || "Продолжите с того места, где остановились: сохранённые ответы и документ не потеряются.")}</p><div class="tool-location">${toolPathLabel(current.tool)}</div></div><div class="tool-continue-progress"><b>${percent(current.instance.progress_percent)}%</b><span>${escapeHtml(workspaceToolStatus(current.instance.status))}</span><a class="primary-action" href="/app/tools/${encodeURIComponent(current.tool.id)}" data-link>Продолжить <i>→</i></a></div></section>` : `<section class="tool-empty-start panel"><div><span class="eyebrow">Текущая работа</span><h2>Активных инструментов пока нет</h2><p>Начните с рекомендации AI-BOSS или выберите нужный участок архитектуры ниже.</p></div></section>`}
+    ${current ? `<section class="tool-continue panel"><div><span class="eyebrow orange-text">Продолжить работу</span><h2>${escapeHtml(toolDisplayTitle(current.tool))}</h2><p>${escapeHtml(current.tool.short_description || "Продолжите с того места, где остановились: сохранённые ответы и документ не потеряются.")}</p><div class="tool-location">${toolPathLabel(current.tool)}</div></div><div class="tool-continue-progress"><b>${percent(current.instance.progress_percent)}%</b><span>${escapeHtml(workspaceToolStatus(current.instance.status))}</span><a class="primary-action" href="/app/tools/${encodeURIComponent(current.tool.id)}" data-link>Продолжить <i>→</i></a></div></section>` : `<section class="tool-empty-start panel"><div><span class="eyebrow">Текущая работа</span><h2>Активных инструментов пока нет</h2><p>Начните с рекомендации AI-BOSS или выберите нужный участок архитектуры ниже.</p></div></section>`}
     <section class="tool-recommendations"><div class="tools-section-head"><div><span class="eyebrow">Что имеет смысл сделать следующим</span><h2>Рекомендация, а не обязательный маршрут</h2><p>Вы можете начать с предложенного инструмента или выбрать другой участок бизнеса.</p></div></div><div class="tool-recommendation-grid">${recommendations.length ? recommendations.map((item, index) => workspaceToolCard(item.tool, toolInstanceFor(item.tool, instances), { recommended: true, primary: index === 0, reason: item.reason })).join("") : `<div class="empty-state"><h2>Для рекомендации пока мало контекста</h2><p>Зафиксируйте текущий запрос или пройдите экспресс-диагностику — тогда AI-BOSS сможет объяснить, какой инструмент полезнее сейчас.</p><a class="primary-action" href="/app/diagnostics" data-link>Перейти к диагностике <span>→</span></a></div>`}</div></section>
     <section class="my-tools-section"><div class="tools-section-head"><div><span class="eyebrow">Мои инструменты</span><h2>Работа и подтверждённые результаты</h2><p>Завершённым считается инструмент, по которому сохранён результат компании, а не просто открыта карточка.</p></div><b>${myTools.length}</b></div>${myTools.length ? `<div class="my-tools-list">${myTools.slice(0, 8).map((item) => workspaceToolRow(item)).join("")}</div>` : `<div class="tool-empty-inline">Здесь появятся начатые инструменты, личные документы и завершённые результаты.</div>`}</section>
     <section class="tool-library"><div class="tools-section-head"><div><span class="eyebrow">Все инструменты</span><h2>Карта сборки бизнеса</h2><p>Раскрывайте архитектуру последовательно: класс → слой → домен → поддомен → инструменты.</p></div><b>${allTools.length}</b></div>
@@ -851,7 +857,7 @@ function renderToolDetail() {
     ? `${TELEGRAM_CHAT_URL}?start=tool_${instance.telegram_start_token}`
     : TELEGRAM_CHAT_URL;
   renderShell(`
-    ${sectionHero("Инструмент архитектуры", tool.title, tool.short_description || "AI-BOSS проведёт по инструменту, сохранит ответы и добавит результат в память компании.")}
+    ${sectionHero("Инструмент архитектуры", toolDisplayTitle(tool), tool.short_description || "AI-BOSS проведёт по инструменту, сохранит ответы и добавит результат в память компании.")}
     <section class="tool-workspace-grid">
       <article class="panel tool-purpose"><span class="eyebrow">Зачем сейчас</span><h2>${escapeHtml(tool.when_to_use || "Структурировать этот участок бизнеса и получить рабочий результат.")}</h2><p><b>Результат:</b> ${escapeHtml(tool.result || "Заполненный управленческий артефакт, связанный с контекстом компании.")}</p></article>
       <article class="panel tool-progress-panel"><span class="eyebrow">Состояние</span><div class="tool-progress-number">${percent(instance?.progress_percent)}%</div><p>${instance ? `Статус: ${escapeHtml(statusLabel(instance.status))}. Сохранено ответов: ${answers.length} из ${questions.length || "—"}.` : "Инструмент ещё не начат. Выбери удобный способ работы."}</p></article>
