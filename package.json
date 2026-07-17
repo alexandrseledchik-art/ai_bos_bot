@@ -30,6 +30,7 @@
     "execution:excellence:check": "node src/scripts/check-execution-excellence.js",
     "core-behavior:e2e:check": "node src/scripts/check-core-behavior-e2e.js",
     "skills:check": "node src/scripts/check-skill-architecture.js",
+    "skills:eval": "node src/scripts/run-skill-selection-evals.js",
     "consultant:mvp:check": "node src/scripts/check-consultant-mvp.js",
     "consultant:web:check": "node src/scripts/check-consultant-web.js",
     "consultant:roks:check": "node src/scripts/check-roks-deep-diagnostic-logic.js",

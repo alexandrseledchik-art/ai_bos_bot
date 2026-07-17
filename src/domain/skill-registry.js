@@ -339,6 +339,24 @@ export const AI_BOSS_SKILLS_V1 = Object.freeze([
     currentImplementation: ["src/infrastructure/telegram/resolve-telegram-input.js", "src/infrastructure/google/public-google-link-reader.js", "src/application/company-analysis-core.js", "src/application/tool-workflow-service.js"]
   }),
   skill({
+    id: "website_screening",
+    version: "1.0.0",
+    department: SKILL_DEPARTMENTS.DIAGNOSTICS,
+    kind: SKILL_KINDS.BUSINESS,
+    activation: SKILL_ACTIVATION.PRIMARY,
+    purpose: "Провести внешний скрининг сайта, не подменяя его внутренней диагностикой бизнеса.",
+    whenToUse: ["Пользователь прислал URL", "Нужно разобрать продукт, обещание или входную воронку по сайту"],
+    whenNotToUse: ["Не делать выводы о финансах, команде, управлении и внутреннем ограничении только по сайту"],
+    requiredContext: ["urls", "screeningResults"],
+    inputs: ["websiteUrl", "statedProblem"],
+    outputs: ["knownFacts", "externalObservations", "cannotAssert", "routingQuestion"],
+    memoryUpdates: ["screeningSnapshot", "observations"],
+    artifactTypes: ["website_screening"],
+    completionCriteria: ["Факты отделены от наблюдений и гипотез", "Названы границы внешнего скрининга", "Выбрано продолжение: сайт или бизнес"],
+    nextSkillCandidates: ["business_diagnostic", "result_interpretation", "artifact_builder"],
+    currentImplementation: ["src/infrastructure/screening/website-screener.js", "src/application/conversation-service.js", "src/application/guardrails.js"]
+  }),
+  skill({
     id: "artifact_builder",
     version: "1.0.0",
     department: SKILL_DEPARTMENTS.EXECUTION,

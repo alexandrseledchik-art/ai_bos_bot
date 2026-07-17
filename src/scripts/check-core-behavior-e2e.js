@@ -85,6 +85,9 @@ const profit = await service.handleUserMessage({
 });
 
 assert.ok(profit.decision?.diagnosticQuality?.score10 >= 10);
+assert.equal(profit.decision?.skillSelection?.shadowMode, true);
+assert.equal(profit.decision?.skillSelection?.primarySkill, "business_diagnostic");
+assert.equal(profit.decision?.decisionObject?.skillSelection?.primarySkill, "business_diagnostic");
 assert.equal(profit.decision?.decisionObject?.businessStateMode, "stabilization");
 assert.equal(profit.decision?.decisionObject?.operatingMode, "diagnostician");
 assert.equal(profit.decision?.decisionObject?.transition, "diagnosis_to_execution");
@@ -107,11 +110,13 @@ const state = await store.readState();
 const snapshots = state.snapshots || [];
 const latestSnapshot = snapshots[snapshots.length - 1];
 assert.ok(latestSnapshot?.decisionObject, "snapshot should persist decisionObject");
+assert.equal(latestSnapshot?.decisionObject?.skillSelection?.primarySkill, "business_diagnostic");
 
 const projected = projectStateToRelationalRows(state);
 const projectedSnapshot = projected.snapshots[projected.snapshots.length - 1];
 assert.ok(projectedSnapshot?.graph_snapshot?.decisionObject, "projected snapshot should preserve decisionObject in graph_snapshot");
 assert.equal(projectedSnapshot.graph_snapshot.decisionObject.schemaVersion, "decision_object_v1");
 assert.equal(projectedSnapshot.graph_snapshot.decisionObject.reviewStatus, "not_reviewed");
+assert.equal(projectedSnapshot.graph_snapshot.decisionObject.skillSelection.primarySkill, "business_diagnostic");
 
 console.log("Core behavior end-to-end checks passed.");

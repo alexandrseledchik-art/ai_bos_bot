@@ -30,6 +30,7 @@ import { assessChatDiagnosticExcellence } from "./chat-diagnostic-excellence-ass
 import { ConsultantTelegramMode } from "./consultant-telegram-mode.js";
 import { DataSufficiencyChecker } from "./data-sufficiency-checker.js";
 import { ReferenceModelService } from "./reference-model-service.js";
+import { SkillOrchestrator } from "./skill-orchestrator.js";
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
@@ -743,6 +744,7 @@ export class ConversationService {
     this.screener = screener;
     this.maxHistoryMessages = maxHistoryMessages;
     this.modeOrchestrator = new AIBossModeOrchestrator();
+    this.skillOrchestrator = new SkillOrchestrator();
     this.consultantTelegramMode = new ConsultantTelegramMode({ googleDrive });
   }
 
@@ -941,6 +943,7 @@ export class ConversationService {
         decision,
         diagnosticQuality: decision.diagnosticQuality
       });
+      decision.skillSelection = this.skillOrchestrator.select({ context, decision });
 
       const userMessage = createMessage({
         threadId: thread.id,

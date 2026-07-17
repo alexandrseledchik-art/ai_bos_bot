@@ -93,6 +93,7 @@ AI-BOSS — единая управляющая функция бизнеса, �
     │   ├── maturity_assessment
     │   ├── constraint_prioritization
     │   ├── document_analysis
+    │   ├── website_screening
     │   └── result_interpretation
     ├── Архитектура
     │   ├── architecture_navigation
@@ -429,13 +430,13 @@ next_step_selection
 - добавлена проверка контрактов;
 - production-поведение не изменено.
 
-### Этап 2. Оркестратор выбора
+### Этап 2. Оркестратор выбора — выполнено в shadow mode
 
-- добавить deterministic shortlist;
-- добавить `SkillSelectionDecision`;
-- логировать выбранные скиллы в существующий decision object;
-- пока использовать результат в shadow mode;
-- сравнивать выбор с текущим operating mode.
+- добавлен deterministic shortlist;
+- добавлен `SkillSelectionDecision`;
+- выбранные скиллы сохраняются в `decisionObject.skillSelection`;
+- выбор работает в shadow mode и не меняет пользовательский ответ;
+- отдельный eval-набор проверяет маршрутизацию на 35 контрольных ситуациях.
 
 ### Этап 3. Первый пилотный маршрут
 
@@ -503,13 +504,13 @@ load context
 
 ## 15. Следующий технический шаг
 
-Реализовать Этап 2 в shadow mode:
+Реализовать Этап 3 как ограниченный production-пилот:
 
-1. `SkillOrchestrator` получает текущий context.
-2. Реестр отсекает несовместимые скиллы.
-3. Оркестратор выбирает основной и вспомогательные скиллы.
-4. Выбор записывается в `decisionObject.skillSelection`.
-5. На ответ пока не влияет.
-6. Eval-набор сравнивает ожидаемый и фактический выбор на контрольных маршрутах.
+1. Сохранить текущий reasoner как fallback.
+2. Передавать выбор скиллов только в маршрут `business_diagnostic`.
+3. Проверять критерий завершения `diagnostic_interview`.
+4. Сохранять результат `observation_capture` и `company_memory`.
+5. Не активировать `next_step_selection`, пока не хватает доказательств.
+6. Сравнить production-пилот с текущим ответом по качеству следующего вопроса.
 
-Только после стабильного выбора можно отдавать оркестратору управление первым production-маршрутом.
+Остальные маршруты остаются в shadow mode до отдельной проверки.
