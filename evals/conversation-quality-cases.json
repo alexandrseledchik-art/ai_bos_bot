@@ -58,13 +58,11 @@
     "turns": [
       "/start"
     ],
-    "expectedEntryMode": "unclear",
-    "expectedAction": "clarify",
     "turnChecks": [
       {
-        "mustContain": ["главное ограничение", "3-7 сообщений", "текстом, голосом или ссылкой на сайт", "Скажи одной фразой"],
+        "mustContain": ["главное ограничение", "Здесь, в чате, мы общаемся", "Основная работа проходит на платформе", "кабинета компании"],
         "mustNotContain": ["11 слоёв", "11 слоев", "A-D", "business architect", "tool navigator", "strategic sparring partner"],
-        "maxParagraphs": 4,
+        "maxParagraphs": 5,
         "maxChars": 1500
       }
     ]

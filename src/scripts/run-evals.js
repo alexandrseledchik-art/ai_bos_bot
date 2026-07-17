@@ -88,12 +88,23 @@ async function createService(cwd) {
     reasoningEffort: "medium"
   });
 
-  return new ConversationService({
+  const service = new ConversationService({
     store,
     reasoner,
     screener: new EvalWebsiteScreener(),
     maxHistoryMessages: 6
   });
+
+  // Golden diagnostic cases exercise the core conversation pipeline in isolation.
+  // Consultant commands have their own checks and may legitimately intercept
+  // phrases such as "что сейчас главное" when an active company exists.
+  service.consultantTelegramMode = {
+    async handle() {
+      return { handled: false };
+    }
+  };
+
+  return service;
 }
 
 function printCaseResult(result) {
@@ -102,6 +113,10 @@ function printCaseResult(result) {
 
   for (const issue of result.issues) {
     console.log(`  - ${issue}`);
+  }
+
+  if (!result.passed && result.reply) {
+    console.log(`  reply: ${result.reply.replace(/\s+/g, " ").slice(0, 500)}`);
   }
 }
 
@@ -131,13 +146,18 @@ async function run() {
       issues.push(`entryMode expected=${testCase.expectedEntryMode} actual=${classification.entryMode}`);
     }
 
-    if (run.decision.selectedMode !== testCase.expectedMode) {
+    const platformWelcome = run.runtime?.webCabinetFirst === true && testCase.input === "/start";
+    if (!run.decision && !platformWelcome) {
+      issues.push("conversation returned no diagnostic decision");
+    }
+
+    if (run.decision && run.decision.selectedMode !== testCase.expectedMode) {
       issues.push(
         `mode expected=${testCase.expectedMode} actual=${run.decision.selectedMode}`
       );
     }
 
-    if (run.decision.decision.action !== testCase.expectedAction) {
+    if (run.decision && run.decision.decision.action !== testCase.expectedAction) {
       issues.push(
         `action expected=${testCase.expectedAction} actual=${run.decision.decision.action}`
       );
@@ -165,7 +185,8 @@ async function run() {
     results.push({
       id: testCase.id,
       passed: issues.length === 0,
-      issues
+      issues,
+      reply: run.reply
     });
   }
 

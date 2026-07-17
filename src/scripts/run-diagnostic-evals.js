@@ -595,6 +595,9 @@ async function run() {
     printMetric(result, "surface");
     printMetric(result, "promotion");
     printMetric(result, "artifact");
+    if (!result.passed) {
+      console.log(`  actual question: ${result.debug.nextBestQuestion}`);
+    }
   }
 
   const metricNames = ["nextBestQuestion", "causeDepth", "uncertainty", "adviceDiscipline", "surface", "promotion", "artifact"];

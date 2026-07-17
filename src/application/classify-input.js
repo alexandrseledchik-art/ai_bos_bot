@@ -187,15 +187,15 @@ export function classifyInput(text) {
   } else if (!urls.length && hasMetaRoleIntent) {
     type = "free_text_vague";
     entryMode = "meta_role";
-  } else if (!urls.length && hasConcreteProblemSignal && !matchesExplicitVagueIntent) {
-    type = "free_text_problem";
-    entryMode = "problem_first";
-  } else if (!urls.length && hasSpecificToolIntent && !hasConcreteProblemSignal) {
+  } else if (!urls.length && hasSpecificToolIntent) {
     type = "free_text_vague";
     entryMode = "specific_tool_request";
   } else if (!urls.length && hasToolDiscoveryIntent && !hasConcreteProblemSignal) {
     type = "free_text_vague";
     entryMode = "tool_discovery";
+  } else if (!urls.length && hasConcreteProblemSignal && !matchesExplicitVagueIntent) {
+    type = "free_text_problem";
+    entryMode = "problem_first";
   } else if (!urls.length && matchesUnknownIntent) {
     type = "unknown";
     entryMode = "unclear";

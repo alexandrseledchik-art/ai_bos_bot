@@ -119,12 +119,14 @@ async function createService(cwd) {
     reasoningEffort: "medium"
   });
 
-  return new ConversationService({
+  const service = new ConversationService({
     store,
     reasoner,
     screener: new EvalWebsiteScreener(),
     maxHistoryMessages: 8
   });
+  service.consultantTelegramMode = { handle: async () => ({ handled: false }) };
+  return service;
 }
 
 async function loadCases(cwd) {
@@ -246,16 +248,16 @@ async function runCase(testCase, service) {
   if (testCase.expectedEntryMode) {
     addIssue(
       issues,
-      finalRun.classification.entryMode === testCase.expectedEntryMode,
-      `entryMode expected=${testCase.expectedEntryMode} actual=${finalRun.classification.entryMode}`
+      finalRun.classification?.entryMode === testCase.expectedEntryMode,
+      `entryMode expected=${testCase.expectedEntryMode} actual=${finalRun.classification?.entryMode || "missing"}`
     );
   }
 
   if (testCase.expectedAction) {
     addIssue(
       issues,
-      finalRun.decision.decision.action === testCase.expectedAction,
-      `action expected=${testCase.expectedAction} actual=${finalRun.decision.decision.action}`
+      finalRun.decision?.decision?.action === testCase.expectedAction,
+      `action expected=${testCase.expectedAction} actual=${finalRun.decision?.decision?.action || "missing"}`
     );
   }
 

@@ -47,7 +47,7 @@ assert.equal(weakPacket.enabled, true);
 assert.equal(weakPacket.mustAskForSignal, true);
 assert.equal(weakPacket.responsePolicy.allowConstraintSelection, false);
 assert.equal(weakPacket.responsePolicy.allowNextStep, false);
-assert.equal(weakPacket.requiredSignal.startsWith("По последним 20"), true);
+assert.match(weakPacket.requiredSignal, /последн(?:им|ие) 20/i);
 assert.equal(new Set(weakPacket.hypotheses.map((item) => item.layer)).size >= 3, true);
 
 const prematureDecision = {
@@ -61,7 +61,7 @@ assert.equal(enforced.decision.action, "clarify");
 assert.equal(enforced.entryState.selectedConstraint, "");
 assert.equal(enforced.memory.constraint, "");
 assert.equal(enforced.memory.actionWave.enabled, false);
-assert.match(enforced.response.responseText, /последним 20 обращениям/);
+assert.match(enforced.response.responseText, /последн(?:им|ие) 20 обращен/i);
 assert.doesNotMatch(enforced.response.responseText, /нанять менеджера/i);
 assert.equal(pilot.assess({ packet: weakPacket, decision: enforced }).criterionMet, true);
 

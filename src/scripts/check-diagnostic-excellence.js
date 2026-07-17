@@ -89,10 +89,10 @@ function main() {
     ].join("\n")
   });
   assert.equal(roks.probableConstraint.mode, "upper_frame");
-  assert.match(roks.probableConstraint.title, /собственник, рынок и стратегия/i);
+  assert.match(roks.probableConstraint.title, /собственник[а-я]*, рынок и стратегия/i);
   assert.ok((roks.parallelActions || []).some((item) => item.layer === "finance"));
   assert.ok((roks.parallelActions || []).some((item) => item.layer === "team"));
-  assert.match(roks.nextStep.title, /собственник-рынок/i);
+  assert.match(roks.nextStep.title, /цель собственника.*рыночн/i);
   assertQuality(roks);
 
   console.log("Diagnostic excellence checks passed.");

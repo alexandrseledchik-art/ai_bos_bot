@@ -1,0 +1,133 @@
+[
+  {
+    "id": "lead_overload_mixed_flow",
+    "turns": ["Продажи слабые: лидов много, команда не успевает обрабатывать", "Из последних 20 обращений только 6 были целевыми, до первого контакта дошли 5"],
+    "expectedPrimary": "business_diagnostic",
+    "expectedFinalAction": "answer",
+    "expectedConstraintLayers": ["commercial"],
+    "forbidStaffingFrame": true
+  },
+  {
+    "id": "leads_do_not_close",
+    "turns": ["Лиды есть, но сделки не закрываются", "Из 30 последних лидов 18 были целевыми, 12 дошли до встречи и только 2 купили"],
+    "expectedPrimary": "business_diagnostic",
+    "expectedFinalAction": "answer",
+    "expectedConstraintLayers": ["commercial", "operations", "product"]
+  },
+  {
+    "id": "margin_drop_quantified",
+    "turns": ["Выручка не изменилась, но маржа упала с 31% до 17% за квартал"],
+    "expectedPrimary": "business_diagnostic",
+    "expectedFinalAction": "answer",
+    "expectedConstraintLayers": ["finance"]
+  },
+  {
+    "id": "cash_gap_without_facts",
+    "turns": ["Кассовый разрыв повторяется, хотя продажи идут"],
+    "expectedPrimary": "business_diagnostic",
+    "expectedFinalAction": "clarify"
+  },
+  {
+    "id": "owner_bottleneck",
+    "turns": ["Без меня в компании всё останавливается", "За прошлую неделю на мне зависло 7 решений, пять из них команда ждала больше двух дней"],
+    "expectedPrimary": "business_diagnostic",
+    "expectedFinalAction": "answer",
+    "expectedConstraintLayers": ["owner_context", "governance", "operations"]
+  },
+  {
+    "id": "delivery_delays",
+    "turns": ["Клиентские проекты постоянно срывают сроки", "Из 12 проектов за квартал 8 задержались больше чем на 10 дней, чаще всего на передаче между продажей и производством"],
+    "expectedPrimary": "business_diagnostic",
+    "expectedFinalAction": "answer",
+    "expectedConstraintLayers": ["operations"]
+  },
+  {
+    "id": "customer_churn",
+    "turns": ["Клиенты покупают один раз и не возвращаются", "За полгода повторную покупку сделали 9 из 54 клиентов"],
+    "expectedPrimary": "business_diagnostic",
+    "expectedFinalAction": "answer",
+    "expectedConstraintLayers": ["product", "commercial", "operations"]
+  },
+  {
+    "id": "strategy_sprawl",
+    "turns": ["Мы распыляемся и не понимаем, какое направление главное", "У нас 6 продуктов для 4 сегментов, но 72% прибыли дают один продукт и один сегмент"],
+    "expectedPrimary": "business_diagnostic",
+    "expectedFinalAction": "answer",
+    "expectedConstraintLayers": ["strategy"]
+  },
+  {
+    "id": "vague_entry",
+    "turns": ["Что-то в бизнесе идёт не так"],
+    "expectedPrimary": "intent_clarification",
+    "expectedFinalAction": "clarify"
+  },
+  {
+    "id": "tool_first_raci",
+    "turns": ["Мне нужна матрица ответственности для отдела продаж"],
+    "expectedPrimary": "tool_selection",
+    "expectedFinalAction": "clarify"
+  },
+  {
+    "id": "url_screening",
+    "turns": ["https://acme.example"],
+    "expectedPrimary": "website_screening",
+    "expectedFinalAction": "screen"
+  },
+  {
+    "id": "business_sale_preparation",
+    "turns": ["Хочу подготовить бизнес к продаже"],
+    "expectedPrimary": "intent_clarification",
+    "expectedFinalAction": "clarify"
+  },
+  {
+    "id": "staffing_is_user_hypothesis",
+    "turns": ["Команда перегружена, думаю, нужно нанять ещё людей"],
+    "expectedPrimary": "business_diagnostic",
+    "expectedFinalAction": "clarify"
+  },
+  {
+    "id": "crm_is_proposed_solution",
+    "turns": ["Нам срочно нужна CRM"],
+    "expectedPrimary": "business_diagnostic",
+    "expectedFinalAction": "clarify"
+  },
+  {
+    "id": "data_visibility",
+    "turns": ["Мы не понимаем реальную прибыль по направлениям"],
+    "expectedPrimary": "business_diagnostic",
+    "expectedFinalAction": "clarify"
+  },
+  {
+    "id": "weak_repeat_sales",
+    "turns": ["Продажи есть, но почти все клиенты одноразовые", "За год 74% клиентов купили один раз, повторная выручка составляет 11%"],
+    "expectedPrimary": "business_diagnostic",
+    "expectedFinalAction": "answer",
+    "expectedConstraintLayers": ["product"]
+  },
+  {
+    "id": "market_demand_drop",
+    "turns": ["Заявок стало меньше на 38% за четыре месяца при том же рекламном бюджете"],
+    "expectedPrimary": "business_diagnostic",
+    "expectedFinalAction": "answer",
+    "expectedConstraintLayers": ["commercial", "external_environment"]
+  },
+  {
+    "id": "price_and_margin",
+    "turns": ["Средний чек вырос на 12%, но валовая маржа снизилась с 29% до 19%"],
+    "expectedPrimary": "business_diagnostic",
+    "expectedFinalAction": "answer",
+    "expectedConstraintLayers": ["finance"]
+  },
+  {
+    "id": "partner_conflict",
+    "turns": ["Мы с партнёром постоянно меняем приоритеты и команда не понимает, куда идти"],
+    "expectedPrimary": "business_diagnostic",
+    "expectedFinalAction": "clarify"
+  },
+  {
+    "id": "growth_without_focus",
+    "turns": ["Хотим расти быстрее, но не понимаем, что сейчас ограничивает рост"],
+    "expectedPrimary": "business_diagnostic",
+    "expectedFinalAction": "clarify"
+  }
+]

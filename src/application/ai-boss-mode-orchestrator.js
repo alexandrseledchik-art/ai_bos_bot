@@ -48,8 +48,23 @@ function collectContextText(context = {}, decision = {}) {
   ].join(" "));
 }
 
+function collectBusinessStateText(context = {}, decision = {}) {
+  const entryState = decision.entryState || context.entryState || {};
+  return lowerText([
+    context.userText,
+    context.classification?.cleanText,
+    context.intentIntegrity?.proposedSolution,
+    context.intentIntegrity?.reason,
+    entryState.claimedProblem,
+    entryState.claimedCause,
+    entryState.selectedConstraint,
+    ...(entryState.symptoms || [])
+  ].join(" "));
+}
+
 function inferBusinessStateMode(context = {}, decision = {}) {
-  const text = collectContextText(context, decision);
+  // Competing hypotheses are exploration material, not evidence of the current business state.
+  const text = collectBusinessStateText(context, decision);
   const integrityType = context.intentIntegrity?.integrityType || "";
 
   if (

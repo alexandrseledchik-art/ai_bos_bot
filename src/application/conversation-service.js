@@ -967,7 +967,8 @@ export class ConversationService {
       let decision = await this.reasoner.decide(context);
       decision = this.diagnosticSkillPilot.enforce({
         packet: context.skillExecution,
-        decision
+        decision,
+        context
       });
       decision = applyGuardrails(decision, context);
       decision.diagnosticQuality = assessChatDiagnosticExcellence({ decision, context });
