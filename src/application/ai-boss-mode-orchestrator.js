@@ -689,6 +689,7 @@ export class AIBossModeOrchestrator {
         businessStateConfidence: orchestration.businessStateConfidence
       },
       skillSelection: decision.skillSelection || null,
+      skillExecution: decision.skillExecution || null,
       reasonCodes: orchestration.reasonCodes || [],
       reasonCodesByLayer: {
         businessState: orchestration.businessStateReasonCodes || [],

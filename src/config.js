@@ -107,6 +107,7 @@ export function loadConfig() {
     appBaseUrl: process.env.APP_BASE_URL || "",
     alexanderBookingUrl: process.env.ALEXANDER_BOOKING_URL || "",
     miniAppAlphaMode: process.env.MINI_APP_ALPHA_MODE === "true",
+    skillOrchestratorDiagnosticEnabled: process.env.SKILL_ORCHESTRATOR_DIAGNOSTIC_ENABLED !== "false",
     openaiApiKey: process.env.OPENAI_API_KEY || "",
     openaiBaseUrl: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
     reasoningModel: process.env.OPENAI_REASONING_MODEL || "gpt-5.4-mini",

@@ -62,7 +62,8 @@ export function getServices() {
       reasoner,
       screener,
       googleDrive,
-      maxHistoryMessages: config.maxHistoryMessages
+      maxHistoryMessages: config.maxHistoryMessages,
+      skillOrchestratorDiagnosticEnabled: config.skillOrchestratorDiagnosticEnabled
     })
   };
 

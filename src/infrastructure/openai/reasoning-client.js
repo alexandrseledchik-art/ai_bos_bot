@@ -1511,6 +1511,10 @@ function buildEntryState(context, focus, signalSufficiency, selectedConstraint =
     nextBestQuestion = "По 20 последним лидам что видно: источник, целевость, качество лидов, первый контакт и где остановилась сделка?";
   }
 
+  if (context.skillExecution?.enabled && context.skillExecution.mustAskForSignal && context.skillExecution.requiredSignal) {
+    nextBestQuestion = normalizeText(context.skillExecution.requiredSignal);
+  }
+
   const symptoms = uniqueStrings([
     ...(previous.symptoms || []),
     text
@@ -2812,7 +2816,10 @@ function buildConstraintRejectionFeedbackDecision(context) {
 
 function buildProblemDecision(context) {
   const focus = detectFocus(context.userText);
-  const hardSignal = detectHardSignal(context.userText);
+  const pilotAllowsConstraint = context.skillExecution?.enabled
+    ? context.skillExecution.responsePolicy?.allowConstraintSelection === true
+    : true;
+  const hardSignal = detectHardSignal(context.userText) && pilotAllowsConstraint;
   const candidateConstraints = genericConstraintsByFocus(focus, context.userText);
   const primaryConstraint = hardSignal ? candidateConstraints[0]?.label || "" : "";
   const promotionReadiness = hardSignal ? "ready_for_diagnostic_case" : "keep_in_entry";

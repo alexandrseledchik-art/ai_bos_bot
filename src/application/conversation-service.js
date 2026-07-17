@@ -29,6 +29,7 @@ import { AutonomousDataCollector } from "./autonomous-data-collector.js";
 import { assessChatDiagnosticExcellence } from "./chat-diagnostic-excellence-assessor.js";
 import { ConsultantTelegramMode } from "./consultant-telegram-mode.js";
 import { DataSufficiencyChecker } from "./data-sufficiency-checker.js";
+import { DiagnosticSkillPilot } from "./diagnostic-skill-pilot.js";
 import { ReferenceModelService } from "./reference-model-service.js";
 import { SkillOrchestrator } from "./skill-orchestrator.js";
 
@@ -738,13 +739,22 @@ function buildArtifactBody({ company, activeCase, decision, classification, user
 }
 
 export class ConversationService {
-  constructor({ store, reasoner, screener, googleDrive = null, maxHistoryMessages = 12 }) {
+  constructor({
+    store,
+    reasoner,
+    screener,
+    googleDrive = null,
+    maxHistoryMessages = 12,
+    skillOrchestratorDiagnosticEnabled = true
+  }) {
     this.store = store;
     this.reasoner = reasoner;
     this.screener = screener;
     this.maxHistoryMessages = maxHistoryMessages;
     this.modeOrchestrator = new AIBossModeOrchestrator();
     this.skillOrchestrator = new SkillOrchestrator();
+    this.diagnosticSkillPilot = new DiagnosticSkillPilot();
+    this.skillOrchestratorDiagnosticEnabled = skillOrchestratorDiagnosticEnabled;
     this.consultantTelegramMode = new ConsultantTelegramMode({ googleDrive });
   }
 
@@ -935,7 +945,30 @@ export class ConversationService {
       context.dataSufficiency = dataSufficiency;
       context.orchestration = this.modeOrchestrator.orchestrate({ context });
 
+      const preliminarySkillSelection = this.skillOrchestrator.select({
+        context,
+        decision: { orchestration: context.orchestration }
+      });
+      context.skillSelection = preliminarySkillSelection;
+      if (this.skillOrchestratorDiagnosticEnabled) {
+        try {
+          context.skillExecution = this.diagnosticSkillPilot.build({
+            context,
+            selection: preliminarySkillSelection
+          });
+        } catch (error) {
+          context.skillExecution = {
+            enabled: false,
+            fallbackReason: normalizeText(error?.message || "diagnostic_skill_pilot_failed")
+          };
+        }
+      }
+
       let decision = await this.reasoner.decide(context);
+      decision = this.diagnosticSkillPilot.enforce({
+        packet: context.skillExecution,
+        decision
+      });
       decision = applyGuardrails(decision, context);
       decision.diagnosticQuality = assessChatDiagnosticExcellence({ decision, context });
       decision.orchestration = this.modeOrchestrator.orchestrate({
@@ -944,6 +977,10 @@ export class ConversationService {
         diagnosticQuality: decision.diagnosticQuality
       });
       decision.skillSelection = this.skillOrchestrator.select({ context, decision });
+      decision.skillExecution = this.diagnosticSkillPilot.assess({
+        packet: context.skillExecution,
+        decision
+      });
 
       const userMessage = createMessage({
         threadId: thread.id,
@@ -961,6 +998,8 @@ export class ConversationService {
 
       thread.entryState = mergeEntryState(thread.entryState, decision.entryState, classification.type);
       thread.entryState.entryMode = classification.entryMode || thread.entryState.entryMode || "unclear";
+      thread.entryState.lastSkillSelection = decision.skillSelection || null;
+      thread.entryState.lastSkillExecution = decision.skillExecution || null;
       thread.updatedAt = nowIso();
 
       if (decision.memory.companyName && normalizeText(decision.memory.companyName) !== normalizeText(company.name)) {
@@ -1177,7 +1216,9 @@ export class ConversationService {
         entryStateAfterMerge: thread.entryState,
         graphPacket,
         persistedMemory,
-        decisionObject: decision.decisionObject || null
+        decisionObject: decision.decisionObject || null,
+        skillSelection: decision.skillSelection || null,
+        skillExecution: decision.skillExecution || null
       };
       const miniAppInvite = buildMiniAppInvite({
             classification,
