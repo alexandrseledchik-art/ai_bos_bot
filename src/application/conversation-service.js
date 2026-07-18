@@ -32,6 +32,7 @@ import { DataSufficiencyChecker } from "./data-sufficiency-checker.js";
 import { DiagnosticSkillPilot } from "./diagnostic-skill-pilot.js";
 import { ReferenceModelService } from "./reference-model-service.js";
 import { SkillOrchestrator } from "./skill-orchestrator.js";
+import { SkillRunManager } from "./skill-run-manager.js";
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
@@ -557,6 +558,10 @@ function mergeEntryState(currentState, incomingState, routeType) {
     nextBestStep: incoming.nextBestStep || current.nextBestStep,
     whyThisStep: incoming.whyThisStep || current.whyThisStep,
     promotionReadiness: incoming.promotionReadiness || current.promotionReadiness,
+    activeSkillRun: current.activeSkillRun || null,
+    skillRunHistory: Array.isArray(current.skillRunHistory) ? current.skillRunHistory : [],
+    lastSkillSelection: current.lastSkillSelection || null,
+    lastSkillExecution: current.lastSkillExecution || null,
     lastMiniAppInvite: current.lastMiniAppInvite || null
   });
 }
@@ -753,6 +758,7 @@ export class ConversationService {
     this.maxHistoryMessages = maxHistoryMessages;
     this.modeOrchestrator = new AIBossModeOrchestrator();
     this.skillOrchestrator = new SkillOrchestrator();
+    this.skillRunManager = new SkillRunManager();
     this.diagnosticSkillPilot = new DiagnosticSkillPilot();
     this.skillOrchestratorDiagnosticEnabled = skillOrchestratorDiagnosticEnabled;
     this.consultantTelegramMode = new ConsultantTelegramMode({ googleDrive });
@@ -797,6 +803,18 @@ export class ConversationService {
       let company = ensureCompany(state, thread, userMeta);
       company = applyActiveCompanyContext(state, thread, telegramChatId, userMeta) || company;
       if (looksStartCommand(text)) {
+        const startRunState = this.skillRunManager.prepare({
+          entryState: thread.entryState || emptyEntryState(),
+          selection: {
+            primarySkill: "onboarding_conversation",
+            reasonCodes: ["start_or_onboarding"]
+          },
+          context: { userText: text, classification: { type: "unknown" } }
+        }).state;
+        thread.entryState = this.skillRunManager.applyToEntryState(
+          thread.entryState || emptyEntryState(),
+          startRunState
+        );
         const returning = state.messages.some((message) => message.threadId === thread.id && message.role === "user" && !looksStartCommand(message.text));
         const reply = buildPlatformWelcomeMessage(userMeta, { returning });
         state.messages.push(
@@ -949,12 +967,19 @@ export class ConversationService {
         context,
         decision: { orchestration: context.orchestration }
       });
-      context.skillSelection = preliminarySkillSelection;
+      let skillRunPreparation = this.skillRunManager.prepare({
+        entryState: thread.entryState || emptyEntryState(),
+        selection: preliminarySkillSelection,
+        context
+      });
+      context.skillSelection = skillRunPreparation.selection;
+      context.skillRun = skillRunPreparation.run;
+      context.skillRunTransition = skillRunPreparation.transition;
       if (this.skillOrchestratorDiagnosticEnabled) {
         try {
           context.skillExecution = this.diagnosticSkillPilot.build({
             context,
-            selection: preliminarySkillSelection
+            selection: context.skillSelection
           });
         } catch (error) {
           context.skillExecution = {
@@ -977,10 +1002,33 @@ export class ConversationService {
         decision,
         diagnosticQuality: decision.diagnosticQuality
       });
-      decision.skillSelection = this.skillOrchestrator.select({ context, decision });
+      decision.skillSelection = ["started", "continued"].includes(skillRunPreparation.transition)
+        ? context.skillSelection
+        : this.skillOrchestrator.select({ context, decision });
+      if (
+        skillRunPreparation.transition === "none" &&
+        decision.skillSelection?.primarySkill === "business_diagnostic"
+      ) {
+        skillRunPreparation = this.skillRunManager.prepare({
+          entryState: thread.entryState || emptyEntryState(),
+          selection: decision.skillSelection,
+          context
+        });
+        context.skillSelection = skillRunPreparation.selection;
+        context.skillRun = skillRunPreparation.run;
+        context.skillRunTransition = skillRunPreparation.transition;
+        decision.skillSelection = skillRunPreparation.selection;
+      }
       decision.skillExecution = this.diagnosticSkillPilot.assess({
         packet: context.skillExecution,
         decision
+      });
+      const skillRunState = this.skillRunManager.finalize({
+        preparation: skillRunPreparation,
+        packet: context.skillExecution,
+        execution: decision.skillExecution,
+        decision,
+        context
       });
 
       const userMessage = createMessage({
@@ -1001,6 +1049,7 @@ export class ConversationService {
       thread.entryState.entryMode = classification.entryMode || thread.entryState.entryMode || "unclear";
       thread.entryState.lastSkillSelection = decision.skillSelection || null;
       thread.entryState.lastSkillExecution = decision.skillExecution || null;
+      thread.entryState = this.skillRunManager.applyToEntryState(thread.entryState, skillRunState);
       thread.updatedAt = nowIso();
 
       if (decision.memory.companyName && normalizeText(decision.memory.companyName) !== normalizeText(company.name)) {
@@ -1219,7 +1268,13 @@ export class ConversationService {
         persistedMemory,
         decisionObject: decision.decisionObject || null,
         skillSelection: decision.skillSelection || null,
-        skillExecution: decision.skillExecution || null
+        skillExecution: decision.skillExecution || null,
+        skillRun: thread.entryState.activeSkillRun || (
+          ["started", "continued", "interrupted"].includes(skillRunPreparation.transition)
+            ? skillRunState.skillRunHistory?.at(-1) || null
+            : null
+        ),
+        skillRunTransition: skillRunPreparation.transition
       };
       const miniAppInvite = buildMiniAppInvite({
             classification,

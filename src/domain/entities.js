@@ -102,6 +102,10 @@ export function emptyEntryState() {
     nextBestStep: "",
     whyThisStep: "",
     promotionReadiness: "keep_in_entry",
+    activeSkillRun: null,
+    skillRunHistory: [],
+    lastSkillSelection: null,
+    lastSkillExecution: null,
     lastMiniAppInvite: null,
     lastUpdatedAt: ""
   };

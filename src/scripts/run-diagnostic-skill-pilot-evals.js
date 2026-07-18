@@ -51,6 +51,7 @@ const results = [];
 for (const testCase of cases) {
   const issues = [];
   const runs = [];
+  let activeRunId = "";
   for (const [index, text] of testCase.turns.entries()) {
     const run = await service.handleUserMessage({
       telegramChatId: `skill-pilot-${testCase.id}`,
@@ -69,6 +70,18 @@ for (const testCase of cases) {
       if (run.decision?.memory?.actionWave?.enabled) issues.push(`turn ${index + 1}: action wave started before evidence`);
       if (!run.reply.includes("?")) issues.push(`turn ${index + 1}: waiting state has no question`);
       if ((execution.hypothesisLayers || []).length < 2) issues.push(`turn ${index + 1}: hypotheses did not spread across layers`);
+      const skillRun = run.runtime?.skillRun;
+      if (!skillRun?.runId) issues.push(`turn ${index + 1}: persistent skill run was not created`);
+      if (skillRun?.status !== "waiting_for_user") issues.push(`turn ${index + 1}: skill run is not waiting for user`);
+      if (activeRunId && skillRun?.runId !== activeRunId) issues.push(`turn ${index + 1}: skill run id changed during continuation`);
+      activeRunId = skillRun?.runId || activeRunId;
+    }
+    if (execution?.status === "completed" && activeRunId) {
+      const skillRun = run.runtime?.skillRun;
+      if (run.runtime?.skillRunTransition !== "continued") issues.push(`turn ${index + 1}: completed run did not continue the active run`);
+      if (skillRun?.runId !== activeRunId) issues.push(`turn ${index + 1}: completed run has a different id`);
+      if (skillRun?.status !== "completed") issues.push(`turn ${index + 1}: persistent run was not completed`);
+      if (!skillRun?.handoff?.skillId) issues.push(`turn ${index + 1}: completed run has no handoff`);
     }
   }
 

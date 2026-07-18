@@ -33,6 +33,7 @@
     "skills:eval": "node src/scripts/run-skill-selection-evals.js",
     "skills:pilot:check": "node src/scripts/check-diagnostic-skill-pilot.js",
     "skills:pilot:eval": "node src/scripts/run-diagnostic-skill-pilot-evals.js",
+    "skills:run:check": "node src/scripts/check-persistent-skill-runs.js",
     "consultant:mvp:check": "node src/scripts/check-consultant-mvp.js",
     "consultant:web:check": "node src/scripts/check-consultant-web.js",
     "consultant:roks:check": "node src/scripts/check-roks-deep-diagnostic-logic.js",
