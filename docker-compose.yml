@@ -1,0 +1,15 @@
+services:
+  ai-boss:
+    build: .
+    container_name: ai-boss
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATA_ROOT: /app/data
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
