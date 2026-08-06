@@ -386,6 +386,19 @@ function systemFlow({ compact = false } = {}) {
   </section>`;
 }
 
+function experienceCases() {
+  const cases = [
+    { number: "01", name: "РОЛЬФ", result: "11 лет", note: "Карьера от техника до директора по продажам", href: "https://seledchik.ru/rolf/" },
+    { number: "02", name: "MPSTATS", result: "2 млрд ₽", note: "Сумма продажи сервиса банку Точка", href: "https://seledchik.ru/mpstats/" },
+    { number: "03", name: "Heavy Booster", result: "1,5+ млрд ₽", note: "Общий оборот E-commerce-компании", href: "https://seledchik.ru/heavybooster/" },
+    { number: "04", name: "HAVAL", result: "×3 / ×5", note: "Рост выручки и прибыли", href: "https://seledchik.ru/haval/" }
+  ];
+  return `<section class="experience-cases">
+    <div class="experience-cases-head"><div><span class="eyebrow">Опыт, стоящий за системой</span><h2>Кейсы Александра Селедчика</h2></div><a href="https://seledchik.ru/#cases" target="_blank" rel="noopener">Все кейсы →</a></div>
+    <div class="experience-case-list">${cases.map((item) => `<a class="experience-case" href="${item.href}" target="_blank" rel="noopener"><span>${item.number}</span><div><small>${item.name}</small><strong>${item.result}</strong><p>${item.note}</p></div><b>Подробнее</b></a>`).join("")}</div>
+  </section>`;
+}
+
 function renderWelcomeDashboard(data) {
   const firstName = data.appUser?.first_name ? `, ${escapeHtml(data.appUser.first_name)}` : "";
   renderShell(`
@@ -400,7 +413,8 @@ function renderWelcomeDashboard(data) {
       <p class="welcome-choice-note">Выбор определяет только начало работы. Разбор задачи всё равно учитывает бизнес целиком, а общая сборка помогает решать конкретные задачи.</p>
     </section>
     ${systemFlow()}
-    <section class="work-formats panel"><div><span class="eyebrow">Работайте удобным способом</span><h2>Разговор становится частью системы</h2><p>Можно отвечать текстом или голосом, проходить диагностику, заполнять инструменты вместе с AI-BOSS и подключать рабочие документы. Результаты сохраняются в контексте компании.</p></div><a class="primary-action" href="${TELEGRAM_CHAT_URL}" target="_blank" rel="noopener">Открыть AI-BOSS <span>→</span></a></section>`);
+    <section class="work-formats panel"><div><span class="eyebrow">Работайте удобным способом</span><h2>Разговор становится частью системы</h2><p>Можно отвечать текстом или голосом, проходить диагностику, заполнять инструменты вместе с AI-BOSS и подключать рабочие документы. Результаты сохраняются в контексте компании.</p></div><a class="primary-action" href="${TELEGRAM_CHAT_URL}" target="_blank" rel="noopener">Открыть AI-BOSS <span>→</span></a></section>
+    ${experienceCases()}`);
 }
 
 function renderReadyDashboard(data, workspace) {
@@ -412,7 +426,8 @@ function renderReadyDashboard(data, workspace) {
       <article class="ready-entry"><span class="panel-icon">◇</span><div><p class="eyebrow">Общая сборка</p><h2>Увидеть бизнес как систему</h2><p>Начните с общей картины. Диагностика покажет состояние ключевых частей бизнеса, а архитектура поможет последовательно собирать пробелы.</p></div><a class="primary-action" href="/app/diagnostics/express" data-diagnostic-start="express">Получить общую картину <span>→</span></a></article>
       <article class="ready-entry dark"><span class="panel-icon orange">AI</span><div><p class="eyebrow">Текущая задача</p><h2>Разобрать запрос с AI-BOSS</h2><p>Опишите ситуацию своими словами. AI-BOSS соберёт версии, запросит необходимые факты и поможет определить первый следующий шаг.</p></div><a class="primary-action orange-action" href="${TELEGRAM_CHAT_URL}" target="_blank" rel="noopener">Перейти к разбору <span>→</span></a></article>
     </section>
-    ${systemFlow({ compact: true })}`);
+    ${systemFlow({ compact: true })}
+    ${experienceCases()}`);
 }
 
 function renderActiveDashboard(data, workspace) {
@@ -453,7 +468,8 @@ function renderActiveDashboard(data, workspace) {
       </section>
       ${currentTool ? `<section class="panel current-tool-panel wide"><div><span class="eyebrow orange-text">Текущий инструмент</span><h2>${escapeHtml(currentTool.tool?.title || "Инструмент в работе")}</h2><p>${escapeHtml(currentTool.tool?.short_description || "Продолжи заполнение — ответы уже сохраняются в памяти компании.")}</p></div><div><b>${percent(currentTool.instance.progress_percent)}%</b><a class="text-action" href="/app/tools/${encodeURIComponent(currentTool.tool?.id || currentTool.instance.tool_id)}" data-link>Продолжить →</a></div></section>` : ""}
     </div>
-    <details class="dashboard-guide"><summary>Как связаны разделы AI-BOSS</summary>${systemFlow({ compact: true })}</details>`);
+    <details class="dashboard-guide"><summary>Как связаны разделы AI-BOSS</summary>${systemFlow({ compact: true })}</details>
+    ${experienceCases()}`);
 }
 
 function renderDashboard() {
