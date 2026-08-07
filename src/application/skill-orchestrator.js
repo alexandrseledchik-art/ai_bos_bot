@@ -10,6 +10,7 @@ const ALWAYS_ON_SKILLS = AI_BOSS_SKILLS_V1
 
 const COMMUNICATION_SKILLS = new Set([
   "onboarding_conversation",
+  "natural_conversation",
   "intent_clarification",
   "diagnostic_interview",
   "concept_explanation",
@@ -99,6 +100,10 @@ function buildPrimaryCandidates({ context, decision }) {
 
   if (/^\/start(?:\s|$)/i.test(text) || context.isOnboarding === true) {
     addCandidate(candidates, candidate("onboarding_conversation", 1, ["start_or_onboarding"]));
+  }
+
+  if (routeType === "small_talk" || entryMode === "small_talk") {
+    addCandidate(candidates, candidate("natural_conversation", 0.99, ["natural_dialogue"]));
   }
 
   if (currentTool || context.toolContinuation === true) {
@@ -234,6 +239,7 @@ function chooseCommunicationSkill(primarySkill, supportingSkills, context) {
 function selectionGoal(primarySkill, context) {
   const goals = {
     onboarding_conversation: "Помочь пользователю понять роль AI-BOSS и начать первый полезный ход в Telegram.",
+    natural_conversation: "Ответить живо и уместно, сохранив контекст разговора и не запуская бизнес-диагностику без бизнес-сигнала.",
     intent_clarification: "Понять практический результат, который нужен пользователю сейчас.",
     diagnostic_interview: "Получить один наблюдаемый сигнал, который уменьшает неопределённость.",
     concept_explanation: "Объяснить понятие или метод простым языком пользователя.",

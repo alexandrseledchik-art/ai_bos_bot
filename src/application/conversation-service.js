@@ -306,21 +306,13 @@ function buildPlatformWelcomeMessage(userMeta = {}, { returning = false } = {}) 
   ].join("\n");
 }
 
-function buildSmallTalkReply(text, userMeta = {}, { hasActiveDecision = false } = {}) {
-  const name = String(userMeta.firstName || userMeta.first_name || "").trim();
-  const greeting = name ? `Привет, ${name}.` : "Привет.";
-  const asksHow = /(?:как\s+(?:ты|дела)|ты\s+как|что\s+нового)/iu.test(String(text || ""));
-  const continuity = hasActiveDecision
-    ? "У нас ещё открыто зафиксированное решение — можем продолжить с него."
-    : "Можем просто поговорить или сразу разобрать одну ситуацию в бизнесе.";
-
-  return asksHow
-    ? `${greeting} Я в рабочем режиме и на связи. А ты как? ${continuity}`
-    : `${greeting} Я на связи. ${continuity} С чего начнём?`;
-}
-
 function contextualizeClassification(classification, thread, history) {
-  if (classification.entryMode === "tool_discovery" || classification.entryMode === "specific_tool_request") {
+  if (
+    classification.type === "small_talk" ||
+    classification.entryMode === "meta_role" ||
+    classification.entryMode === "tool_discovery" ||
+    classification.entryMode === "specific_tool_request"
+  ) {
     return classification;
   }
 
@@ -359,12 +351,7 @@ function contextualizeClassification(classification, thread, history) {
     };
   }
 
-  const hasOngoingDiagnosticThread =
-    Boolean(thread?.activeCaseId) ||
-    thread?.entryState?.promotionReadiness === "promoted" ||
-    thread?.entryState?.promotionReadiness === "ready_for_diagnostic_case";
-
-  if (!lastAssistantAskedQuestion(history) && !(hasOngoingDiagnosticThread && classification.wordCount <= 4)) {
+  if (!lastAssistantAskedQuestion(history)) {
     return classification;
   }
 
@@ -385,6 +372,10 @@ function findCase(state, caseId) {
 }
 
 function selectRelevantCase(state, thread, classification) {
+  if (classification.type === "small_talk" || classification.entryMode === "meta_role") {
+    return null;
+  }
+
   const activeCase = findCase(state, thread.activeCaseId);
   if (!activeCase) {
     return null;
@@ -568,7 +559,12 @@ function mergeEntryState(currentState, incomingState, routeType) {
 }
 
 function shouldPromoteToDiagnosticCase(decision, activeCase, classification) {
-  if (classification.type === "url_only" || classification.type === "url_plus_problem") {
+  if (
+    classification.type === "small_talk" ||
+    classification.entryMode === "meta_role" ||
+    classification.type === "url_only" ||
+    classification.type === "url_plus_problem"
+  ) {
     return false;
   }
 
@@ -799,6 +795,20 @@ export class ConversationService {
     });
   }
 
+  async composeLiveReply({ telegramChatId, userText, userMeta = {}, eventType, facts = {}, draft = "" }) {
+    const state = await this.store.readState();
+    const thread = state.threads.find((item) => item.telegramChatId === String(telegramChatId));
+    const history = thread ? recentHistory(state, thread.id, this.maxHistoryMessages) : [];
+    return this.reasoner.composeReply({
+      userText,
+      userMeta,
+      history,
+      eventType,
+      facts,
+      draft
+    });
+  }
+
   async handleUserMessage({ telegramChatId, text, userMeta = {} }) {
     return this.store.update(async (state) => {
       const thread = ensureThread(state, telegramChatId);
@@ -843,14 +853,36 @@ export class ConversationService {
 
       const initialClassification = classifyInput(text);
       if (initialClassification.type === "small_talk") {
+        const history = recentHistory(state, thread.id, this.maxHistoryMessages);
         const managementCycle = this.telegramDecisionCycles.getContext({ state, thread });
-        const reply = buildSmallTalkReply(text, userMeta, {
-          hasActiveDecision: Boolean(managementCycle.activeDecisionLock)
+        const skillSelection = this.skillOrchestrator.select({
+          context: {
+            userText: text,
+            userMeta,
+            history,
+            classification: initialClassification,
+            managementCycle
+          }
+        });
+        const reply = await this.reasoner.composeReply({
+          userText: text,
+          userMeta,
+          history,
+          eventType: "natural_conversation",
+          facts: {
+            activeDecision: managementCycle.activeDecisionLock
+              ? {
+                  constraint: managementCycle.activeDecisionLock.constraint,
+                  nextStep: managementCycle.activeDecisionLock.nextStep
+                }
+              : null
+          }
         });
         state.messages.push(
           createMessage({ threadId: thread.id, role: "user", text }),
           createMessage({ threadId: thread.id, role: "assistant", text: reply })
         );
+        thread.entryState.lastSkillSelection = skillSelection;
         thread.updatedAt = nowIso();
         company.updatedAt = thread.updatedAt;
         return {
@@ -862,7 +894,8 @@ export class ConversationService {
             activeCompanyId: company.id,
             activeCaseId: thread.activeCaseId || "",
             chatFirst: true,
-            smallTalk: true
+            smallTalk: true,
+            skillSelection
           }
         };
       }
@@ -875,14 +908,27 @@ export class ConversationService {
         text
       });
       if (managementCommand.handled) {
+        const history = recentHistory(state, thread.id, this.maxHistoryMessages);
+        const reply = await this.reasoner.composeReply({
+          userText: text,
+          userMeta,
+          history,
+          eventType: "management_command",
+          facts: {
+            decisionCycle: managementCommand.decisionCycle || null,
+            decisionLock: managementCommand.decisionLock || null,
+            pendingDecision: managementCommand.pendingDecision || null
+          },
+          draft: managementCommand.reply
+        });
         state.messages.push(
           createMessage({ threadId: thread.id, role: "user", text }),
-          createMessage({ threadId: thread.id, role: "assistant", text: managementCommand.reply })
+          createMessage({ threadId: thread.id, role: "assistant", text: reply })
         );
         thread.updatedAt = nowIso();
         company.updatedAt = thread.updatedAt;
         return {
-          reply: managementCommand.reply,
+          reply,
           miniAppInvite: null,
           managementCycle: {
             decisionCycle: managementCommand.decisionCycle || null,
@@ -908,6 +954,19 @@ export class ConversationService {
       });
 
       if (consultantResult.handled) {
+        const history = recentHistory(state, thread.id, this.maxHistoryMessages);
+        const reply = await this.reasoner.composeReply({
+          userText: text,
+          userMeta,
+          history,
+          eventType: "consultant_operation",
+          facts: {
+            company: consultantResult.company || company,
+            source: consultantResult.source || null,
+            analysis: consultantResult.analysis || null
+          },
+          draft: consultantResult.reply
+        });
         const userMessage = createMessage({
           threadId: thread.id,
           role: "user",
@@ -916,7 +975,7 @@ export class ConversationService {
         const assistantMessage = createMessage({
           threadId: thread.id,
           role: "assistant",
-          text: consultantResult.reply
+          text: reply
         });
 
         state.messages.push(userMessage);
@@ -924,7 +983,7 @@ export class ConversationService {
         thread.updatedAt = nowIso();
 
         return {
-          reply: consultantResult.reply,
+          reply,
           consultantMode: true,
           company: consultantResult.company || company,
           source: consultantResult.source || null,
@@ -1127,8 +1186,11 @@ export class ConversationService {
       state.messages.push(userMessage);
       state.messages.push(assistantMessage);
 
-      thread.entryState = mergeEntryState(thread.entryState, decision.entryState, classification.type);
-      thread.entryState.entryMode = classification.entryMode || thread.entryState.entryMode || "unclear";
+      const isConversationalTurn = classification.type === "small_talk" || classification.entryMode === "meta_role";
+      if (!isConversationalTurn) {
+        thread.entryState = mergeEntryState(thread.entryState, decision.entryState, classification.type);
+        thread.entryState.entryMode = classification.entryMode || thread.entryState.entryMode || "unclear";
+      }
       thread.entryState.lastSkillSelection = decision.skillSelection || null;
       thread.entryState.lastSkillExecution = decision.skillExecution || null;
       thread.entryState = this.skillRunManager.applyToEntryState(thread.entryState, skillRunState);
@@ -1284,9 +1346,11 @@ export class ConversationService {
             alternatives: persistedMemory.hypotheses
           });
           if (proposalResult.created) {
-            const proposalPrompt = this.telegramDecisionCycles.buildProposalPrompt(proposalResult.proposal);
-            decision.response.responseText = `${decision.response.responseText.trim()}\n\n${proposalPrompt}`;
-            assistantMessage.text = decision.response.responseText;
+            if (decision._responseOrigin !== "model") {
+              const proposalPrompt = this.telegramDecisionCycles.buildProposalPrompt(proposalResult.proposal);
+              decision.response.responseText = `${decision.response.responseText.trim()}\n\n${proposalPrompt}`;
+              assistantMessage.text = decision.response.responseText;
+            }
           }
         }
 

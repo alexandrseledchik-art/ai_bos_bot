@@ -146,6 +146,11 @@ async function run() {
       issues.push(`entryMode expected=${testCase.expectedEntryMode} actual=${classification.entryMode}`);
     }
 
+    const selectedSkill = run.decision?.skillSelection?.primarySkill || run.runtime?.skillSelection?.primarySkill;
+    if (testCase.expectedSkill && selectedSkill !== testCase.expectedSkill) {
+      issues.push(`skill expected=${testCase.expectedSkill} actual=${selectedSkill || "none"}`);
+    }
+
     const directConversationResponse = (run.runtime?.chatFirst === true && testCase.input === "/start") || run.runtime?.smallTalk === true;
     if (!run.decision && !directConversationResponse) {
       issues.push("conversation returned no diagnostic decision");

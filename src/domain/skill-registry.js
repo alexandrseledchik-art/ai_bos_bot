@@ -94,6 +94,23 @@ export const AI_BOSS_SKILLS_V1 = Object.freeze([
     currentImplementation: ["src/application/conversation-service.js"]
   }),
   skill({
+    id: "natural_conversation",
+    version: "1.0.0",
+    department: SKILL_DEPARTMENTS.COMMUNICATION,
+    kind: SKILL_KINDS.COMMUNICATION,
+    activation: SKILL_ACTIVATION.PRIMARY,
+    purpose: "Поддерживать естественный разговор и отвечать на социальные реплики без запуска бизнес-диагностики.",
+    whenToUse: ["Приветствие", "Small talk", "Короткая социальная реплика без бизнес-сигнала"],
+    whenNotToUse: ["Пользователь принёс конкретную бизнес-проблему", "Нужно выполнить служебную команду"],
+    requiredContext: ["userMessage", "recentHistory", "activeDecisionSummary"],
+    inputs: ["userText", "conversationTone", "recentHistory"],
+    outputs: ["naturalReply"],
+    memoryUpdates: ["conversationContinuity"],
+    completionCriteria: ["Ответ относится к текущей реплике", "Диагностика не запущена без бизнес-сигнала"],
+    nextSkillCandidates: ["intent_clarification", "concept_explanation", "business_diagnostic"],
+    currentImplementation: ["src/application/classify-input.js", "src/application/conversation-service.js", "src/infrastructure/openai/reasoning-client.js"]
+  }),
+  skill({
     id: "intent_clarification",
     version: "1.0.0",
     department: SKILL_DEPARTMENTS.COMMUNICATION,

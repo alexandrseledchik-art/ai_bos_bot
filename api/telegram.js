@@ -16,11 +16,7 @@ import { MiniAppCompatSyncClient } from "../src/infrastructure/storage/mini-app-
 import { extractTelegramMessagePayload } from "../src/infrastructure/telegram/telegram-api.js";
 import { buildMiniAppReplyMarkup } from "../src/infrastructure/telegram/mini-app-webapp.js";
 import {
-  buildFileCapabilityReply,
-  buildVoiceCapabilityReply,
-  describeTelegramPayloadForLog,
-  isFileCapabilityQuestion,
-  isVoiceCapabilityQuestion
+  describeTelegramPayloadForLog
 } from "../src/infrastructure/telegram/telegram-meta.js";
 import { resolveTelegramPayloadToText } from "../src/infrastructure/telegram/resolve-telegram-input.js";
 
@@ -229,28 +225,6 @@ async function handleTelegramWebhook(request) {
       return json({ ok: true, handled: payload.kind });
     }
 
-    if (isVoiceCapabilityQuestion(resolved.text)) {
-      await recordAndSendTelegramReply({
-        conversationService,
-        telegramApi,
-        payload,
-        userText: resolved.text,
-        reply: buildVoiceCapabilityReply({ voiceEnabled: Boolean(audioTranscriber?.isEnabled) })
-      });
-      return json({ ok: true, handled: "voice-capability-question" });
-    }
-
-    if (isFileCapabilityQuestion(resolved.text)) {
-      await recordAndSendTelegramReply({
-        conversationService,
-        telegramApi,
-        payload,
-        userText: resolved.text,
-        reply: buildFileCapabilityReply()
-      });
-      return json({ ok: true, handled: "file-capability-question" });
-    }
-
     const toolChat = await handleActiveToolChat({
       config,
       googleDrive,
@@ -258,12 +232,20 @@ async function handleTelegramWebhook(request) {
       text: resolved.text
     });
     if (toolChat?.handled) {
+      const reply = await conversationService.composeLiveReply({
+        telegramChatId: String(payload.chatId),
+        userText: resolved.text,
+        userMeta: resolved.userMeta || {},
+        eventType: "tool_workflow",
+        facts: { handled: true },
+        draft: toolChat.reply
+      });
       await recordAndSendTelegramReply({
         conversationService,
         telegramApi,
         payload,
         userText: resolved.text,
-        reply: toolChat.reply
+        reply
       });
       return json({ ok: true, handled: "tool-chat-workflow" });
     }
@@ -279,6 +261,11 @@ async function handleTelegramWebhook(request) {
       text: resolved.text,
       userMeta: {
         ...(resolved.userMeta || {}),
+        capabilities: {
+          voiceMessages: Boolean(audioTranscriber?.isEnabled),
+          files: true,
+          links: true
+        },
         ...(miniAppHandoff ? { miniAppHandoff } : {})
       }
     });

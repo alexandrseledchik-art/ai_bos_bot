@@ -2946,6 +2946,57 @@ function buildProblemDecision(context) {
   };
 }
 
+// Offline-only test fallback. A configured runtime never uses this path:
+// live model failures are surfaced instead of being hidden behind scripted copy.
+function buildOfflineSmallTalkDecision(context) {
+  const text = normalizeText(context.userText);
+  const asksHow = /(?:как\s+(?:ты|дела)|ты\s+как|что\s+нового)/iu.test(text);
+  return {
+    selectedMode: "clarification_mode",
+    decision: {
+      action: "answer",
+      signalSufficiency: "weak",
+      confidence: 0.9,
+      rationale: "Социальная реплика не содержит бизнес-сигнала и не должна запускать диагностику."
+    },
+    response: {
+      whatIUnderstood: "Пользователь поддерживает обычный разговор.",
+      hypotheses: ["Диагностический маршрут не требуется."],
+      whyItMatters: "Ответ должен соответствовать реплике, а не старому бизнес-кейсу.",
+      nextStep: "",
+      responseText: asksHow
+        ? "Я в порядке и на связи. А ты как?"
+        : "Привет. Я на связи — можем просто поговорить."
+    },
+    guardrails: {
+      knownFacts: [text],
+      observations: [],
+      workingHypotheses: [],
+      canNotAssert: ["В реплике нет основания для бизнес-диагностики."],
+      confidenceNote: "Это обычный разговор."
+    },
+    graphAnalysis: buildGraphAnalysisPacket(context.graphPacket),
+    entryState: {
+      ...(context.entryState || {}),
+      entryMode: "small_talk",
+      signalSufficiency: "weak",
+      promotionReadiness: "keep_in_entry"
+    },
+    memory: {
+      companyName: "",
+      caseKind: "",
+      goal: "",
+      symptoms: [],
+      hypotheses: [],
+      constraint: "",
+      situation: "",
+      actionWave: { enabled: false, firstStep: "", notNow: "", whyThisFirst: "" },
+      toolRecommendations: [],
+      artifact: { shouldSave: false, title: "", summary: "", kind: "snapshot" }
+    }
+  };
+}
+
 function buildHeuristicDecision(context) {
   const { classification, userText } = context;
   const focus = detectFocus(userText);
@@ -2953,6 +3004,10 @@ function buildHeuristicDecision(context) {
 
   if (context.userMeta?.miniAppHandoff?.type === "constraint_rejection_feedback") {
     return buildConstraintRejectionFeedbackDecision(context);
+  }
+
+  if (classification.type === "small_talk") {
+    return buildOfflineSmallTalkDecision(context);
   }
 
   if (classification.entryMode === "specific_tool_request" || classification.entryMode === "tool_discovery") {
@@ -3018,6 +3073,22 @@ async function readStructuredOutput(response) {
   throw new Error("OpenAI response did not contain structured JSON text.");
 }
 
+async function readTextOutput(response) {
+  if (typeof response.output_text === "string" && response.output_text.trim()) {
+    return response.output_text.trim();
+  }
+
+  for (const item of response.output || []) {
+    for (const content of item.content || []) {
+      if (content.type === "output_text" && content.text?.trim()) {
+        return content.text.trim();
+      }
+    }
+  }
+
+  throw new Error("OpenAI response did not contain reply text.");
+}
+
 export class OpenAIReasoningClient {
   constructor({ apiKey, baseUrl, model, reasoningEffort }) {
     this.apiKey = apiKey;
@@ -3076,13 +3147,71 @@ export class OpenAIReasoningClient {
     }
 
     const json = await response.json();
-    return readStructuredOutput(json);
+    const decision = await readStructuredOutput(json);
+    if (!normalizeText(decision?.response?.responseText)) {
+      throw new Error("OpenAI response contained an empty user-facing reply.");
+    }
+    decision._responseOrigin = "model";
+    return decision;
+  }
+
+  async composeReply({ userText, userMeta = {}, history = [], eventType, facts = {}, draft = "" }) {
+    const response = await fetch(`${this.baseUrl}/responses`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${this.apiKey}`
+      },
+      body: JSON.stringify({
+        model: this.model,
+        reasoning: { effort: this.reasoningEffort },
+        input: [
+          {
+            role: "system",
+            content: [{
+              type: "input_text",
+              text: [
+                "Ты AI-BOSS в Telegram. Сформулируй один короткий живой ответ пользователю.",
+                "Продолжай разговор естественно, учитывай последние реплики и язык пользователя.",
+                "Факты события обязательны: не меняй их, не добавляй выполненных действий и обещаний.",
+                "Черновик передаёт смысл, но запрещено копировать его как шаблон или упоминать, что он существует.",
+                "Не запускай диагностику, если пользователь не дал бизнес-сигнал. Не используй служебные заголовки и канцелярит.",
+                "Верни только текст сообщения без JSON и пояснений."
+              ].join("\n")
+            }]
+          },
+          {
+            role: "user",
+            content: [{
+              type: "input_text",
+              text: JSON.stringify({ userText, userMeta, history, eventType, facts, semanticDraft: draft }, null, 2)
+            }]
+          }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenAI reply composition error ${response.status}: ${errorText}`);
+    }
+
+    return readTextOutput(await response.json());
   }
 }
 
 export class HeuristicReasoningClient {
   async decide(context) {
-    return buildHeuristicDecision(context);
+    return { ...buildHeuristicDecision(context), _responseOrigin: "heuristic" };
+  }
+
+  async composeReply({ userText = "", eventType = "", draft = "" }) {
+    if (eventType === "natural_conversation") {
+      return /(?:как\s+(?:ты|дела)|ты\s+как|что\s+нового)/iu.test(normalizeText(userText))
+        ? "Я в рабочем режиме и на связи. А ты как?"
+        : "Привет. Я на связи — можем просто поговорить или перейти к твоей ситуации.";
+    }
+    return normalizeText(draft);
   }
 }
 
@@ -3099,10 +3228,6 @@ export class ReasoningClient {
       return this.fallback.decide(context);
     }
 
-    if (context.classification?.entryMode === "meta_role") {
-      return this.fallback.decide(context);
-    }
-
     if (!this.primary) {
       return this.fallback.decide(context);
     }
@@ -3110,8 +3235,21 @@ export class ReasoningClient {
     try {
       return await this.primary.decide(context);
     } catch (error) {
-      console.warn("Falling back to heuristic reasoning client:", error.message);
-      return this.fallback.decide(context);
+      console.error("Live reasoning failed; scripted fallback is disabled:", error.message);
+      throw error;
+    }
+  }
+
+  async composeReply(context) {
+    if (!this.primary) {
+      return this.fallback.composeReply(context);
+    }
+
+    try {
+      return await this.primary.composeReply(context);
+    } catch (error) {
+      console.error("Live reply composition failed; scripted fallback is disabled:", error.message);
+      throw error;
     }
   }
 }

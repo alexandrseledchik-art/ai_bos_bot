@@ -333,6 +333,15 @@ export class DiagnosticSkillPilot {
 
   enforce({ packet = null, decision = null, context = {} } = {}) {
     if (!packet?.enabled || !decision) return decision;
+    const liveResponseText = decision._responseOrigin === "model"
+      ? normalize(decision.response?.responseText)
+      : "";
+    const preserveLiveResponse = () => {
+      if (liveResponseText && decision.response) {
+        decision.response.responseText = liveResponseText;
+      }
+      return decision;
+    };
 
     if (!packet.mustAskForSignal && decision.decision?.action === "answer") {
       const selectedConstraint = normalize(decision.entryState?.selectedConstraint || decision.memory?.constraint);
@@ -370,10 +379,10 @@ export class DiagnosticSkillPilot {
           responseText: `По текущим фактам рабочая гипотеза — ${primary.label.toLowerCase()}. Это пока не окончательный диагноз.\n\nБлижайшая альтернатива: ${alternative?.label?.toLowerCase() || "ограничение может находиться в соседнем слое системы"}.\n\nПервый шаг проверки: ${nextCheck}`
         };
       }
-      return decision;
+      return preserveLiveResponse();
     }
 
-    if (!packet.mustAskForSignal) return decision;
+    if (!packet.mustAskForSignal) return preserveLiveResponse();
 
     const selectedConstraint = normalize(decision.entryState?.selectedConstraint || decision.memory?.constraint);
     const actionWaveEnabled = decision.memory?.actionWave?.enabled === true;
@@ -381,7 +390,7 @@ export class DiagnosticSkillPilot {
     if (!selectedConstraint && !actionWaveEnabled && !prematureAnswer) {
       if (decision.response) decision.response.nextStep = packet.requiredSignal;
       if (decision.entryState) decision.entryState.nextBestQuestion = packet.requiredSignal;
-      return decision;
+      return preserveLiveResponse();
     }
 
     const hypotheses = packet.hypotheses.slice(0, 2).map((item) => item.label).filter(Boolean);
@@ -420,7 +429,7 @@ export class DiagnosticSkillPilot {
       nextStep: packet.requiredSignal,
       responseText: `Симптом уже виден, но его ближайшее объяснение пока нельзя считать корнем.\n\n${fieldSummary}\n\n${packet.requiredSignal}`
     };
-    return decision;
+    return preserveLiveResponse();
   }
 
   assess({ packet = null, decision = null } = {}) {
