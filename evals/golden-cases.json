@@ -14,18 +14,18 @@
     "id": "informal_greeting",
     "input": "здарова",
     "expectedRoute": "small_talk",
+    "expectedSkill": "natural_conversation",
     "artifactExpected": false,
-    "mustContain": ["Привет", "Я на связи"],
-    "mustContainAny": ["просто поговорить", "ситуацию в бизнесе"],
+    "mustContain": [],
     "mustNotContain": ["Симптом", "рабочих версий", "источник данных", "диагноз"]
   },
   {
     "id": "how_are_you_small_talk",
     "input": "ты как?",
     "expectedRoute": "small_talk",
+    "expectedSkill": "natural_conversation",
     "artifactExpected": false,
-    "mustContain": ["Я в рабочем режиме", "А ты как?"],
-    "mustContainAny": ["просто поговорить", "ситуацию в бизнесе"],
+    "mustContain": [],
     "mustNotContain": ["Симптом", "рабочих версий", "источник данных", "диагноз"]
   },
   {

@@ -196,4 +196,49 @@ const segmented = await service.handleUserMessage({
 assert.equal(segmented.runtime?.audienceProfile?.primarySegment?.id, "owner_medium_management_gap");
 assert.equal(segmented.runtime?.audienceProfile?.entryChannel?.value, "telegram");
 
+const originalReasoner = service.reasoner;
+service.reasoner = {
+  async decide(context) {
+    const decision = await originalReasoner.decide(context);
+    if (context.classification?.entryMode === "meta_role") {
+      decision._responseOrigin = "model";
+      decision.response.responseText = `Живой модельный ответ на: ${context.userText}`;
+    }
+    return decision;
+  },
+  composeReply(context) {
+    return originalReasoner.composeReply(context);
+  }
+};
+
+const beforeCapabilityQuestion = await store.readState();
+const beforeBusinessCounts = {
+  observations: beforeCapabilityQuestion.observations.length,
+  situations: beforeCapabilityQuestion.situations.length,
+  toolRecommendations: beforeCapabilityQuestion.toolRecommendations.length
+};
+const capabilityReply = await service.handleUserMessage({
+  telegramChatId: "core-behavior-e2e-profit",
+  text: "чем поможешь?",
+  userMeta: {
+    firstName: "Александр",
+    username: "core_e2e_profit"
+  }
+});
+assert.equal(capabilityReply.classification?.entryMode, "meta_role");
+assert.equal(capabilityReply.decision?.skillSelection?.primarySkill, "concept_explanation");
+assert.equal(capabilityReply.reply, "Живой модельный ответ на: чем поможешь?");
+
+const afterCapabilityQuestion = await store.readState();
+assert.deepEqual(
+  {
+    observations: afterCapabilityQuestion.observations.length,
+    situations: afterCapabilityQuestion.situations.length,
+    toolRecommendations: afterCapabilityQuestion.toolRecommendations.length
+  },
+  beforeBusinessCounts,
+  "Capability questions must not add diagnostic memory to the active case."
+);
+service.reasoner = originalReasoner;
+
 console.log("Core behavior end-to-end checks passed.");

@@ -11,11 +11,7 @@ import {
 import { extractTelegramMessagePayload, TelegramApiClient } from "./telegram-api.js";
 import { buildMiniAppReplyMarkup } from "./mini-app-webapp.js";
 import {
-  buildFileCapabilityReply,
-  buildVoiceCapabilityReply,
-  describeTelegramPayloadForLog,
-  isFileCapabilityQuestion,
-  isVoiceCapabilityQuestion
+  describeTelegramPayloadForLog
 } from "./telegram-meta.js";
 import { resolveTelegramPayloadToText } from "./resolve-telegram-input.js";
 import { DEFAULT_WEB_ACCESS_TTL_SECONDS } from "../auth/web-session.js";
@@ -157,30 +153,17 @@ export class TelegramBotRunner {
               continue;
             }
 
-            if (isVoiceCapabilityQuestion(resolved.text)) {
-              await this.recordAndSendReply({
-                payload,
-                userText: resolved.text,
-                reply: buildVoiceCapabilityReply({ voiceEnabled: Boolean(this.audioTranscriber?.isEnabled) }),
-                onMessage
-              });
-              continue;
-            }
-
-            if (isFileCapabilityQuestion(resolved.text)) {
-              await this.recordAndSendReply({
-                payload,
-                userText: resolved.text,
-                reply: buildFileCapabilityReply(),
-                onMessage
-              });
-              continue;
-            }
-
             result = await onMessage({
               telegramChatId: String(payload.chatId),
               text: resolved.text,
-              userMeta: resolved.userMeta
+              userMeta: {
+                ...(resolved.userMeta || {}),
+                capabilities: {
+                  voiceMessages: Boolean(this.audioTranscriber?.isEnabled),
+                  files: true,
+                  links: true
+                }
+              }
             });
           } finally {
             stopTyping();

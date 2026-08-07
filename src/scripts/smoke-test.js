@@ -204,10 +204,13 @@ async function run() {
     text: "здарова",
     userMeta: { username: "small_talk_user", firstName: "Алексей" }
   });
-  if (smallTalk.classification?.type !== "small_talk" || smallTalk.runtime?.smallTalk !== true) {
-    throw new Error("Informal greeting must use the deterministic small-talk route.");
+  if (
+    smallTalk.classification?.type !== "small_talk" ||
+    smallTalk.runtime?.skillSelection?.primarySkill !== "natural_conversation"
+  ) {
+    throw new Error("Informal greeting must use the live natural-conversation skill.");
   }
-  if (!/Я на связи/i.test(smallTalk.reply) || /Симптом|рабочих версий|источник данных/i.test(smallTalk.reply)) {
+  if (!smallTalk.reply?.trim() || /Симптом|рабочих версий|источник данных/i.test(smallTalk.reply)) {
     throw new Error("Small talk must stay conversational and must not start business diagnostics.");
   }
 

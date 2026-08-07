@@ -2161,6 +2161,9 @@ function userLikelyClaimedCause(context, entryState) {
 
 export function applyGuardrails(rawDecision, context) {
   const decision = rawDecision && typeof rawDecision === "object" ? structuredClone(rawDecision) : {};
+  const liveResponseText = rawDecision?._responseOrigin === "model"
+    ? ensureString(rawDecision?.response?.responseText)
+    : "";
   const routeType = context.classification.type;
   const screen = context.screening?.[0];
   const routeModeMap = {
@@ -2513,7 +2516,7 @@ export function applyGuardrails(rawDecision, context) {
     decision.response.nextStep = decision.entryState.nextBestQuestion;
   }
 
-  decision.response.responseText = buildSurfaceResponse(decision, context);
+  decision.response.responseText = liveResponseText || buildSurfaceResponse(decision, context);
 
   return decision;
 }
