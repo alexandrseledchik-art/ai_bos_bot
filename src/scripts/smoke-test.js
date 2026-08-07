@@ -192,14 +192,23 @@ async function run() {
     text: "/start",
     userMeta: { username: "new_platform_user", firstName: "Алексей" }
   });
-  if (!/Здесь, в чате, мы общаемся/i.test(startResult.reply) || !/Основная работа проходит на платформе/i.test(startResult.reply)) {
-    throw new Error("Start must explain the roles of Telegram chat and web platform.");
+  if (!/Вся текущая работа идёт здесь, в Telegram/i.test(startResult.reply) || !/«фиксируем»/i.test(startResult.reply)) {
+    throw new Error("Start must explain the Telegram-first management cycle.");
   }
-  if (startResult.miniAppInvite?.route !== "/app" || startResult.miniAppInvite?.webOnly !== true) {
-    throw new Error("Start must offer only the signed web cabinet entry.");
+  if (startResult.miniAppInvite !== null || startResult.runtime?.chatFirst !== true) {
+    throw new Error("Start must stay in Telegram and must not invite the user to Mini App or web cabinet.");
   }
-  if (startResult.miniAppInvite?.label !== "Создать кабинет компании") {
-    throw new Error("A new user must see the cabinet creation action.");
+
+  const smallTalk = await service.handleUserMessage({
+    telegramChatId: "small-talk-user",
+    text: "здарова",
+    userMeta: { username: "small_talk_user", firstName: "Алексей" }
+  });
+  if (smallTalk.classification?.type !== "small_talk" || smallTalk.runtime?.smallTalk !== true) {
+    throw new Error("Informal greeting must use the deterministic small-talk route.");
+  }
+  if (!/Я на связи/i.test(smallTalk.reply) || /Симптом|рабочих версий|источник данных/i.test(smallTalk.reply)) {
+    throw new Error("Small talk must stay conversational and must not start business diagnostics.");
   }
 
   const inputs = [

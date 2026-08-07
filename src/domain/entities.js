@@ -55,6 +55,7 @@ export const ENTRY_MODES = [
   "tool_discovery",
   "specific_tool_request",
   "meta_role",
+  "small_talk",
   "url_only",
   "url_plus_problem",
   "unclear"
@@ -107,6 +108,8 @@ export function emptyEntryState() {
     lastSkillSelection: null,
     lastSkillExecution: null,
     lastMiniAppInvite: null,
+    pendingDecision: null,
+    audienceProfile: null,
     lastUpdatedAt: ""
   };
 }
@@ -135,6 +138,9 @@ export function emptyState() {
     constraints: [],
     situations: [],
     actionWaves: [],
+    decisionCycles: [],
+    decisionLocks: [],
+    decisionJournalEntries: [],
     toolRecommendations: [],
     artifacts: [],
     snapshots: [],
@@ -433,6 +439,87 @@ export function createActionWave({ caseId, firstStep, notNow, whyThisFirst }) {
     firstStep,
     notNow,
     whyThisFirst,
+    createdAt: nowIso()
+  };
+}
+
+export function createDecisionCycle({ companyId, caseId, threadId }) {
+  const createdAt = nowIso();
+  return {
+    id: createId("decision_cycle"),
+    companyId,
+    caseId,
+    threadId,
+    status: "active",
+    startedAt: createdAt,
+    closedAt: "",
+    createdAt,
+    updatedAt: createdAt
+  };
+}
+
+export function createDecisionLock({
+  cycleId,
+  companyId,
+  caseId,
+  threadId,
+  constraint,
+  nextStep,
+  whyThisFirst = "",
+  expectedResult = "",
+  reviewAt,
+  reopenConditions = []
+}) {
+  const createdAt = nowIso();
+  return {
+    id: createId("decision_lock"),
+    cycleId,
+    companyId,
+    caseId,
+    threadId,
+    constraint,
+    nextStep,
+    whyThisFirst,
+    expectedResult: expectedResult || nextStep,
+    reviewAt,
+    reopenConditions,
+    status: "active",
+    awaitingResult: false,
+    actualResult: "",
+    releaseReason: "",
+    releasedAt: "",
+    completedAt: "",
+    createdAt,
+    updatedAt: createdAt
+  };
+}
+
+export function createDecisionJournalEntry({
+  cycleId,
+  lockId = "",
+  companyId,
+  caseId,
+  threadId,
+  entryType,
+  context = {},
+  alternatives = [],
+  selectionReason = "",
+  expectedResult = "",
+  actualResult = ""
+}) {
+  return {
+    id: createId("decision_journal"),
+    cycleId,
+    lockId,
+    companyId,
+    caseId,
+    threadId,
+    entryType,
+    context,
+    alternatives,
+    selectionReason,
+    expectedResult,
+    actualResult,
     createdAt: nowIso()
   };
 }

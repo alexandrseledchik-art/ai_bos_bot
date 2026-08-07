@@ -24,7 +24,7 @@ import { checkIntentIntegrity } from "./intent-integrity-checker.js";
 import { extractObservations } from "./observation-extractor.js";
 import { analyzeWithGraph } from "./graph-reasoner.js";
 import { applyGuardrails } from "./guardrails.js";
-import { buildMiniAppInvite, createMiniAppInviteSnapshot, MINI_APP_CABINET_SCREENS } from "./mini-app-invite-policy.js";
+import { buildMiniAppInvite, createMiniAppInviteSnapshot } from "./mini-app-invite-policy.js";
 import { AutonomousDataCollector } from "./autonomous-data-collector.js";
 import { assessChatDiagnosticExcellence } from "./chat-diagnostic-excellence-assessor.js";
 import { ConsultantTelegramMode } from "./consultant-telegram-mode.js";
@@ -33,6 +33,8 @@ import { DiagnosticSkillPilot } from "./diagnostic-skill-pilot.js";
 import { ReferenceModelService } from "./reference-model-service.js";
 import { SkillOrchestrator } from "./skill-orchestrator.js";
 import { SkillRunManager } from "./skill-run-manager.js";
+import { TelegramDecisionCycleManager } from "./telegram-decision-cycle-manager.js";
+import { buildAudienceProfile } from "../domain/audience-segmentation.js";
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
@@ -288,36 +290,33 @@ function looksStartCommand(text) {
   return /^\/start(?:@\w+)?$/i.test(String(text || "").trim());
 }
 
-function buildStartCabinetInvite({ returning = false } = {}) {
-  return {
-    screenId: "web_cabinet",
-    route: "/app",
-    label: returning ? "Продолжить работу" : "Создать кабинет компании",
-    title: "Веб-кабинет AI-BOSS",
-    stage: "start",
-    reason: "После старта пользователь должен перейти в веб-кабинет, где проходит основная работа.",
-    purpose: "Открыть рабочую платформу компании.",
-    preferWebCabinet: true,
-    webOnly: true
-  };
-}
-
 function buildPlatformWelcomeMessage(userMeta = {}, { returning = false } = {}) {
   const name = String(userMeta.firstName || userMeta.first_name || "").trim();
   const greeting = name ? `Привет, ${name}.` : "Привет.";
   const startLine = returning
-    ? "Продолжим работу в AI-BOSS."
-    : "Начните с создания кабинета компании.";
+    ? "Продолжим ваш управленческий кейс здесь."
+    : "Начните с одной ситуации, которая сейчас больше всего мешает бизнесу.";
 
   return [
-    `${greeting} Я AI-BOSS — управляющий помощник платформы для сборки бизнеса как системы. Я помогаю найти главное ограничение бизнеса, отделить симптом от причины и понять, что делать первым.`,
+    `${greeting} Я AI-BOSS — управляющий помощник для собственника. Помогаю быстро собрать картину бизнеса, отделить симптом от причины и понять, что делать первым.`,
     "",
-    "Здесь, в чате, мы общаемся: вы можете задавать вопросы, описывать ситуации, отправлять голосовые сообщения, файлы и ссылки. Я помогу разобраться в информации и подскажу следующий шаг.",
+    "Вся текущая работа идёт здесь, в Telegram: вы описываете ситуацию, отправляете цифры, файлы или ссылки, а я собираю факты, предлагаю рабочую гипотезу и один проверочный шаг.",
     "",
-    "Основная работа проходит на платформе: там вы будете собирать архитектуру бизнеса, проходить диагностику, заполнять инструменты и видеть сохранённые результаты.",
-    "",
-    `${startLine} После входа я помогу выбрать первый маршрут и буду сопровождать вас на каждом этапе.`
+    `${startLine} Когда решите действовать, зафиксируем решение командой «фиксируем» и вернёмся к фактическому результату.`
   ].join("\n");
+}
+
+function buildSmallTalkReply(text, userMeta = {}, { hasActiveDecision = false } = {}) {
+  const name = String(userMeta.firstName || userMeta.first_name || "").trim();
+  const greeting = name ? `Привет, ${name}.` : "Привет.";
+  const asksHow = /(?:как\s+(?:ты|дела)|ты\s+как|что\s+нового)/iu.test(String(text || ""));
+  const continuity = hasActiveDecision
+    ? "У нас ещё открыто зафиксированное решение — можем продолжить с него."
+    : "Можем просто поговорить или сразу разобрать одну ситуацию в бизнесе.";
+
+  return asksHow
+    ? `${greeting} Я в рабочем режиме и на связи. А ты как? ${continuity}`
+    : `${greeting} Я на связи. ${continuity} С чего начнём?`;
 }
 
 function contextualizeClassification(classification, thread, history) {
@@ -562,7 +561,9 @@ function mergeEntryState(currentState, incomingState, routeType) {
     skillRunHistory: Array.isArray(current.skillRunHistory) ? current.skillRunHistory : [],
     lastSkillSelection: current.lastSkillSelection || null,
     lastSkillExecution: current.lastSkillExecution || null,
-    lastMiniAppInvite: current.lastMiniAppInvite || null
+    lastMiniAppInvite: current.lastMiniAppInvite || null,
+    pendingDecision: current.pendingDecision || null,
+    audienceProfile: current.audienceProfile || null
   });
 }
 
@@ -759,6 +760,7 @@ export class ConversationService {
     this.modeOrchestrator = new AIBossModeOrchestrator();
     this.skillOrchestrator = new SkillOrchestrator();
     this.skillRunManager = new SkillRunManager();
+    this.telegramDecisionCycles = new TelegramDecisionCycleManager();
     this.diagnosticSkillPilot = new DiagnosticSkillPilot();
     this.skillOrchestratorDiagnosticEnabled = skillOrchestratorDiagnosticEnabled;
     this.consultantTelegramMode = new ConsultantTelegramMode({ googleDrive });
@@ -821,26 +823,82 @@ export class ConversationService {
           createMessage({ threadId: thread.id, role: "user", text }),
           createMessage({ threadId: thread.id, role: "assistant", text: reply })
         );
-        const offeredAt = nowIso();
-        const cabinetInvite = buildStartCabinetInvite({ returning });
         thread.entryState = {
           ...(thread.entryState || emptyEntryState()),
-          lastMiniAppInvite: createMiniAppInviteSnapshot(cabinetInvite, offeredAt),
-          lastUpdatedAt: offeredAt
+          lastUpdatedAt: nowIso()
         };
-        thread.updatedAt = offeredAt;
-        company.updatedAt = offeredAt;
+        thread.updatedAt = thread.entryState.lastUpdatedAt;
+        company.updatedAt = thread.entryState.lastUpdatedAt;
         return {
           reply,
-          miniAppInvite: cabinetInvite,
+          miniAppInvite: null,
           runtime: {
             threadId: thread.id,
             activeCompanyId: company.id,
             returning,
-            webCabinetFirst: true
+            chatFirst: true
           }
         };
       }
+
+      const initialClassification = classifyInput(text);
+      if (initialClassification.type === "small_talk") {
+        const managementCycle = this.telegramDecisionCycles.getContext({ state, thread });
+        const reply = buildSmallTalkReply(text, userMeta, {
+          hasActiveDecision: Boolean(managementCycle.activeDecisionLock)
+        });
+        state.messages.push(
+          createMessage({ threadId: thread.id, role: "user", text }),
+          createMessage({ threadId: thread.id, role: "assistant", text: reply })
+        );
+        thread.updatedAt = nowIso();
+        company.updatedAt = thread.updatedAt;
+        return {
+          reply,
+          classification: initialClassification,
+          miniAppInvite: null,
+          runtime: {
+            threadId: thread.id,
+            activeCompanyId: company.id,
+            activeCaseId: thread.activeCaseId || "",
+            chatFirst: true,
+            smallTalk: true
+          }
+        };
+      }
+
+      const managementCommand = this.telegramDecisionCycles.handleCommand({
+        state,
+        thread,
+        company,
+        activeCase: findCase(state, thread.activeCaseId),
+        text
+      });
+      if (managementCommand.handled) {
+        state.messages.push(
+          createMessage({ threadId: thread.id, role: "user", text }),
+          createMessage({ threadId: thread.id, role: "assistant", text: managementCommand.reply })
+        );
+        thread.updatedAt = nowIso();
+        company.updatedAt = thread.updatedAt;
+        return {
+          reply: managementCommand.reply,
+          miniAppInvite: null,
+          managementCycle: {
+            decisionCycle: managementCommand.decisionCycle || null,
+            decisionLock: managementCommand.decisionLock || null,
+            pendingDecision: managementCommand.pendingDecision || null
+          },
+          runtime: {
+            threadId: thread.id,
+            activeCompanyId: company.id,
+            activeCaseId: thread.activeCaseId || "",
+            chatFirst: true,
+            managementCommand: true
+          }
+        };
+      }
+
       const consultantResult = await this.consultantTelegramMode.handle({
         state,
         thread,
@@ -881,7 +939,7 @@ export class ConversationService {
       }
 
       const history = recentHistory(state, thread.id, this.maxHistoryMessages);
-      const classification = contextualizeClassification(classifyInput(text), thread, history);
+      const classification = contextualizeClassification(initialClassification, thread, history);
       const intentIntegrity = checkIntentIntegrity({
         text,
         classification,
@@ -889,6 +947,11 @@ export class ConversationService {
         history
       });
       const currentCase = selectRelevantCase(state, thread, classification);
+      const managementCycle = this.telegramDecisionCycles.getContext({ state, thread });
+      const memorySummary = {
+        ...summarizeCaseMemory(state, currentCase?.id || ""),
+        managementCycle
+      };
       const screening = [];
 
       for (const url of classification.urls) {
@@ -913,7 +976,8 @@ export class ConversationService {
               mode: currentCase.mode
             }
           : null,
-        memorySummary: summarizeCaseMemory(state, currentCase?.id || ""),
+        memorySummary,
+        managementCycle,
         entryState: thread.entryState || emptyEntryState(),
         history
       };
@@ -962,6 +1026,15 @@ export class ConversationService {
       context.autonomousData = autonomousData;
       context.dataSufficiency = dataSufficiency;
       context.orchestration = this.modeOrchestrator.orchestrate({ context });
+      context.audienceProfile = buildAudienceProfile({
+        userText: text,
+        userMeta,
+        company,
+        orchestration: context.orchestration,
+        previousProfile: thread.entryState?.audienceProfile || null
+      });
+      thread.entryState.audienceProfile = context.audienceProfile;
+      context.entryState = thread.entryState;
 
       const preliminarySkillSelection = this.skillOrchestrator.select({
         context,
@@ -1002,6 +1075,15 @@ export class ConversationService {
         decision,
         diagnosticQuality: decision.diagnosticQuality
       });
+      decision.audienceProfile = buildAudienceProfile({
+        userText: text,
+        userMeta,
+        company,
+        orchestration: decision.orchestration,
+        previousProfile: context.audienceProfile
+      });
+      context.audienceProfile = decision.audienceProfile;
+      thread.entryState.audienceProfile = decision.audienceProfile;
       decision.skillSelection = ["started", "continued"].includes(skillRunPreparation.transition)
         ? context.skillSelection
         : this.skillOrchestrator.select({ context, decision });
@@ -1190,6 +1272,22 @@ export class ConversationService {
               whyThisFirst: persistedMemory.actionWave.whyThisFirst
             })
           );
+
+          const proposalResult = this.telegramDecisionCycles.propose({
+            state,
+            thread,
+            company,
+            activeCase,
+            constraint: persistedMemory.constraint || thread.entryState.selectedConstraint,
+            nextStep: persistedMemory.actionWave.firstStep,
+            whyThisFirst: persistedMemory.actionWave.whyThisFirst,
+            alternatives: persistedMemory.hypotheses
+          });
+          if (proposalResult.created) {
+            const proposalPrompt = this.telegramDecisionCycles.buildProposalPrompt(proposalResult.proposal);
+            decision.response.responseText = `${decision.response.responseText.trim()}\n\n${proposalPrompt}`;
+            assistantMessage.text = decision.response.responseText;
+          }
         }
 
         for (const tool of persistedMemory.toolRecommendations) {
@@ -1269,6 +1367,8 @@ export class ConversationService {
         decisionObject: decision.decisionObject || null,
         skillSelection: decision.skillSelection || null,
         skillExecution: decision.skillExecution || null,
+        managementCycle: this.telegramDecisionCycles.getContext({ state, thread }),
+        audienceProfile: decision.audienceProfile || context.audienceProfile || null,
         skillRun: thread.entryState.activeSkillRun || (
           ["started", "continued", "interrupted"].includes(skillRunPreparation.transition)
             ? skillRunState.skillRunHistory?.at(-1) || null

@@ -60,7 +60,8 @@
     ],
     "turnChecks": [
       {
-        "mustContain": ["главное ограничение", "Здесь, в чате, мы общаемся", "Основная работа проходит на платформе", "кабинета компании"],
+        "mustContain": ["картину бизнеса", "Вся текущая работа идёт здесь, в Telegram", "один проверочный шаг", "фиксируем"],
+        "expectMiniAppInvite": false,
         "mustNotContain": ["11 слоёв", "11 слоев", "A-D", "business architect", "tool navigator", "strategic sparring partner"],
         "maxParagraphs": 5,
         "maxChars": 1500
