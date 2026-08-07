@@ -60,7 +60,7 @@
     ],
     "turnChecks": [
       {
-        "mustContain": ["картину бизнеса", "Вся текущая работа идёт здесь, в Telegram", "один проверочный шаг", "фиксируем"],
+        "mustContain": ["Добро пожаловать в AI-BOSS", "картину бизнеса", "в Telegram", "Платформа AI-BOSS» в меню бота"],
         "expectMiniAppInvite": false,
         "mustNotContain": ["11 слоёв", "11 слоев", "A-D", "business architect", "tool navigator", "strategic sparring partner"],
         "maxParagraphs": 5,

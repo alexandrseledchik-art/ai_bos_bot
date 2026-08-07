@@ -69,6 +69,60 @@ export function buildMiniAppReplyMarkup(invite, {
   };
 }
 
+export function buildPersistentPlatformReplyMarkup({
+  appBaseUrl,
+  telegramUser = null,
+  webSessionSecret = "",
+  webLoginTtlSeconds = DEFAULT_WEB_ACCESS_TTL_SECONDS,
+  label = "Открыть платформу AI-BOSS"
+} = {}) {
+  if (!telegramUser || !webSessionSecret) {
+    return null;
+  }
+
+  const url = buildWebCabinetLoginUrl({
+    appBaseUrl,
+    telegramUser,
+    secret: webSessionSecret,
+    ttlSeconds: webLoginTtlSeconds
+  });
+  if (!url) {
+    return null;
+  }
+
+  return {
+    inline_keyboard: [[{
+      text: label,
+      url
+    }]]
+  };
+}
+
+export function buildPersistentPlatformMenuButton({
+  appBaseUrl,
+  telegramUser = null,
+  webSessionSecret = "",
+  webLoginTtlSeconds = DEFAULT_WEB_ACCESS_TTL_SECONDS,
+  text = "Платформа AI-BOSS"
+} = {}) {
+  const markup = buildPersistentPlatformReplyMarkup({
+    appBaseUrl,
+    telegramUser,
+    webSessionSecret,
+    webLoginTtlSeconds
+  });
+  const url = markup?.inline_keyboard?.[0]?.[0]?.url || "";
+  if (!url) {
+    return null;
+  }
+
+  return {
+    type: "web_app",
+    text,
+    web_app: { url }
+  };
+}
+
 export function buildMiniAppMenuButton(appBaseUrl, { route = "/mini-app", text = "Кабинет" } = {}) {
   const url = buildMiniAppUrl(appBaseUrl, route);
   if (!url) {

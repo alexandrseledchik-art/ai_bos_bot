@@ -198,11 +198,13 @@ async function main() {
   assertInvitePolicy();
   await assertTelegramMarkup();
   const conversationService = fs.readFileSync("src/application/conversation-service.js", "utf8");
+  const telegramWebhook = fs.readFileSync("api/telegram.js", "utf8");
   const adminApi = fs.readFileSync("api/admin/[...path].js", "utf8");
-  assert.match(conversationService, /buildStartCabinetInvite/);
   assert.match(conversationService, /buildPlatformWelcomeMessage/);
-  assert.match(conversationService, /webOnly: true/);
   assert.match(conversationService, /looksStartCommand\(text\)/);
+  assert.doesNotMatch(telegramWebhook, /buildMiniAppReplyMarkup/);
+  assert.match(telegramWebhook, /buildPersistentPlatformMenuButton/);
+  assert.match(telegramWebhook, /replyMarkup: isStart/);
   assert.match(adminApi, /telegram\/miniapp-menu/);
   assert.match(adminApi, /setChatMenuButton/);
 
