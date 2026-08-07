@@ -397,19 +397,27 @@ Goal:
 
 AI-BOSS fixes the current working hypothesis and remembers why.
 
+Implementation update (2026-08-06):
+
+- the first Decision Lock slice is implemented directly in the Telegram chat runtime state;
+- the explicit commands are `фиксируем`, `не фиксируем`, `статус решения`, `готово` and `результат: ...`;
+- a plain `да` never creates a management commitment;
+- accepted decisions persist a cycle, lock and append-only journal entry in the primary bot state;
+- Telegram Mini App is intentionally not part of this stage;
+- relational database projection can be added later after the chat pilot validates the workflow.
+
 Files:
 
-- add `src/application/decision-lock-manager.js`;
-- add `src/application/decision-journal-service.js`;
-- update `src/application/mini-app-diagnostics-service.js`;
-- update `src/application/conversation-service.js`.
+- add `src/application/telegram-decision-cycle-manager.js`;
+- update `src/application/conversation-service.js`;
+- update `src/application/prompt-builder.js`;
+- extend `src/domain/entities.js` with runtime decision entities.
 
-Database:
+Persistence for the chat pilot:
 
-- add `decision_cycles`;
-- add `decision_locks`;
-- add `decision_journal_entries`;
-- add links from existing `constraint_hypotheses` and `next_steps` if needed.
+- store `decisionCycles`, `decisionLocks` and `decisionJournalEntries` in the primary bot state;
+- keep the journal append-only;
+- defer relational Supabase projection until the Telegram chat flow is validated.
 
 Deliverables:
 
@@ -419,7 +427,7 @@ Deliverables:
 
 Acceptance:
 
-- confirmed hypothesis creates a lock;
+- explicit owner command `фиксируем` creates a lock;
 - rejected alternatives are stored;
 - lock is released only by contradiction, failed test, stronger hypothesis or owner rejection;
 - journal stores expected result and review date.

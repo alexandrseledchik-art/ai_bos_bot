@@ -303,6 +303,7 @@ export const DECISION_SCHEMA = {
             "tool_discovery",
             "specific_tool_request",
             "meta_role",
+            "small_talk",
             "url_only",
             "url_plus_problem",
             "unclear"

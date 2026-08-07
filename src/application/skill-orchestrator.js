@@ -217,7 +217,7 @@ function chooseSupportingSkills(primarySkill, { context, decision }) {
   if (primarySkill === "website_screening") supporting.push("result_interpretation", "artifact_builder");
   if (primarySkill === "next_step_selection") supporting.push("artifact_builder");
   if (primarySkill === "execution_coordination") supporting.push("progress_navigation", "artifact_builder");
-  if (primarySkill === "onboarding_conversation") supporting.push("platform_support");
+  if (primarySkill === "onboarding_conversation") supporting.push("concept_explanation");
 
   return unique(supporting.filter((skillId) => skillId !== primarySkill && !ALWAYS_ON_SKILLS.includes(skillId)), 3);
 }
@@ -233,7 +233,7 @@ function chooseCommunicationSkill(primarySkill, supportingSkills, context) {
 
 function selectionGoal(primarySkill, context) {
   const goals = {
-    onboarding_conversation: "Помочь пользователю понять устройство AI-BOSS и выбрать первый маршрут.",
+    onboarding_conversation: "Помочь пользователю понять роль AI-BOSS и начать первый полезный ход в Telegram.",
     intent_clarification: "Понять практический результат, который нужен пользователю сейчас.",
     diagnostic_interview: "Получить один наблюдаемый сигнал, который уменьшает неопределённость.",
     concept_explanation: "Объяснить понятие или метод простым языком пользователя.",

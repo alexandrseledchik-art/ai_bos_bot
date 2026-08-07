@@ -82,16 +82,16 @@ export const AI_BOSS_SKILLS_V1 = Object.freeze([
     department: SKILL_DEPARTMENTS.COMMUNICATION,
     kind: SKILL_KINDS.COMMUNICATION,
     activation: SKILL_ACTIVATION.PRIMARY,
-    purpose: "Познакомить пользователя с AI-BOSS, объяснить разделение чата и платформы и помочь сделать первый шаг.",
+    purpose: "Познакомить пользователя с AI-BOSS и помочь начать первый полезный управленческий ход прямо в Telegram.",
     whenToUse: ["Первый /start", "Пользователь не понимает, куда попал", "Нужно восстановить маршрут после паузы"],
     whenNotToUse: ["Пользователь уже принёс конкретную содержательную задачу"],
-    requiredContext: ["userIdentity", "accessState", "workspaceState"],
-    inputs: ["userName", "returningUser", "webCabinetUrl"],
-    outputs: ["welcomeMessage", "entryChoice", "cabinetInvite"],
+    requiredContext: ["userIdentity", "conversationState", "activeCase"],
+    inputs: ["userName", "returningUser", "activeCaseSummary"],
+    outputs: ["welcomeMessage", "firstConversationMove"],
     memoryUpdates: ["onboardingStatus", "preferredEntryRoute"],
-    completionCriteria: ["Пользователь понимает роль чата и платформы", "Определён первый маршрут или открыт кабинет"],
-    nextSkillCandidates: ["intent_clarification", "architecture_navigation", "business_diagnostic", "platform_support"],
-    currentImplementation: ["src/application/conversation-service.js", "src/application/mini-app-invite-policy.js"]
+    completionCriteria: ["Пользователь понимает роль AI-BOSS", "Определён первый вопрос или бизнес-ситуация для работы в Telegram"],
+    nextSkillCandidates: ["intent_clarification", "architecture_navigation", "business_diagnostic", "concept_explanation"],
+    currentImplementation: ["src/application/conversation-service.js"]
   }),
   skill({
     id: "intent_clarification",

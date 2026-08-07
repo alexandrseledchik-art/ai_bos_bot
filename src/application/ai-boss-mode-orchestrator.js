@@ -705,6 +705,7 @@ export class AIBossModeOrchestrator {
       },
       skillSelection: decision.skillSelection || null,
       skillExecution: decision.skillExecution || null,
+      audienceProfile: decision.audienceProfile || context.audienceProfile || null,
       reasonCodes: orchestration.reasonCodes || [],
       reasonCodesByLayer: {
         businessState: orchestration.businessStateReasonCodes || [],

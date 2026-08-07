@@ -33,6 +33,24 @@ AI-BOSS should classify the current business state into one of five modes:
 
 The mode is not a label for the company forever. It is the current operating context for the active business case.
 
+### 2.1. Do not mix operating mode with audience axes
+
+`businessStateMode` is an internal case-prioritization context. It determines urgency, risk tolerance, diagnostic order and time horizon.
+
+It is not:
+
+- the human role;
+- the business size;
+- the development stage;
+- the observed business condition;
+- the industry;
+- the entry channel;
+- the audience segment.
+
+For example, `Growth Mode` may be selected because the active case requires scaling logic. The audience profile must still store `developmentStage = growth` separately, and a commercial segment appears only when role, size or stage, business condition and current task form a sufficiently supported intersection.
+
+To reduce ambiguity in future schemas, treat this field as a legacy name for `caseOperatingContext`. Do not derive a segment from it alone.
+
 ## 3. Crisis Mode
 
 Primary goal:

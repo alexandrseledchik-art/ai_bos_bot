@@ -1,5 +1,7 @@
 const URL_PATTERN = /\bhttps?:\/\/[^\s]+/gi;
 
+const SMALL_TALK_PATTERN = /^(?:(?:привет|здравствуй(?:те)?|здарова|здорово|доброе\s+утро|добрый\s+(?:день|вечер)|хай|hello|hi|hey)(?:[,!\.\s]+(?:как\s+(?:ты|дела)(?:\s+у\s+тебя)?|ты\s+как))?|как\s+(?:ты|дела)(?:\s+у\s+тебя)?|ты\s+как|что\s+нового)[?!,.\s]*$/iu;
+
 const VAGUE_PATTERNS = [
   /разобрать бизнес/i,
   /увеличить прибыль/i,
@@ -146,6 +148,10 @@ export function extractUrls(text) {
   return [...new Set(matches.map((item) => item.trim().replace(/[),.;!?]+$/, "")))];
 }
 
+export function isSmallTalkInput(text) {
+  return SMALL_TALK_PATTERN.test(String(text || "").trim());
+}
+
 function countWords(text) {
   return text.split(/\s+/).filter(Boolean).length;
 }
@@ -161,6 +167,7 @@ export function classifyInput(text) {
   const hasMetaRoleIntent = META_ROLE_PATTERNS.some((pattern) => pattern.test(cleanText));
   const matchesExplicitVagueIntent = VAGUE_PATTERNS.some((pattern) => pattern.test(cleanText));
   const matchesUnknownIntent = /^(не понимаю|неясно|не знаю)$/i.test(cleanText);
+  const hasSmallTalkIntent = !urls.length && isSmallTalkInput(cleanText);
   const hasOperationalPainSignal =
     /(ручн|перенос|дублир|crm|систем[аы]\s+не\s+связ|процесс|нет\s+метрик|не\s+видим|разные\s+цифр|своя\s+версия\s+правд|спорят\s+о\s+цифр|отч[её]т|аналитик|непонятно[^а-яё0-9]+куда\s+движ|много\s+инициатив|мало\s+что\s+довод|решени[яй]\s+.*не\s+связан|отделы\s+.*сам\s+по\s+себе|новые\s+направлен|старый\s+бизнес\s+.*проседа|ключев[а-яё]+\s+сотрудник|одного-двух\s+ключев|потолок\s+достиг|продуктов[а-яё]+\s+линейк[а-яё]+\s+разрос|старые\s+канал[а-яё]+\s+.*перестал|хорошо\s+прода[её]т.*плохо\s+исполня|внешн[а-яё]+\s+изменен|рынок,\s*курс|санкц|законодательств|не\s+повторя|не\s+тираж|нет\s+прибыл|прибыли\s+нет)/i.test(
       cleanText
@@ -178,7 +185,10 @@ export function classifyInput(text) {
   let type = "unknown";
   let entryMode = "unclear";
 
-  if (urls.length > 0 && !cleanText) {
+  if (hasSmallTalkIntent) {
+    type = "small_talk";
+    entryMode = "small_talk";
+  } else if (urls.length > 0 && !cleanText) {
     type = "url_only";
     entryMode = "url_only";
   } else if (urls.length > 0 && cleanText) {
@@ -217,6 +227,7 @@ export function classifyInput(text) {
     hasToolDiscoveryIntent,
     hasSpecificToolIntent,
     hasMetaRoleIntent,
+    hasSmallTalkIntent,
     looksVague,
     hasConcreteProblemSignal
   };

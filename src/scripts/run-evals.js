@@ -146,8 +146,8 @@ async function run() {
       issues.push(`entryMode expected=${testCase.expectedEntryMode} actual=${classification.entryMode}`);
     }
 
-    const platformWelcome = run.runtime?.webCabinetFirst === true && testCase.input === "/start";
-    if (!run.decision && !platformWelcome) {
+    const directConversationResponse = (run.runtime?.chatFirst === true && testCase.input === "/start") || run.runtime?.smallTalk === true;
+    if (!run.decision && !directConversationResponse) {
       issues.push("conversation returned no diagnostic decision");
     }
 
