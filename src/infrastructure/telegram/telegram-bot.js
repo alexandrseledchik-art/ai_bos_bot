@@ -3,13 +3,15 @@ import {
   buildAccessRequestAdminMessage
 } from "../../application/access-control-service.js";
 import {
-  buildAccessApprovedMiniAppInvite,
   buildAccessApprovedUserMessage,
   handleAccessAdminCommand,
   looksLikeAdminCommand
 } from "../../application/access-admin-commands.js";
 import { extractTelegramMessagePayload, TelegramApiClient } from "./telegram-api.js";
-import { buildMiniAppReplyMarkup } from "./mini-app-webapp.js";
+import {
+  buildPersistentPlatformMenuButton,
+  buildPersistentPlatformReplyMarkup
+} from "./mini-app-webapp.js";
 import {
   describeTelegramPayloadForLog
 } from "./telegram-meta.js";
@@ -75,6 +77,22 @@ export class TelegramBotRunner {
     await this.sendMessage(payload.chatId, reply, options);
   }
 
+  async refreshPlatformMenuButton(chatId, telegramUser) {
+    const menuButton = buildPersistentPlatformMenuButton({
+      appBaseUrl: this.appBaseUrl,
+      telegramUser,
+      webSessionSecret: this.webSessionSecret,
+      webLoginTtlSeconds: this.webLoginTtlSeconds
+    });
+    if (!menuButton) return;
+
+    try {
+      await this.api.setChatMenuButton({ chatId, menuButton });
+    } catch (error) {
+      console.warn("Telegram platform menu button refresh skipped:", error.message);
+    }
+  }
+
   async start(onMessage) {
     while (true) {
       try {
@@ -94,8 +112,9 @@ export class TelegramBotRunner {
               fromTelegramUserId: payload.userMeta?.telegramUserId || payload.userMeta?.id || payload.chatId,
               accessControl: this.accessControl,
               onUserApproved: async (user) => {
+                await this.refreshPlatformMenuButton(user.telegram_user_id, user);
                 await this.sendMessage(user.telegram_user_id, buildAccessApprovedUserMessage(user), {
-                  replyMarkup: buildMiniAppReplyMarkup(buildAccessApprovedMiniAppInvite(), {
+                  replyMarkup: buildPersistentPlatformReplyMarkup({
                     appBaseUrl: this.appBaseUrl,
                     telegramUser: user,
                     webSessionSecret: this.webSessionSecret,
@@ -134,6 +153,8 @@ export class TelegramBotRunner {
             }
           }
 
+          await this.refreshPlatformMenuButton(payload.chatId, payload.userMeta);
+
           const stopTyping = this.api.startTyping(payload.chatId);
           let result;
 
@@ -170,16 +191,19 @@ export class TelegramBotRunner {
           }
 
           if (result?.reply) {
+            const isStart = payload.kind === "text" && /^\/start(?:@\w+)?(?:\s|$)/i.test(payload.text || "");
             await this.sendMessage(payload.chatId, result.reply, {
-              replyMarkup: buildMiniAppReplyMarkup(result.miniAppInvite, {
-                appBaseUrl: this.appBaseUrl,
-                telegramUser: {
-                  ...payload.userMeta,
-                  id: payload.userMeta?.telegramUserId || payload.userMeta?.id || payload.chatId
-                },
-                webSessionSecret: this.webSessionSecret,
-                webLoginTtlSeconds: this.webLoginTtlSeconds
-              })
+              replyMarkup: isStart
+                ? buildPersistentPlatformReplyMarkup({
+                    appBaseUrl: this.appBaseUrl,
+                    telegramUser: {
+                      ...payload.userMeta,
+                      id: payload.userMeta?.telegramUserId || payload.userMeta?.id || payload.chatId
+                    },
+                    webSessionSecret: this.webSessionSecret,
+                    webLoginTtlSeconds: this.webLoginTtlSeconds
+                  })
+                : null
             });
           }
         }

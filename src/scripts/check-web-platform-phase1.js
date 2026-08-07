@@ -12,7 +12,11 @@ import {
   verifyWebLoginToken,
   verifyWebSessionToken
 } from "../infrastructure/auth/web-session.js";
-import { buildMiniAppReplyMarkup } from "../infrastructure/telegram/mini-app-webapp.js";
+import {
+  buildMiniAppReplyMarkup,
+  buildPersistentPlatformMenuButton,
+  buildPersistentPlatformReplyMarkup
+} from "../infrastructure/telegram/mini-app-webapp.js";
 
 const secret = "phase-one-web-session-secret-123456";
 const telegramUser = {
@@ -68,6 +72,25 @@ const loginUrl = buildWebCabinetLoginUrl({
   secret
 });
 assert.match(loginUrl, /^https:\/\/aibosbot\.test\/api\/platform\/auth\/exchange\?token=/);
+
+const persistentPlatformMarkup = buildPersistentPlatformReplyMarkup({
+  appBaseUrl: "https://aibosbot.test",
+  telegramUser,
+  webSessionSecret: secret
+});
+assert.equal(persistentPlatformMarkup.inline_keyboard.length, 1);
+assert.equal(persistentPlatformMarkup.inline_keyboard[0][0].text, "Открыть платформу AI-BOSS");
+assert.match(persistentPlatformMarkup.inline_keyboard[0][0].url, /\/api\/platform\/auth\/exchange/);
+assert.equal("web_app" in persistentPlatformMarkup.inline_keyboard[0][0], false);
+
+const persistentPlatformMenuButton = buildPersistentPlatformMenuButton({
+  appBaseUrl: "https://aibosbot.test",
+  telegramUser,
+  webSessionSecret: secret
+});
+assert.equal(persistentPlatformMenuButton.type, "web_app");
+assert.equal(persistentPlatformMenuButton.text, "Платформа AI-BOSS");
+assert.match(persistentPlatformMenuButton.web_app.url, /\/api\/platform\/auth\/exchange/);
 
 const replyMarkup = buildMiniAppReplyMarkup(
   { route: "/mini-app", label: "Открыть кабинет" },

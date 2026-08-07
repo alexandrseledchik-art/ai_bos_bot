@@ -192,8 +192,8 @@ async function run() {
     text: "/start",
     userMeta: { username: "new_platform_user", firstName: "Алексей" }
   });
-  if (!/Вся текущая работа идёт здесь, в Telegram/i.test(startResult.reply) || !/«фиксируем»/i.test(startResult.reply)) {
-    throw new Error("Start must explain the Telegram-first management cycle.");
+  if (!/Добро пожаловать в AI-BOSS/i.test(startResult.reply) || !/На платформе доступны рабочие инструменты/i.test(startResult.reply)) {
+    throw new Error("Start must welcome the user, explain AI-BOSS and point to the platform.");
   }
   if (startResult.miniAppInvite !== null || startResult.runtime?.chatFirst !== true) {
     throw new Error("Start must stay in Telegram and must not invite the user to Mini App or web cabinet.");

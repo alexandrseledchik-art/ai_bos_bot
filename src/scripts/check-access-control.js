@@ -213,8 +213,8 @@ async function main() {
   assert.equal(approvalNotifications.length, 1);
   assert.equal(approvalNotifications[0].user.telegram_user_id, 222);
   assert.equal(approvalNotifications[0].context.command, "/approve");
-  assert.match(buildAccessApprovedUserMessage({ first_name: "Сергей" }), /Привет, Сергей/);
-  assert.match(buildAccessApprovedUserMessage(), /Основная работа проходит в веб-кабинете/i);
+  assert.match(buildAccessApprovedUserMessage({ first_name: "Сергей" }), /Сергей, добро пожаловать в AI-BOSS/);
+  assert.match(buildAccessApprovedUserMessage(), /«Платформа AI-BOSS» в меню бота/i);
   assert.deepEqual(buildAccessApprovedMiniAppInvite(), {
     route: "/app",
     label: "Создать кабинет компании",

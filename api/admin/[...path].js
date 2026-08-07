@@ -4,13 +4,13 @@ import {
   readAdminJsonBody
 } from "../../src/application/admin-api-context.js";
 import {
-  buildAccessApprovedMiniAppInvite,
   buildAccessApprovedUserMessage
 } from "../../src/application/access-admin-commands.js";
 import { answerWorkspaceQuestion } from "../../src/application/workspace-chat-service.js";
 import { getServices } from "../../src/create-services.js";
 import {
-  buildMiniAppReplyMarkup
+  buildPersistentPlatformMenuButton,
+  buildPersistentPlatformReplyMarkup
 } from "../../src/infrastructure/telegram/mini-app-webapp.js";
 import { TelegramApiClient } from "../../src/infrastructure/telegram/telegram-api.js";
 
@@ -134,8 +134,20 @@ async function dispatchAdminRoute(request) {
               token: config.telegramToken,
               apiBaseUrl: config.telegramApiBaseUrl
             });
+            const menuButton = buildPersistentPlatformMenuButton({
+              appBaseUrl: config.appBaseUrl,
+              telegramUser: user,
+              webSessionSecret: config.webSessionSecret,
+              webLoginTtlSeconds: config.webLoginTtlSeconds
+            });
+            if (menuButton) {
+              await telegramApi.setChatMenuButton({
+                chatId: user.telegram_user_id,
+                menuButton
+              });
+            }
             await telegramApi.sendMessage(user.telegram_user_id, buildAccessApprovedUserMessage(user), {
-              replyMarkup: buildMiniAppReplyMarkup(buildAccessApprovedMiniAppInvite(), {
+              replyMarkup: buildPersistentPlatformReplyMarkup({
                 appBaseUrl: config.appBaseUrl,
                 telegramUser: user,
                 webSessionSecret: config.webSessionSecret,
