@@ -10,7 +10,7 @@ function redirect(location, status = 302) {
 }
 
 function fallbackUrl(config) {
-  const base = String(config.appBaseUrl || "https://aibosbot.vercel.app").replace(/\/+$/, "");
+  const base = String(config.appBaseUrl || "https://aiboss.seledchik.ru").replace(/\/+$/, "");
   return `${base}/book?telegram=not_configured`;
 }
 

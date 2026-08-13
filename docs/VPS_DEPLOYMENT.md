@@ -8,13 +8,13 @@
 - `Dockerfile` — сборка production-контейнера.
 - `docker-compose.yml` — запуск сервиса на порту `3000`.
 - `/healthz` — health-check.
-- API-роуты `/api/telegram`, `/api/companies/*`, `/api/mini-app/*`, `/api/platform/*`, `/api/admin/*` работают через те же handlers, что и на Vercel.
+- API-роуты `/api/telegram`, `/api/site-navigator`, `/api/companies/*`, `/api/mini-app/*`, `/api/platform/*`, `/api/admin/*` работают через те же handlers, что и на Vercel.
 - Страницы `/app`, `/mini-app`, `/companies`, `/admin`, `/book` раздаются как SPA.
 
 ## Что нужно для фактического переноса
 
 1. VPS с доступом по SSH.
-2. Домен или поддомен, например `app.aiboss.ru`.
+2. DNS-запись `aiboss.seledchik.ru A 82.202.131.145`.
 3. `.env` с production-переменными.
 4. Решение, где храним состояние:
    - Supabase — предпочтительно, если хотим не зависеть от файлов на сервере.
@@ -71,7 +71,7 @@ curl http://127.0.0.1:3000/healthz
 
 ```nginx
 server {
-  server_name app.aiboss.ru;
+    server_name aiboss.seledchik.ru;
 
   location / {
     proxy_pass http://127.0.0.1:3000;
@@ -83,6 +83,8 @@ server {
   }
 }
 ```
+
+Порт контейнера публикуется только на `127.0.0.1:3000`; прямой доступ к Node.js из интернета не требуется.
 
 После этого включить HTTPS через `certbot`.
 
