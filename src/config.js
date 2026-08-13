@@ -104,7 +104,7 @@ export function loadConfig() {
     adminTelegramUserIds,
     accessRequestNotifyChatId,
     adminDashboardToken: process.env.ADMIN_DASHBOARD_TOKEN || "",
-    appBaseUrl: process.env.APP_BASE_URL || "",
+    appBaseUrl: (process.env.APP_BASE_URL || "")\n      .replace(/^https:\\/\\/aibosbot\\.vercel\\.app\\/?$/i, "https://aiboss.seledchik.ru"),
     alexanderBookingUrl: process.env.ALEXANDER_BOOKING_URL || "",
     miniAppAlphaMode: process.env.MINI_APP_ALPHA_MODE === "true",
     skillOrchestratorDiagnosticEnabled: process.env.SKILL_ORCHESTRATOR_DIAGNOSTIC_ENABLED !== "false",
