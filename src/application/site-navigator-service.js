@@ -18,6 +18,17 @@ function normalizeHistory(history = []) {
     .filter((item) => item.text);
 }
 
+function resolvePublicUrl(url, appBaseUrl) {
+  if (!appBaseUrl) return url;
+  try {
+    const sourceUrl = new URL(url);
+    if (!["aibosbot.vercel.app", "aiboss.seledchik.ru"].includes(sourceUrl.hostname)) return url;
+    return `${appBaseUrl}${sourceUrl.pathname}${sourceUrl.search}${sourceUrl.hash}`;
+  } catch {
+    return url;
+  }
+}
+
 function readOutputText(payload) {
   if (typeof payload?.output_text === "string" && payload.output_text.trim()) {
     return payload.output_text.trim();
@@ -38,6 +49,7 @@ export class SiteNavigatorService {
     baseUrl = "https://api.openai.com/v1",
     model,
     reasoningEffort = "low",
+    appBaseUrl = "https://aibosbot.vercel.app",
     fetchImpl = fetch,
     composeReply = null
   } = {}) {
@@ -45,6 +57,7 @@ export class SiteNavigatorService {
     this.baseUrl = String(baseUrl || "https://api.openai.com/v1").replace(/\/$/, "");
     this.model = model;
     this.reasoningEffort = reasoningEffort;
+    this.appBaseUrl = String(appBaseUrl || "https://aibosbot.vercel.app").replace(/\/+$/, "");
     this.fetchImpl = fetchImpl;
     this.composeReply = composeReply;
   }
@@ -56,11 +69,20 @@ export class SiteNavigatorService {
     const pagePath = normalize(page?.path, 300);
     const route = selectSiteNavigatorRoute(userQuestion, pagePath);
     const sources = selectSiteNavigatorSources(userQuestion, { pagePath, route });
+    const resolvedSources = sources.map((source) => ({
+      ...source,
+      url: resolvePublicUrl(source.url, this.appBaseUrl)
+    }));
+    const routeCta = SITE_NAVIGATOR_ROUTES[route] || SITE_NAVIGATOR_ROUTES.general;
+    const cta = {
+      ...routeCta,
+      url: resolvePublicUrl(routeCta.url, this.appBaseUrl)
+    };
     const trustedContext = {
       pageType: pagePath.includes("/books/business-assembly") ? "book" : "main_site",
       pagePath,
       route,
-      sources: sources.map(({ title, url, summary }) => ({ title, url, summary }))
+      sources: resolvedSources.map(({ title, url, summary }) => ({ title, url, summary }))
     };
 
     const answer = this.composeReply
@@ -70,8 +92,8 @@ export class SiteNavigatorService {
     return {
       answer: normalize(answer, 1800),
       route,
-      cta: SITE_NAVIGATOR_ROUTES[route] || SITE_NAVIGATOR_ROUTES.general,
-      sources: sources.slice(0, 3).map(({ title, url }) => ({ title, url })),
+      cta,
+      sources: resolvedSources.slice(0, 3).map(({ title, url }) => ({ title, url })),
       skill: "site_navigator"
     };
   }
