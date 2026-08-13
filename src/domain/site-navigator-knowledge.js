@@ -141,7 +141,7 @@ export function selectSiteNavigatorRoute(question, pagePath = "") {
   if (/связ|созвон|обсуд|консультац|работать с александр|личн.*работ|помощь александр|чем александр|проект|сопровожд/.test(text)) return "consulting";
   if (/ai[\s‑-]?boss|платформ|кабинет|память компан|рабоч.*инструмент/.test(text)) return "ai_boss";
   if (/диагност|оценить.*компан|с чего начать измен|где начать|состояние компан|проверить.*управлен/.test(text)) return "diagnostic";
-  if (/книг|что внутри|содержан|сколько глав|подойдет|подойдёт|читать/.test(text)) return "book";
+  if (/книг|что внутри|содержан|сколько глав|читать/.test(text)) return "book";
   if (/кто.*александр|об автор|опыт|кейс|результат/.test(text)) return "author";
   if (/стать|почитать|материал/.test(text)) return "articles";
   if (path.includes("/books/business-assembly")) return "book";

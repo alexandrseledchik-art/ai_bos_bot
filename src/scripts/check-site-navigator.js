@@ -7,6 +7,7 @@ import {
 } from "../domain/site-navigator-knowledge.js";
 
 assert.equal(selectSiteNavigatorRoute("Подойдёт ли мне книга?"), "book");
+assert.equal(selectSiteNavigatorRoute("Какой формат мне подойдёт?"), "general");
 assert.equal(selectSiteNavigatorRoute("С чего начать изменения в компании?"), "diagnostic");
 assert.equal(selectSiteNavigatorRoute("Чем Александр может помочь?"), "consulting");
 assert.equal(selectSiteNavigatorRoute("Хочу обсудить проект лично"), "consulting");
