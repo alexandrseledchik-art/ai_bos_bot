@@ -5,6 +5,9 @@
   "functions": {
     "api/telegram.js": {
       "maxDuration": 60
+    },
+    "api/site-navigator.js": {
+      "maxDuration": 30
     }
   },
   "rewrites": [

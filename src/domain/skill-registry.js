@@ -111,6 +111,23 @@ export const AI_BOSS_SKILLS_V1 = Object.freeze([
     currentImplementation: ["src/application/classify-input.js", "src/application/conversation-service.js", "src/infrastructure/openai/reasoning-client.js"]
   }),
   skill({
+    id: "site_navigator",
+    version: "1.0.0",
+    department: SKILL_DEPARTMENTS.COMMUNICATION,
+    kind: SKILL_KINDS.COMMUNICATION,
+    activation: SKILL_ACTIVATION.PRIMARY,
+    purpose: "Помочь посетителю сайта понять книгу, опыт и продукты Александра и выбрать подходящий маршрут.",
+    whenToUse: ["Вопрос в виджете сайта", "Выбор между книгой, диагностикой, AI-BOSS и личной работой", "Навигация по материалам и кейсам"],
+    whenNotToUse: ["Не проводить диагностику бизнеса", "Не создавать компанию или кейс", "Не использовать память клиентов AI-BOSS"],
+    requiredContext: ["userQuestion", "currentPage", "allowedKnowledgeSources"],
+    inputs: ["question", "shortWidgetHistory", "pagePath"],
+    outputs: ["groundedAnswer", "sourceLinks", "recommendedRoute", "callToAction"],
+    memoryUpdates: [],
+    completionCriteria: ["Ответ основан на разрешённых источниках", "Выбран один понятный маршрут", "Роль AI-помощника не смешана с Александром или AI-BOSS"],
+    nextSkillCandidates: ["site_navigator"],
+    currentImplementation: ["src/application/site-navigator-service.js", "src/domain/site-navigator-knowledge.js", "api/site-navigator.js"]
+  }),
+  skill({
     id: "intent_clarification",
     version: "1.0.0",
     department: SKILL_DEPARTMENTS.COMMUNICATION,
