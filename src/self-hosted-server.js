@@ -10,6 +10,7 @@ import bookStartApi from "../api/book/start.js";
 import companiesApi from "../api/companies/[...path].js";
 import miniAppApi from "../api/mini-app/[...path].js";
 import platformApi from "../api/platform/[...path].js";
+import siteNavigatorApi from "../api/site-navigator.js";
 import telegramApi from "../api/telegram.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -121,6 +122,12 @@ async function handleApi(req, res, url) {
 
   if (url.pathname === "/api/book/start") {
     const response = await bookStartApi.fetch(createFetchRequest(req, url.toString()));
+    await sendFetchResponse(res, response, req.method);
+    return true;
+  }
+
+  if (url.pathname === "/api/site-navigator") {
+    const response = await siteNavigatorApi.fetch(createFetchRequest(req, url.toString()));
     await sendFetchResponse(res, response, req.method);
     return true;
   }
