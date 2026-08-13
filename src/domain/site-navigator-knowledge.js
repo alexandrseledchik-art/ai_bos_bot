@@ -5,7 +5,7 @@ const SOURCE_GROUPS = Object.freeze({
   ai_boss: ["ai_boss", "book"],
   consulting: ["consulting", "cases", "author"],
   articles: ["articles", "book"],
-  general: ["author", "book", "diagnostic", "ai_boss", "consulting"]
+  general: ["consulting", "diagnostic", "book", "ai_boss", "author"]
 });
 
 export const SITE_NAVIGATOR_SOURCES = Object.freeze([
@@ -22,7 +22,7 @@ export const SITE_NAVIGATOR_SOURCES = Object.freeze([
     group: "book",
     title: "Книга «Бизнес. Инструкция по сборке»",
     url: "https://seledchik.ru/books/business-assembly/",
-    keywords: ["книга", "подойдет", "подойдёт", "внутри", "содержание", "глав", "читать", "инструкция", "сборк"],
+    keywords: ["книга", "внутри", "содержание", "глав", "читать", "инструкция", "сборк"],
     summary: "Настольная книга собственника о том, как увидеть бизнес как систему: от клиента, продукта и продаж до операций, финансов, ролей, данных и технологий. В ней 35 глав, около 200 страниц и более 300 инструментов. Книга предназначена прежде всего для собственников, которые хотят перейти от ручного управления к архитектуре бизнеса."
   },
   {
@@ -154,7 +154,7 @@ export function selectSiteNavigatorSources(question, { pagePath = "", route = ""
   const selectedRoute = route || selectSiteNavigatorRoute(question, pagePath);
   const preferredGroups = SOURCE_GROUPS[selectedRoute] || SOURCE_GROUPS.general;
 
-  return SITE_NAVIGATOR_SOURCES
+  const ranked = SITE_NAVIGATOR_SOURCES
     .map((source) => {
       let score = Math.max(0, 5 - preferredGroups.indexOf(source.group));
       if (!preferredGroups.includes(source.group)) score = 0;
@@ -170,7 +170,11 @@ export function selectSiteNavigatorSources(question, { pagePath = "", route = ""
       return { source, score };
     })
     .filter((item) => item.score > 0)
-    .sort((left, right) => right.score - left.score)
-    .slice(0, 4)
-    .map((item) => item.source);
+    .sort((left, right) => right.score - left.score);
+
+  const selected = selectedRoute === "general"
+    ? ranked.filter((item, index, items) => items.findIndex((candidate) => candidate.source.group === item.source.group) === index)
+    : ranked;
+
+  return selected.slice(0, 4).map((item) => item.source);
 }

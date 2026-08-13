@@ -20,6 +20,9 @@ const bookSources = selectSiteNavigatorSources("Что внутри книги?"
 assert.equal(bookSources[0].id, "book-overview");
 assert.ok(bookSources.every((source) => source.url.startsWith("https://")));
 
+const generalSources = selectSiteNavigatorSources("Какой формат мне подойдёт?", { route: "general" });
+assert.deepEqual(generalSources.map((source) => source.group), ["consulting", "diagnostic", "book", "ai_boss"]);
+
 let capturedContext;
 const service = new SiteNavigatorService({
   composeReply: async ({ context }) => {
