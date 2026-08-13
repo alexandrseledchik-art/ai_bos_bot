@@ -25,6 +25,7 @@ assert.deepEqual(generalSources.map((source) => source.group), ["consulting", "d
 
 let capturedContext;
 const service = new SiteNavigatorService({
+  appBaseUrl: "https://aiboss.seledchik.ru",
   composeReply: async ({ context }) => {
     capturedContext = context;
     return "Книга подходит собственнику, которому важно увидеть бизнес как единую систему.";
@@ -41,6 +42,14 @@ assert.equal(result.cta.label, "О книге");
 assert.ok(result.sources.length > 0);
 assert.equal(capturedContext.pageType, "book");
 assert.ok(capturedContext.sources.every((source) => source.summary && source.url));
+
+const aiBossResult = await service.answer({ question: "Расскажи об AI-BOSS", page: { path: "/" } });
+assert.equal(aiBossResult.cta.url, "https://aiboss.seledchik.ru/app?utm_source=seledchik&utm_medium=site_navigator");
+assert.equal(aiBossResult.sources[0].url, "https://aiboss.seledchik.ru/app?utm_source=seledchik&utm_medium=site_navigator");
+
+const currentProductionService = new SiteNavigatorService({ composeReply: async () => "Ответ." });
+const currentProductionResult = await currentProductionService.answer({ question: "Расскажи об AI-BOSS" });
+assert.equal(currentProductionResult.cta.url, "https://aibosbot.vercel.app/app?utm_source=seledchik&utm_medium=site_navigator");
 
 const preflight = await handleSiteNavigatorRequest(new Request("https://aibosbot.test/api/site-navigator", {
   method: "OPTIONS",

@@ -45,7 +45,7 @@ export const SITE_NAVIGATOR_SOURCES = Object.freeze([
     id: "ai-boss",
     group: "ai_boss",
     title: "Платформа AI‑BOSS",
-    url: "https://aiboss.seledchik.ru/app?utm_source=seledchik&utm_medium=site_navigator",
+    url: "https://aibosbot.vercel.app/app?utm_source=seledchik&utm_medium=site_navigator",
     keywords: ["ai-boss", "ai boss", "платформ", "инструмент", "кабинет", "память", "применить", "работать с системой"],
     summary: "AI‑BOSS — рабочая платформа для применения системного подхода к конкретной компании. В ней соединяются диагностика, инструменты и память компании, чтобы последовательно собирать систему управления."
   },
@@ -110,7 +110,7 @@ export const SITE_NAVIGATOR_ROUTES = Object.freeze({
   },
   ai_boss: {
     label: "Открыть AI‑BOSS",
-    url: "https://aiboss.seledchik.ru/app?utm_source=seledchik&utm_medium=site_navigator"
+    url: "https://aibosbot.vercel.app/app?utm_source=seledchik&utm_medium=site_navigator"
   },
   consulting: {
     label: "Связаться с Александром",

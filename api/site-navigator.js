@@ -82,7 +82,8 @@ export async function handleSiteNavigatorRequest(request) {
       apiKey: config.openaiApiKey,
       baseUrl: config.openaiBaseUrl,
       model: config.reasoningModel,
-      reasoningEffort: "low"
+      reasoningEffort: "low",
+      appBaseUrl: config.appBaseUrl
     });
     const result = await service.answer({
       question,
