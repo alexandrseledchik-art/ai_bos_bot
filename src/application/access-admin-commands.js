@@ -52,6 +52,8 @@ export function buildAccessApprovedUserMessage(user = {}) {
   const name = String(user.first_name || user.firstName || "").trim();
   const greeting = name ? `${name}, добро пожаловать в AI-BOSS.` : "Добро пожаловать в AI-BOSS.";
   return [
+    "Доступ к инструментам AI-BOSS открыт.",
+    "",
     greeting,
     "",
     "AI-BOSS — управленческий помощник для собственника. Он помогает собрать картину бизнеса, отделить симптом от причины, найти главное ограничение и понять, что делать первым.",

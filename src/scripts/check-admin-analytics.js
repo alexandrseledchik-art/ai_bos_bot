@@ -168,7 +168,22 @@ function createSeed() {
         company_id: "company-1",
         active_case_id: "case-1",
         telegram_chat_id: "123",
-        entry_state: {},
+        entry_state: {
+          entryAttribution: {
+            sourcePayload: "book_qr",
+            entryChannel: "book",
+            channelPath: ["book", "qr", "telegram"],
+            firstStartedAt: "2026-05-01T10:00:00.000Z"
+          },
+          audienceProfile: {
+            entryChannel: { value: "book" },
+            channelPath: ["book", "qr", "telegram"],
+            primarySegment: {
+              id: "owner_medium_management_gap",
+              title: "Собственник выросшего бизнеса с разрывом управляемости"
+            }
+          }
+        },
         created_at: "2026-05-01T10:00:00.000Z",
         updated_at: "2026-05-01T10:03:00.000Z"
       },
@@ -179,7 +194,14 @@ function createSeed() {
         company_id: "company-2",
         active_case_id: "case-2",
         telegram_chat_id: "789",
-        entry_state: {},
+        entry_state: {
+          entryAttribution: {
+            sourcePayload: "telegram",
+            entryChannel: "telegram",
+            channelPath: ["telegram"],
+            firstStartedAt: "2026-05-01T10:00:00.000Z"
+          }
+        },
         created_at: "2026-05-01T10:00:00.000Z",
         updated_at: "2026-05-01T10:05:00.000Z"
       }
@@ -239,13 +261,21 @@ function createSeed() {
         created_at: "2026-05-01T10:02:00.000Z"
       }
     ],
-    observations: [],
+    observations: [
+      { id: "observation-1", case_id: "case-1", statement: "Маржа снизилась", created_at: "2026-05-01T10:01:00.000Z" },
+      { id: "observation-2", case_id: "case-1", statement: "Данные расходятся", created_at: "2026-05-01T10:02:00.000Z" }
+    ],
     goals: [],
     symptoms: [],
-    hypotheses: [],
+    hypotheses: [
+      { id: "hypothesis-1", case_id: "case-1", statement: "Нет единой версии данных", created_at: "2026-05-01T10:03:00.000Z" }
+    ],
     constraints: [],
     situations: [],
-    action_waves: [],
+    action_waves: [
+      { id: "action-wave-1", case_id: "case-1", first_step: "Сверить три отчёта", created_at: "2026-05-01T10:04:00.000Z" }
+    ],
+    artifacts: [],
     snapshots: [],
     mini_app_eval_logs: [],
     admin_conversation_evaluations: [],
@@ -305,6 +335,16 @@ async function run() {
 
   const improvements = await service.listImprovements();
   assert(improvements.count > 0, "expected improvements list");
+
+  const pilot = await service.getPilotReport();
+  assert(pilot.summary.registered === 3, "expected all registered pilot participants");
+  assert(pilot.summary.started === 2, "expected two participants with working dialogue");
+  assert(pilot.summary.bookEntrants === 1, "expected book attribution");
+  assert(pilot.summary.twoFacts === 1, "expected participant with two facts");
+  assert(pilot.summary.workingHypotheses === 1, "expected participant with hypothesis");
+  assert(pilot.summary.firstSteps === 1, "expected participant with first step");
+  assert(pilot.summary.averageTimeToFirstStepMinutes === 4, "expected time to first step");
+  assert(pilot.participants.some((item) => item.entryChannel === "book" && item.stage === "first_step"), "expected book participant stage");
 
   console.log("Admin analytics checks passed.");
 }

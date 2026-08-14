@@ -178,6 +178,45 @@ function pickAccessUserSummary({ user }) {
   };
 }
 
+function objectValue(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function countByValue(items, getter) {
+  const counts = new Map();
+  for (const item of items) {
+    const value = trimString(getter(item)) || "unknown";
+    counts.set(value, Number(counts.get(value) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([value, count]) => ({ value, count }))
+    .sort((left, right) => right.count - left.count || left.value.localeCompare(right.value));
+}
+
+function percent(count, total) {
+  return total > 0 ? Number(((count / total) * 100).toFixed(1)) : 0;
+}
+
+function minutesBetween(start, end) {
+  const startTime = Date.parse(start || "");
+  const endTime = Date.parse(end || "");
+  if (!Number.isFinite(startTime) || !Number.isFinite(endTime) || endTime < startTime) {
+    return null;
+  }
+  return Number(((endTime - startTime) / 60000).toFixed(1));
+}
+
+function pilotStage(participant) {
+  if (participant.resultReported) return "result";
+  if (participant.decisionLocked) return "decision_locked";
+  if (participant.firstStepCount > 0) return "first_step";
+  if (participant.hypothesisCount > 0) return "hypothesis";
+  if (participant.factCount >= 2) return "facts";
+  if (participant.activeCase) return "diagnostic_case";
+  if (participant.started) return "dialogue";
+  return "registered";
+}
+
 export class AdminAnalyticsService {
   constructor({ syncClient, evaluator = new ConversationEvaluator(), improvementCollector = null }) {
     this.syncClient = syncClient;
@@ -357,6 +396,161 @@ export class AdminAnalyticsService {
     return {
       conversations,
       count: conversations.length
+    };
+  }
+
+  async getPilotReport({ limit = 200 } = {}) {
+    const normalizedLimit = normalizeLimit(limit, 200, 500);
+    const [threads, appUsers, cases, messages, observations, hypotheses, actionWaves, artifacts, evaluations] = await Promise.all([
+      this.safeFindMany("threads", { select: "*", order: "updated_at.desc", limit: normalizedLimit }),
+      this.safeFindMany("app_users", { select: "*", order: "updated_at.desc", limit: normalizedLimit }),
+      this.safeFindMany("cases", { select: "*", order: "updated_at.desc", limit: normalizedLimit }),
+      this.safeFindMany("messages", { select: "*", order: "created_at.asc", limit: 3000 }),
+      this.safeFindMany("observations", { select: "*", order: "created_at.asc", limit: 3000 }),
+      this.safeFindMany("hypotheses", { select: "*", order: "created_at.asc", limit: 1000 }),
+      this.safeFindMany("action_waves", { select: "*", order: "created_at.asc", limit: 1000 }),
+      this.safeFindMany("artifacts", { select: "*", order: "created_at.asc", limit: 1000 }),
+      this.safeFindMany("admin_conversation_evaluations", { select: "*", order: "created_at.asc", limit: 1000 })
+    ]);
+
+    const visibleThreads = threads.filter((thread) => !isServiceThread(thread));
+    const threadByTelegramId = new Map(
+      visibleThreads.map((thread) => [normalizeTelegramId(thread.telegram_chat_id), thread])
+    );
+    const appUserByTelegramId = new Map(
+      appUsers.map((user) => [normalizeTelegramId(user.telegram_user_id), user])
+    );
+    const caseById = indexById(cases);
+    const messagesByThread = groupBy(messages, "thread_id");
+    const observationsByCase = groupBy(observations, "case_id");
+    const hypothesesByCase = groupBy(hypotheses, "case_id");
+    const actionWavesByCase = groupBy(actionWaves, "case_id");
+    const artifactsByCase = groupBy(artifacts, "case_id");
+    const evaluationsByThread = groupBy(evaluations, "thread_id");
+    const telegramIds = [...new Set([
+      ...visibleThreads.map((thread) => normalizeTelegramId(thread.telegram_chat_id)),
+      ...appUsers.map((user) => normalizeTelegramId(user.telegram_user_id))
+    ].filter(Boolean))];
+
+    const participants = telegramIds.map((telegramId) => {
+      const thread = threadByTelegramId.get(telegramId) || null;
+      const appUser = appUserByTelegramId.get(telegramId) || null;
+      const entryState = objectValue(thread?.entry_state);
+      const audienceProfile = objectValue(entryState.audienceProfile);
+      const entryAttribution = objectValue(entryState.entryAttribution);
+      const activeCase = thread?.active_case_id ? caseById.get(thread.active_case_id) || null : null;
+      const threadMessages = thread ? sortMessagesAsc(messagesByThread.get(thread.id) || []) : [];
+      const userMessages = threadMessages.filter((message) => message.role === "user");
+      const workingMessages = userMessages.filter((message) => !/^\/start(?:@\w+)?(?:\s|$)/i.test(trimString(message.text)));
+      const caseId = activeCase?.id || thread?.active_case_id || "";
+      const caseObservations = caseId ? observationsByCase.get(caseId) || [] : [];
+      const caseHypotheses = caseId ? hypothesesByCase.get(caseId) || [] : [];
+      const caseActionWaves = caseId ? actionWavesByCase.get(caseId) || [] : [];
+      const caseArtifacts = caseId ? artifactsByCase.get(caseId) || [] : [];
+      const threadEvaluations = thread ? evaluationsByThread.get(thread.id) || [] : [];
+      const latestEvaluation = sortMessagesAsc(threadEvaluations).at(-1) || null;
+      const firstStep = [...caseActionWaves]
+        .sort((left, right) => String(left.created_at || "").localeCompare(String(right.created_at || "")))[0] || null;
+      const textMessages = userMessages.map((message) => trimString(message.text));
+      const entryChannel = trimString(entryAttribution.entryChannel) ||
+        trimString(audienceProfile.entryChannel?.value) ||
+        (thread ? "telegram" : "unknown");
+      const channelPath = [...new Set([
+        ...(Array.isArray(entryAttribution.channelPath) ? entryAttribution.channelPath : []),
+        ...(Array.isArray(audienceProfile.channelPath) ? audienceProfile.channelPath : []),
+        ...(entryChannel !== "unknown" ? [entryChannel] : [])
+      ].map(trimString).filter(Boolean))];
+      const primarySegment = objectValue(audienceProfile.primarySegment);
+      const participant = {
+        id: thread?.id || `app_user:${telegramId}`,
+        telegramId,
+        name: appUser ? appUserName(appUser) : (thread?.telegram_chat_id || `Telegram ${telegramId}`),
+        username: appUser?.username || "",
+        accessStatus: appUser?.access_status || (thread ? "approved" : "pending"),
+        entryChannel,
+        channelPath,
+        sourcePayload: entryAttribution.sourcePayload || "",
+        primarySegmentId: primarySegment.id || "",
+        primarySegmentTitle: primarySegment.title || "",
+        started: workingMessages.length > 0,
+        activeCase: Boolean(activeCase),
+        messageCount: threadMessages.length,
+        userMessageCount: userMessages.length,
+        factCount: caseObservations.length,
+        hypothesisCount: caseHypotheses.length,
+        firstStepCount: caseActionWaves.length,
+        artifactCount: caseArtifacts.length,
+        decisionLocked: textMessages.some((text) => /^фиксируем[.!]?$/i.test(text)),
+        resultReported: textMessages.some((text) => /^результат\s*:/i.test(text)),
+        timeToFirstStepMinutes: firstStep ? minutesBetween(thread?.created_at, firstStep.created_at) : null,
+        latestEvaluationScore: latestEvaluation?.score ?? null,
+        updatedAt: thread?.updated_at || appUser?.updated_at || appUser?.created_at || ""
+      };
+      participant.stage = pilotStage(participant);
+      return participant;
+    });
+
+    participants.sort((left, right) => String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")));
+
+    const started = participants.filter((item) => item.started);
+    const timesToFirstStep = participants
+      .map((item) => item.timeToFirstStepMinutes)
+      .filter((value) => Number.isFinite(value));
+    const evaluated = participants.filter((item) =>
+      item.latestEvaluationScore !== null &&
+      item.latestEvaluationScore !== undefined &&
+      Number.isFinite(Number(item.latestEvaluationScore))
+    );
+    const count = (predicate) => participants.filter(predicate).length;
+    const summary = {
+      registered: participants.length,
+      approved: count((item) => item.accessStatus === "approved"),
+      started: started.length,
+      bookEntrants: count((item) => item.entryChannel === "book" || item.channelPath.includes("book")),
+      diagnosticCases: count((item) => item.activeCase),
+      qualifiedSegments: count((item) => Boolean(item.primarySegmentId)),
+      twoFacts: count((item) => item.factCount >= 2),
+      workingHypotheses: count((item) => item.hypothesisCount > 0),
+      firstSteps: count((item) => item.firstStepCount > 0),
+      decisionsLocked: count((item) => item.decisionLocked),
+      resultsReported: count((item) => item.resultReported),
+      artifacts: count((item) => item.artifactCount > 0),
+      evaluated: evaluated.length,
+      averageQualityScore: evaluated.length
+        ? Number((evaluated.reduce((sum, item) => sum + Number(item.latestEvaluationScore), 0) / evaluated.length).toFixed(1))
+        : null,
+      averageTimeToFirstStepMinutes: timesToFirstStep.length
+        ? Number((timesToFirstStep.reduce((sum, value) => sum + value, 0) / timesToFirstStep.length).toFixed(1))
+        : null
+    };
+
+    const funnel = [
+      ["registered", "Зарегистрированы", summary.registered],
+      ["started", "Начали рабочий диалог", summary.started],
+      ["diagnostic_case", "Создан диагностический кейс", summary.diagnosticCases],
+      ["two_facts", "Зафиксированы минимум 2 факта", summary.twoFacts],
+      ["hypothesis", "Есть рабочая гипотеза", summary.workingHypotheses],
+      ["first_step", "Есть первый шаг", summary.firstSteps],
+      ["decision_locked", "Решение зафиксировано", summary.decisionsLocked],
+      ["result", "Получен фактический результат", summary.resultsReported]
+    ].map(([key, label, value]) => ({
+      key,
+      label,
+      count: value,
+      percentOfRegistered: percent(value, summary.registered),
+      percentOfStarted: percent(value, summary.started)
+    }));
+
+    return {
+      generatedAt: new Date().toISOString(),
+      summary,
+      funnel,
+      channels: countByValue(participants, (item) => item.entryChannel),
+      segments: countByValue(
+        participants.filter((item) => item.primarySegmentId),
+        (item) => item.primarySegmentId
+      ),
+      participants
     };
   }
 

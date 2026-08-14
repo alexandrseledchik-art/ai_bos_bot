@@ -179,6 +179,16 @@ async function dispatchAdminRoute(request) {
     });
   }
 
+  if (path === "pilot") {
+    return handleAdminRoute(request, ["GET"], async ({ adminAnalytics }) => {
+      const report = await adminAnalytics.getPilotReport({
+        limit: url.searchParams.get("limit") || 200
+      });
+
+      return adminJsonResponse({ ok: true, report });
+    });
+  }
+
   const conversationEvaluateMatch = path.match(/^conversations\/([^/]+)\/evaluate$/);
   if (conversationEvaluateMatch) {
     return handleAdminRoute(request, ["POST"], async ({ adminAnalytics }) => {

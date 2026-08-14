@@ -429,7 +429,7 @@ export class ConsultantTelegramMode {
             "Для MVP нужно:",
             "1. Создать service account в Google Cloud.",
             "2. Расшарить с ним одну папку на Google Drive.",
-            "3. Добавить в Vercel env: `GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_DRIVE_PRIVATE_KEY`, `GOOGLE_DRIVE_FOLDER_ID`.",
+            "3. Добавить в production env: `GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_DRIVE_PRIVATE_KEY`, `GOOGLE_DRIVE_FOLDER_ID`.",
             "",
             "После этого команда `/drive` будет подтягивать документы в активную компанию."
           ].join("\n")

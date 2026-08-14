@@ -109,6 +109,7 @@ export function emptyEntryState() {
     lastSkillExecution: null,
     lastMiniAppInvite: null,
     pendingDecision: null,
+    entryAttribution: null,
     audienceProfile: null,
     lastUpdatedAt: ""
   };

@@ -286,18 +286,88 @@ function looksToolFirstFollowUp(classification, history) {
   return lastAssistantAskedQuestion(history) && wordCount <= 5;
 }
 
-function looksStartCommand(text) {
-  return /^\/start(?:@\w+)?$/i.test(String(text || "").trim());
+function parseStartCommand(text) {
+  const match = String(text || "").trim().match(/^\/start(?:@\w+)?(?:\s+([a-z0-9_-]{1,64}))?$/i);
+  if (!match) {
+    return null;
+  }
+
+  const payload = String(match[1] || "").trim().toLowerCase();
+  let entryChannel = "telegram";
+  if (/book|kniga|reader/.test(payload)) entryChannel = "book";
+  else if (/qr|kuar/.test(payload)) entryChannel = "qr";
+  else if (/site|web|landing/.test(payload)) entryChannel = "website";
+  else if (/consult/.test(payload)) entryChannel = "consultation";
+  else if (/refer|recommend/.test(payload)) entryChannel = "referral";
+
+  return {
+    payload,
+    entryChannel,
+    channelPath: [...new Set([
+      ...(entryChannel === "book" && /qr|kuar/.test(payload) ? ["book", "qr"] : [entryChannel]),
+      "telegram"
+    ])]
+  };
 }
 
-function buildPlatformWelcomeMessage(userMeta = {}, { returning = false } = {}) {
+function looksStartCommand(text) {
+  return Boolean(parseStartCommand(text));
+}
+
+function applyStartAttribution({ thread, company, userMeta = {}, startCommand, timestamp = nowIso() }) {
+  if (!startCommand) {
+    return null;
+  }
+
+  const previous = thread.entryState?.entryAttribution || null;
+  const entryChannel = previous?.entryChannel || startCommand.entryChannel;
+  const channelPath = [...new Set([
+    ...(previous?.channelPath || []),
+    ...(startCommand.channelPath || [])
+  ])];
+  const attribution = {
+    sourcePayload: previous?.sourcePayload || startCommand.payload || "telegram",
+    latestSourcePayload: startCommand.payload || "telegram",
+    entryChannel,
+    channelPath,
+    firstStartedAt: previous?.firstStartedAt || timestamp,
+    lastStartedAt: timestamp,
+    startCount: Number(previous?.startCount || 0) + 1
+  };
+  const audienceProfile = buildAudienceProfile({
+    userText: "",
+    userMeta: {
+      ...userMeta,
+      entryChannel
+    },
+    company,
+    previousProfile: thread.entryState?.audienceProfile || null
+  });
+
+  thread.entryState = {
+    ...(thread.entryState || emptyEntryState()),
+    entryAttribution: attribution,
+    audienceProfile,
+    lastUpdatedAt: timestamp
+  };
+
+  return attribution;
+}
+
+function buildPlatformWelcomeMessage(userMeta = {}, { returning = false, entryChannel = "telegram" } = {}) {
   const name = String(userMeta.firstName || userMeta.first_name || "").trim();
-  const greeting = name ? `${name}, добро пожаловать в AI-BOSS.` : "Добро пожаловать в AI-BOSS.";
+  const greeting = returning
+    ? (name ? `${name}, с возвращением в AI-BOSS.` : "С возвращением в AI-BOSS.")
+    : (name ? `${name}, добро пожаловать в AI-BOSS.` : "Добро пожаловать в AI-BOSS.");
+  const accessLine = ["book", "qr"].includes(entryChannel)
+    ? "Доступ к инструментам AI-BOSS открыт."
+    : "";
   const startLine = returning
     ? "Можно продолжить предыдущий разговор или начать с новой ситуации."
     : "Чтобы начать, опишите одну ситуацию, которая сейчас больше всего мешает бизнесу.";
 
   return [
+    ...(accessLine ? [accessLine, ""] : []),
     greeting,
     "",
     "AI-BOSS — управленческий помощник для собственника. Он помогает собрать картину бизнеса, отделить симптом от причины, найти главное ограничение и понять, что делать первым.",
@@ -558,6 +628,7 @@ function mergeEntryState(currentState, incomingState, routeType) {
     lastSkillExecution: current.lastSkillExecution || null,
     lastMiniAppInvite: current.lastMiniAppInvite || null,
     pendingDecision: current.pendingDecision || null,
+    entryAttribution: current.entryAttribution || null,
     audienceProfile: current.audienceProfile || null
   });
 }
@@ -771,6 +842,11 @@ export class ConversationService {
       const thread = ensureThread(state, telegramChatId);
       const company = ensureCompany(state, thread, userMeta);
       const now = nowIso();
+      const startCommand = parseStartCommand(userText);
+
+      if (startCommand) {
+        applyStartAttribution({ thread, company, userMeta, startCommand, timestamp: now });
+      }
 
       if (userText) {
         state.messages.push(createMessage({
@@ -818,7 +894,16 @@ export class ConversationService {
       const thread = ensureThread(state, telegramChatId);
       let company = ensureCompany(state, thread, userMeta);
       company = applyActiveCompanyContext(state, thread, telegramChatId, userMeta) || company;
-      if (looksStartCommand(text)) {
+      const startCommand = parseStartCommand(text);
+      if (startCommand) {
+        const startedAt = nowIso();
+        const entryAttribution = applyStartAttribution({
+          thread,
+          company,
+          userMeta,
+          startCommand,
+          timestamp: startedAt
+        });
         const startRunState = this.skillRunManager.prepare({
           entryState: thread.entryState || emptyEntryState(),
           selection: {
@@ -832,14 +917,17 @@ export class ConversationService {
           startRunState
         );
         const returning = state.messages.some((message) => message.threadId === thread.id && message.role === "user" && !looksStartCommand(message.text));
-        const reply = buildPlatformWelcomeMessage(userMeta, { returning });
+        const reply = buildPlatformWelcomeMessage(userMeta, {
+          returning,
+          entryChannel: entryAttribution?.entryChannel || "telegram"
+        });
         state.messages.push(
           createMessage({ threadId: thread.id, role: "user", text }),
           createMessage({ threadId: thread.id, role: "assistant", text: reply })
         );
         thread.entryState = {
           ...(thread.entryState || emptyEntryState()),
-          lastUpdatedAt: nowIso()
+          lastUpdatedAt: startedAt
         };
         thread.updatedAt = thread.entryState.lastUpdatedAt;
         company.updatedAt = thread.entryState.lastUpdatedAt;
@@ -850,7 +938,8 @@ export class ConversationService {
             threadId: thread.id,
             activeCompanyId: company.id,
             returning,
-            chatFirst: true
+            chatFirst: true,
+            entryAttribution
           }
         };
       }

@@ -48,6 +48,32 @@ async function createService(cwd) {
 const cwd = process.cwd();
 const { service, store } = await createService(cwd);
 
+const bookStart = await service.handleUserMessage({
+  telegramChatId: "core-behavior-e2e-book-start",
+  text: "/start book_qr",
+  userMeta: {
+    firstName: "Читатель",
+    username: "core_e2e_book"
+  }
+});
+assert.match(bookStart.reply, /Доступ к инструментам AI-BOSS открыт/i);
+assert.equal(bookStart.runtime?.entryAttribution?.entryChannel, "book");
+assert.deepEqual(bookStart.runtime?.entryAttribution?.channelPath, ["book", "qr", "telegram"]);
+const bookStartState = await store.readState();
+const bookStartThread = bookStartState.threads.find((item) => item.telegramChatId === "core-behavior-e2e-book-start");
+assert.equal(bookStartThread?.entryState?.audienceProfile?.entryChannel?.value, "book");
+assert.equal(bookStartThread?.entryState?.entryAttribution?.sourcePayload, "book_qr");
+
+await service.recordTelegramExchange({
+  telegramChatId: "core-behavior-e2e-pending-book",
+  userText: "/start book",
+  assistantText: "Заявка на доступ отправлена.",
+  userMeta: { firstName: "Новый" }
+});
+const pendingBookState = await store.readState();
+const pendingBookThread = pendingBookState.threads.find((item) => item.telegramChatId === "core-behavior-e2e-pending-book");
+assert.equal(pendingBookThread?.entryState?.entryAttribution?.entryChannel, "book");
+
 const crm = await service.handleUserMessage({
   telegramChatId: "core-behavior-e2e-crm",
   text: "Нам нужна CRM",

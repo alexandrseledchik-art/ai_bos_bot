@@ -482,7 +482,7 @@ export class ConsultantWebService {
           googleDrive: {
             ok: false,
             reason: "not_configured",
-            message: "Google Drive не настроен. Добавь в Vercel env GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL, GOOGLE_DRIVE_PRIVATE_KEY и GOOGLE_DRIVE_FOLDER_ID.",
+            message: "Google Drive не настроен. Добавь в production env GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL, GOOGLE_DRIVE_PRIVATE_KEY и GOOGLE_DRIVE_FOLDER_ID.",
             syncedCount: 0,
             readableCount: 0,
             unsupported: []

@@ -130,6 +130,34 @@ function accessStatusLabel(status) {
   return "ожидает доступа";
 }
 
+function pilotStageLabel(stage) {
+  const labels = {
+    registered: "зарегистрирован",
+    dialogue: "рабочий диалог",
+    diagnostic_case: "диагностический кейс",
+    facts: "собраны факты",
+    hypothesis: "рабочая гипотеза",
+    first_step: "первый шаг",
+    decision_locked: "решение зафиксировано",
+    result: "получен результат"
+  };
+  return labels[stage] || stage || "не определён";
+}
+
+function pilotChannelLabel(channel) {
+  const labels = {
+    book: "книга",
+    qr: "QR",
+    telegram: "Telegram",
+    website: "сайт",
+    consultation: "консультация",
+    referral: "рекомендация",
+    web_cabinet: "платформа",
+    unknown: "не определён"
+  };
+  return labels[channel] || channel || labels.unknown;
+}
+
 function renderConversationList(payload) {
   const rows = payload.conversations || [];
   const list = rows.length
@@ -422,6 +450,95 @@ function renderUsers(payload) {
   });
 }
 
+function renderPilot(payload) {
+  const report = payload.report || {};
+  const summary = report.summary || {};
+  const funnel = report.funnel || [];
+  const channels = report.channels || [];
+  const participants = report.participants || [];
+  const metric = (label, value, note = "") => `
+    <article class="metric-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value ?? "—")}</strong>
+      ${note ? `<small>${escapeHtml(note)}</small>` : ""}
+    </article>
+  `;
+
+  content.innerHTML = `
+    <div class="toolbar">
+      <div>
+        <h2>Альфа-пилот</h2>
+        <p>Путь пользователя от регистрации до зафиксированного фактического результата.</p>
+      </div>
+      <button class="secondary" id="refreshPilotButton" type="button">Обновить</button>
+    </div>
+
+    <div class="metric-grid">
+      ${metric("Зарегистрированы", summary.registered || 0)}
+      ${metric("Начали диалог", summary.started || 0)}
+      ${metric("Из книги", summary.bookEntrants || 0)}
+      ${metric("Первый шаг", summary.firstSteps || 0)}
+      ${metric("Зафиксировали решение", summary.decisionsLocked || 0)}
+      ${metric("Получили результат", summary.resultsReported || 0)}
+      ${metric("Средняя оценка", summary.averageQualityScore, summary.evaluated ? `${summary.evaluated} оценено` : "оценок пока нет")}
+      ${metric("До первого шага", summary.averageTimeToFirstStepMinutes === null || summary.averageTimeToFirstStepMinutes === undefined ? "—" : `${summary.averageTimeToFirstStepMinutes} мин`, "среднее по кейсам с шагом")}
+    </div>
+
+    <section class="pilot-section">
+      <h3>Воронка пилота</h3>
+      <div class="funnel-list">
+        ${funnel.map((item) => `
+          <div class="funnel-row">
+            <span>${escapeHtml(item.label)}</span>
+            <strong>${escapeHtml(item.count)}</strong>
+            <span>${escapeHtml(item.percentOfRegistered)}%</span>
+          </div>
+        `).join("") || `<div class="empty">Данных пока нет.</div>`}
+      </div>
+    </section>
+
+    <section class="pilot-section">
+      <h3>Каналы входа</h3>
+      <div class="meta">
+        ${channels.map((item) => `<span class="pill">${escapeHtml(pilotChannelLabel(item.value))}: ${escapeHtml(item.count)}</span>`).join("") || `<span class="pill">нет данных</span>`}
+      </div>
+    </section>
+
+    <section class="pilot-section">
+      <h3>Участники</h3>
+      <div class="grid">
+        ${participants.length ? participants.map((item) => `
+          <article class="row pilot-participant">
+            <div>
+              <div class="row-title">${escapeHtml(item.name)}</div>
+              <p>${escapeHtml(item.username ? `@${item.username} · ` : "")}Telegram ID: ${escapeHtml(item.telegramId)}</p>
+              <div class="meta">
+                <span class="pill ${item.resultReported ? "green" : item.started ? "" : "orange"}">${escapeHtml(pilotStageLabel(item.stage))}</span>
+                <span class="pill">вход: ${escapeHtml(pilotChannelLabel(item.entryChannel))}</span>
+                <span class="pill">факты: ${escapeHtml(item.factCount)}</span>
+                <span class="pill">гипотезы: ${escapeHtml(item.hypothesisCount)}</span>
+                <span class="pill">шаги: ${escapeHtml(item.firstStepCount)}</span>
+                ${item.primarySegmentTitle ? `<span class="pill green">${escapeHtml(item.primarySegmentTitle)}</span>` : ""}
+              </div>
+            </div>
+            ${item.id.startsWith("app_user:") ? "" : `<button class="secondary" data-pilot-open="${escapeHtml(item.id)}" type="button">Открыть диалог</button>`}
+          </article>
+        `).join("") : `<div class="empty">Участников пока нет.</div>`}
+      </div>
+    </section>
+  `;
+
+  content.querySelector("#refreshPilotButton").addEventListener("click", loadPilot);
+  content.querySelectorAll("[data-pilot-open]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      state.view = "conversations";
+      setActiveTab(state.view);
+      await loadConversations();
+      await loadConversationDetail(button.dataset.pilotOpen);
+    });
+  });
+}
+
 async function loadConversations() {
   renderLoading("Загружаю диалоги");
   try {
@@ -495,6 +612,15 @@ async function loadUsers() {
   }
 }
 
+async function loadPilot() {
+  renderLoading("Собираю показатели пилота");
+  try {
+    renderPilot(await api("pilot?limit=300"));
+  } catch (error) {
+    renderError(error);
+  }
+}
+
 async function updateUserAccess(telegramUserId, status) {
   try {
     await api(`users/${encodeURIComponent(telegramUserId)}/access`, {
@@ -525,6 +651,10 @@ async function collectImprovements() {
 
 async function loadCurrentView() {
   setActiveTab(state.view);
+  if (state.view === "pilot") {
+    await loadPilot();
+    return;
+  }
   if (state.view === "evaluations") {
     await loadEvaluations();
     return;
