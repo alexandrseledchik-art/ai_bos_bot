@@ -1,5 +1,6 @@
 services:
   ai-boss:
+    image: ${AI_BOSS_IMAGE:-ai-boss:local}
     build: .
     container_name: ai-boss
     restart: unless-stopped

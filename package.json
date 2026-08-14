@@ -55,6 +55,13 @@
     "platform:phase2": "node src/scripts/check-web-platform-phase2.js",
     "platform:tools": "node src/scripts/check-tool-workflow-platform.js",
     "site-navigator:check": "node src/scripts/check-site-navigator.js",
+    "production:check": "npm run skills:check && npm run skills:eval && npm run skills:pilot:eval && npm run skills:run:check && npm run core-behavior:e2e:check && npm run site-navigator:check && npm run platform:phase1 && npm run platform:tools",
+    "vps:preflight": "bash deploy/vps-preflight.sh",
+    "vps:health": "bash deploy/vps-healthcheck.sh",
+    "vps:health:deep": "bash deploy/vps-healthcheck.sh --deep",
+    "vps:backup": "bash deploy/vps-backup.sh",
+    "vps:deploy": "bash deploy/vps-deploy.sh",
+    "vps:rollback": "bash deploy/vps-rollback.sh",
     "serve:vps": "node src/self-hosted-server.js"
   }
 }

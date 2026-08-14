@@ -1,0 +1,11 @@
+[Unit]
+Description=AI-BOSS protected local backup
+After=docker.service
+
+[Service]
+Type=oneshot
+User=codex
+Group=codex
+WorkingDirectory=/srv/codex/projects/ai-boss
+ExecStart=/srv/codex/projects/ai-boss/deploy/vps-backup.sh
+UMask=0077

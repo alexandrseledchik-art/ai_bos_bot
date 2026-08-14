@@ -128,7 +128,7 @@ npm run sync:supabase -- data/smoke-state.json
 npm start
 ```
 
-9. Регистрация Telegram webhook после деплоя на Vercel:
+9. Регистрация Telegram webhook после первого VPS-деплоя:
 
 ```bash
 npm run telegram:webhook
@@ -139,14 +139,14 @@ npm run telegram:webhook
 - `TELEGRAM_BOT_TOKEN` — токен бота
 - `TELEGRAM_WEBHOOK_SECRET` — секрет для заголовка `x-telegram-bot-api-secret-token`
 - `WEB_SESSION_SECRET` — отдельный секрет подписи входа в веб-кабинет `/app` (минимум 24 символа; если не задан, используется `TELEGRAM_WEBHOOK_SECRET`)
-- `APP_BASE_URL` — публичный URL приложения, например `https://your-app.vercel.app`
+- `APP_BASE_URL` — публичный URL приложения; production: `https://aiboss.seledchik.ru`
 - `ADMIN_DASHBOARD_TOKEN` — токен для `/admin` и `/api/admin/*`
 
-### Веб-кабинет пользователя
+### Веб-платформа пользователя
 
-Полноэкранный кабинет `/app` остаётся в кодовой базе как будущий дополнительный интерфейс, но не входит в текущий Telegram-first маршрут. Бот не предлагает Mini App или веб-кабинет при `/start`: первый полезный результат и управленческий цикл должны происходить в чате.
+Полноэкранная платформа `/app` — дополнительное рабочее пространство для инструментов и сохранённых результатов. Она не заменяет живой Telegram-диалог и не считается отдельной Telegram Mini App. Бот даёт подписанную кнопку перехода на платформу и сохраняет постоянную кнопку возврата в меню чата.
 
-Если веб-кабинет будет снова включён, для подписи входа используется отдельный `WEB_SESSION_SECRET` длиной не менее 24 символов; при его отсутствии применяется `TELEGRAM_WEBHOOK_SECRET`.
+Для подписи входа рекомендуется отдельный `WEB_SESSION_SECRET` длиной не менее 24 символов; при его отсутствии применяется `TELEGRAM_WEBHOOK_SECRET`.
 - `OPENAI_API_KEY` — ключ OpenAI
 - `OPENAI_REASONING_MODEL` — по умолчанию `gpt-5.4-mini`
 - `OPENAI_REASONING_EFFORT` — `low|medium|high`
@@ -156,7 +156,7 @@ npm run telegram:webhook
 - `MAX_HISTORY_MESSAGES` — сколько последних сообщений давать в reasoning context
 - `DATA_ROOT` — опциональный путь для локального state/artifacts; на serverless по умолчанию используется writable `/tmp/aibosbot`
 - `MEMORY_BACKEND` — backend памяти: `file` для локальной разработки, `supabase` для production
-- `SUPABASE_STATE_MODE` — режим Supabase-памяти: `primary` на Vercel/production или `replicated` для локального file + sync
+- `SUPABASE_STATE_MODE` — режим Supabase-памяти: `primary` для Supabase как единственного runtime source of truth или `replicated` для локального file + sync
 - `SUPABASE_STATE_KEY` — ключ runtime-state строки в Supabase, по умолчанию `project_state`
 - `SUPABASE_URL` — база для следующего этапа миграции
 - `SUPABASE_SERVICE_ROLE_KEY` — ключ для серверной синхронизации в Supabase
@@ -173,7 +173,7 @@ SUPABASE_SERVICE_ROLE_KEY=...
 SUPABASE_SYNC_TRANSPORT=auto
 ```
 
-В production на Vercel Supabase должен быть source of truth: runtime state читается и пишется в таблицу `runtime_states`, а relational tables остаются проекцией для аналитики, артефактов и будущего интерфейса.
+В режиме `primary` Supabase является source of truth: runtime state читается и пишется в таблицу `runtime_states`, а relational tables остаются проекцией для аналитики, артефактов и интерфейса.
 
 Для локальной разработки можно оставить:
 
@@ -257,22 +257,26 @@ npm run workspace:membership -- grant --user-id <auth-user-uuid> --workspace-slu
 ## Следующие шаги
 
 - Пошаговый продуктовый план: [docs/STEP_BY_STEP_PLAN.md](</Users/aleksandrseledcik/Library/Mobile Documents/com~apple~CloudDocs/Проект ТГ Бота/docs/STEP_BY_STEP_PLAN.md>)
+- План реального пилота: [docs/ALPHA_PILOT_PLAN.md](docs/ALPHA_PILOT_PLAN.md)
+- Эксплуатация VPS: [docs/VPS_DEPLOYMENT.md](docs/VPS_DEPLOYMENT.md)
 - Golden evals: [evals/golden-cases.json](</Users/aleksandrseledcik/Library/Mobile Documents/com~apple~CloudDocs/Проект ТГ Бота/evals/golden-cases.json>)
 - Diagnostic quality evals: [evals/diagnostic-quality-cases.json](</Users/aleksandrseledcik/Library/Mobile Documents/com~apple~CloudDocs/Проект ТГ Бота/evals/diagnostic-quality-cases.json>)
 - SQL схема памяти: [supabase/migrations/20260421_init_business_diagnostic.sql](</Users/aleksandrseledcik/Library/Mobile Documents/com~apple~CloudDocs/Проект ТГ Бота/supabase/migrations/20260421_init_business_diagnostic.sql>)
 - Проекция state.json в реляционный вид: [state-projector.js](</Users/aleksandrseledcik/Library/Mobile Documents/com~apple~CloudDocs/Проект ТГ Бота/src/infrastructure/storage/state-projector.js>)
 
-## Vercel Mode
+## Production VPS mode
 
-- Vercel webhook handler: [api/telegram.js](</Users/aleksandrseledcik/Library/Mobile Documents/com~apple~CloudDocs/Проект ТГ Бота/api/telegram.js>)
+- Webhook handler: [api/telegram.js](api/telegram.js)
 - Local polling runner: [telegram-bot.js](</Users/aleksandrseledcik/Library/Mobile Documents/com~apple~CloudDocs/Проект ТГ Бота/src/infrastructure/telegram/telegram-bot.js>)
 - Webhook registration script: [register-telegram-webhook.js](</Users/aleksandrseledcik/Library/Mobile Documents/com~apple~CloudDocs/Проект ТГ Бота/src/scripts/register-telegram-webhook.js>)
 
 Логика одна и та же:
 
 - локально можно продолжать использовать long polling через `npm start`
-- на Vercel Telegram должен ходить в `/api/telegram`
-- после первого деплоя нужно вызвать `npm run telegram:webhook`
+- в production Telegram ходит в `https://aiboss.seledchik.ru/api/telegram`
+- основной сервис запускается в Docker за Nginx на VPS
+- preflight, deploy, rollback, backup и healthcheck находятся в `deploy/`
+- после первоначального переноса webhook повторно регистрируется только при изменении публичного URL или восстановлении настройки
 - бот теперь принимает не только текст, но и `voice`/`audio` сообщения; голосовые сначала транскрибируются через OpenAI, а потом идут в тот же диагностический pipeline
 - если транскрибация не настроена или не удалась, бот честно просит прислать ту же мысль текстом вместо молчаливого игнора
 

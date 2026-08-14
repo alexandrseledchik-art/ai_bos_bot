@@ -1,116 +1,174 @@
-# Перенос AI-BOSS на VPS
+# AI-BOSS production on VPS
 
-Проект подготовлен к запуску на VPS как обычный Node.js-сервис в Docker. Текущий Vercel-режим при этом не ломается: Vercel может продолжать работать, пока мы не переключим домен и Telegram webhook.
+Статус: основной production-контур. Vercel больше не обслуживает Telegram webhook и site navigator.
 
-## Что уже готово
+## Production topology
 
-- `src/self-hosted-server.js` — Node-сервер для VPS.
-- `Dockerfile` — сборка production-контейнера.
-- `docker-compose.yml` — запуск сервиса на порту `3000`.
-- `/healthz` — health-check.
-- API-роуты `/api/telegram`, `/api/site-navigator`, `/api/companies/*`, `/api/mini-app/*`, `/api/platform/*`, `/api/admin/*` работают через те же handlers, что и на Vercel.
-- Страницы `/app`, `/mini-app`, `/companies`, `/admin`, `/book` раздаются как SPA.
+```text
+Telegram / seledchik.ru
+        ↓ HTTPS
+aiboss.seledchik.ru
+        ↓ Nginx
+127.0.0.1:3000
+        ↓
+Docker container ai-boss
+        ├─ OpenAI Responses API
+        ├─ Telegram Bot API
+        └─ Supabase + local replicated state
+```
 
-## Что нужно для фактического переноса
+- VPS: `82.202.131.145`, Ubuntu 24.04.
+- Project: `/srv/codex/projects/ai-boss`.
+- Public URL: `https://aiboss.seledchik.ru`.
+- Telegram webhook: `https://aiboss.seledchik.ru/api/telegram`.
+- Node.js port is published only on `127.0.0.1:3000`.
+- Nginx configuration source: `deploy/nginx-aiboss.seledchik.ru.conf`.
 
-1. VPS с доступом по SSH.
-2. DNS-запись `aiboss.seledchik.ru A 82.202.131.145`.
-3. `.env` с production-переменными.
-4. Решение, где храним состояние:
-   - Supabase — предпочтительно, если хотим не зависеть от файлов на сервере.
-   - `DATA_ROOT=/app/data` — подходит для простого режима, но нужно делать backup.
+## Required environment
 
-## Минимальные переменные окружения
+Production secrets live only in `/srv/codex/projects/ai-boss/.env`. The file must have mode `600` and must never be committed.
 
-Обязательные:
+Required variables:
 
-- `TELEGRAM_BOT_TOKEN`
-- `TELEGRAM_WEBHOOK_SECRET`
-- `APP_BASE_URL=https://<домен>`
-- `WEB_SESSION_SECRET`
-- `ADMIN_DASHBOARD_TOKEN`
+- `TELEGRAM_BOT_TOKEN`;
+- `TELEGRAM_WEBHOOK_SECRET`;
+- `APP_BASE_URL=https://aiboss.seledchik.ru`;
+- `ADMIN_DASHBOARD_TOKEN`;
+- `OPENAI_API_KEY`;
+- `SUPABASE_URL`;
+- `SUPABASE_SERVICE_ROLE_KEY`.
 
-Если используем Supabase:
+Important optional variables:
 
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `SUPABASE_STATE_MODE`
-- `MEMORY_BACKEND`
+- `WEB_SESSION_SECRET` — separate signature secret for platform login;
+- `OPENAI_REASONING_MODEL` — active reasoning model;
+- `OPENAI_REASONING_EFFORT`;
+- `OPENAI_TRANSCRIPTION_MODEL`;
+- `MEMORY_BACKEND=supabase`;
+- `SUPABASE_STATE_MODE=replicated` for local state with Supabase projection, or `primary` when Supabase is the only runtime source of truth;
+- Google Drive integration variables.
 
-Если используем OpenAI:
+Never pass secret values in command arguments, chat messages, Git or Docker image layers.
 
-- `OPENAI_API_KEY`
-- `OPENAI_MODEL`
+## Routine commands
 
-Если нужна Google Drive-интеграция:
-
-- `GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL`
-- `GOOGLE_DRIVE_PRIVATE_KEY`
-- `GOOGLE_DRIVE_FOLDER_ID`
-
-## Запуск на VPS
+Run from the project directory:
 
 ```bash
-git clone <repo-url> ai-boss
-cd ai-boss
-cp .env.example .env
-# заполнить .env production-значениями
-docker compose up -d --build
-curl http://127.0.0.1:3000/healthz
+npm run vps:preflight
+npm run vps:health
+npm run vps:health:deep
+npm run vps:backup
 ```
 
-Ожидаемый ответ:
+The shallow health check verifies:
 
-```json
-{"ok":true,"service":"ai-boss","mode":"self-hosted"}
+- Docker health;
+- local and public `/healthz`;
+- public Telegram endpoint;
+- Telegram webhook URL and current Telegram delivery error.
+
+The deep check additionally performs one real site-navigator model call and a signed empty Telegram webhook probe. It should be used after deploys, not every five minutes.
+
+## Deployment
+
+Production deploy requires a clean Git worktree:
+
+```bash
+git status --short
+npm run vps:deploy
 ```
 
-## Nginx перед сервисом
+`vps:deploy` performs the following sequence:
 
-Пример:
+1. validates `.env`, Docker, Compose and the public URL;
+2. runs the production regression suite;
+3. creates a protected backup;
+4. builds an immutable image `ai-boss:git-<revision>`;
+5. starts a canary on `127.0.0.1:3001`;
+6. checks canary health and makes a real site-navigator request;
+7. replaces the production container;
+8. waits for Docker health;
+9. runs the public deep health check;
+10. records current and previous images in `/srv/codex/runtime/ai-boss`.
 
-```nginx
-server {
-    server_name aiboss.seledchik.ru;
+On a failed production health check, the script restores the previous container or image automatically.
 
-  location / {
-    proxy_pass http://127.0.0.1:3000;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-  }
-}
-```
-
-Порт контейнера публикуется только на `127.0.0.1:3000`; прямой доступ к Node.js из интернета не требуется.
-
-После этого включить HTTPS через `certbot`.
-
-## Переключение Telegram
-
-После того как домен открылся по HTTPS:
+The Telegram webhook normally does not need to be registered again because its URL remains unchanged. To verify or restore it explicitly:
 
 ```bash
 docker compose exec ai-boss npm run telegram:webhook
-docker compose exec ai-boss npm run telegram:miniapp
 ```
-
-Важно: `APP_BASE_URL` должен быть уже равен VPS-домену.
 
 ## Rollback
 
-Если нужно быстро вернуться на Vercel:
+```bash
+npm run vps:rollback
+```
 
-1. Вернуть `APP_BASE_URL=https://aibosbot.vercel.app`.
-2. Снова зарегистрировать webhook на Vercel.
-3. Проверить `/api/telegram`.
+Rollback uses the recorded previous image, creates a backup before switching and verifies service health afterwards.
 
-## Что остаётся сделать вручную
+## Backups
 
-- Дать SSH-доступ к VPS.
-- Выбрать домен или поддомен.
-- Перенести production `.env`.
-- Настроить Nginx и HTTPS.
-- Перерегистрировать Telegram webhook.
+`deploy/vps-backup.sh` stores protected backups in `/srv/codex/backups/ai-boss`:
+
+- local `data/` archive;
+- a mode-`600` copy of `.env`;
+- manifest with Git revision, Docker image and SHA-256 checksums.
+
+Retention is 30 days. The directory is mode `700`.
+
+This backup does not replace Supabase provider backups. If Supabase becomes the only source of truth, database-level backup and restore must also be configured in Supabase.
+
+## Scheduled operations
+
+Systemd units are stored in `deploy/systemd`. Install them once as root:
+
+```bash
+sudo deploy/install-systemd.sh
+```
+
+Timers:
+
+- `ai-boss-health.timer` — every five minutes;
+- `ai-boss-backup.timer` — daily at approximately 03:30 UTC.
+
+Inspect them with:
+
+```bash
+systemctl status ai-boss-health.timer ai-boss-backup.timer
+journalctl -u ai-boss-health.service -n 100
+journalctl -u ai-boss-backup.service -n 100
+```
+
+## Nginx and TLS
+
+The active Nginx site must proxy all routes to `127.0.0.1:3000`. There must be no special proxy to `aibosbot.vercel.app`.
+
+Before reload:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+TLS certificates are managed by Certbot under `/etc/letsencrypt/live/aiboss.seledchik.ru`.
+
+## Post-deploy verification
+
+Required checks:
+
+```bash
+curl -fsS https://aiboss.seledchik.ru/healthz
+npm run vps:health:deep
+docker ps --filter name=ai-boss
+docker logs --since 10m ai-boss
+```
+
+Expected state:
+
+- container `ai-boss` is `healthy`;
+- webhook points to the VPS domain and IP `82.202.131.145`;
+- pending Telegram updates do not grow;
+- site navigator returns a live answer;
+- recent logs contain no repeating errors.

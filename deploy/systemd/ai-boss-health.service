@@ -1,0 +1,12 @@
+[Unit]
+Description=AI-BOSS production health check
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=codex
+Group=codex
+WorkingDirectory=/srv/codex/projects/ai-boss
+ExecStart=/srv/codex/projects/ai-boss/deploy/vps-healthcheck.sh
+UMask=0077
