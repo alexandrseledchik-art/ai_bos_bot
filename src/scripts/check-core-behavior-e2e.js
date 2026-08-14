@@ -58,7 +58,7 @@ const bookStart = await service.handleUserMessage({
 });
 assert.match(bookStart.reply, /Доступ к инструментам AI-BOSS открыт/i);
 assert.equal(bookStart.runtime?.entryAttribution?.entryChannel, "book");
-assert.deepEqual(bookStart.runtime?.entryAttribution?.channelPath, ["book", "qr", "telegram"]);
+assert.deepEqual(bookStart.runtime?.entryAttribution?.channelPath, ["book", "qr", "web_cabinet", "telegram"]);
 const bookStartState = await store.readState();
 const bookStartThread = bookStartState.threads.find((item) => item.telegramChatId === "core-behavior-e2e-book-start");
 assert.equal(bookStartThread?.entryState?.audienceProfile?.entryChannel?.value, "book");

@@ -304,7 +304,9 @@ function parseStartCommand(text) {
     payload,
     entryChannel,
     channelPath: [...new Set([
-      ...(entryChannel === "book" && /qr|kuar/.test(payload) ? ["book", "qr"] : [entryChannel]),
+      ...(entryChannel === "book"
+        ? ["book", ...(/qr|kuar/.test(payload) ? ["qr"] : []), "web_cabinet"]
+        : [entryChannel]),
       "telegram"
     ])]
   };

@@ -172,12 +172,12 @@ function createSeed() {
           entryAttribution: {
             sourcePayload: "book_qr",
             entryChannel: "book",
-            channelPath: ["book", "qr", "telegram"],
+            channelPath: ["book", "qr", "web_cabinet", "telegram"],
             firstStartedAt: "2026-05-01T10:00:00.000Z"
           },
           audienceProfile: {
             entryChannel: { value: "book" },
-            channelPath: ["book", "qr", "telegram"],
+            channelPath: ["book", "qr", "web_cabinet", "telegram"],
             primarySegment: {
               id: "owner_medium_management_gap",
               title: "Собственник выросшего бизнеса с разрывом управляемости"
