@@ -19,29 +19,40 @@ container_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health
 [[ "$container_status" == "running" ]] || { echo "AI-BOSS container is not running" >&2; exit 1; }
 [[ "$container_health" == "healthy" ]] || { echo "AI-BOSS container health is $container_health" >&2; exit 1; }
 
-curl --fail --silent --show-error --max-time 10 http://127.0.0.1:3000/healthz >/dev/null
-curl --fail --silent --show-error --max-time 15 "$public_base_url/healthz" >/dev/null
-curl --fail --silent --show-error --max-time 15 "$public_base_url/api/telegram" >/dev/null
+curl --fail --silent --show-error --retry 2 --retry-all-errors --max-time 10 http://127.0.0.1:3000/healthz >/dev/null
+curl --fail --silent --show-error --retry 2 --retry-all-errors --max-time 15 "$public_base_url/healthz" >/dev/null
+curl --fail --silent --show-error --retry 2 --retry-all-errors --max-time 15 "$public_base_url/api/telegram" >/dev/null
 
 docker exec "$container_name" node -e '
-  fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getWebhookInfo`)
-    .then((response) => response.json())
-    .then((payload) => {
-      if (!payload.ok) throw new Error(payload.description || "getWebhookInfo failed");
-      const info = payload.result || {};
-      if (info.url !== "https://aiboss.seledchik.ru/api/telegram") {
-        throw new Error(`unexpected webhook: ${info.url || "not set"}`);
+  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  async function check() {
+    let lastError;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        const response = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getWebhookInfo`);
+        const payload = await response.json();
+        if (!payload.ok) throw new Error(payload.description || "getWebhookInfo failed");
+        const info = payload.result || {};
+        if (info.url !== "https://aiboss.seledchik.ru/api/telegram") {
+          throw new Error(`unexpected webhook: ${info.url || "not set"}`);
+        }
+        if (info.last_error_message) throw new Error(info.last_error_message);
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt < 3) await wait(attempt * 1000);
       }
-      if (info.last_error_message) throw new Error(info.last_error_message);
-    })
-    .catch((error) => {
-      console.error(`Telegram webhook check failed: ${error.message}`);
-      process.exit(1);
-    });
+    }
+    throw lastError;
+  }
+  check().catch((error) => {
+    console.error(`Telegram webhook check failed: ${error.message}`);
+    process.exit(1);
+  });
 '
 
 if [[ "$deep" == true ]]; then
-  curl --fail --silent --show-error --max-time 90 \
+  curl --fail --silent --show-error --retry 2 --retry-all-errors --max-time 90 \
     -X POST "$public_base_url/api/site-navigator" \
     -H 'Origin: https://seledchik.ru' \
     -H 'Content-Type: application/json' \
