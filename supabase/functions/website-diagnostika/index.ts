@@ -226,7 +226,7 @@ Deno.serve(async (request: Request) => {
   if (maturityScores.length !== 10 || maturityScores.some((value) => !Number.isInteger(value) || value < 1 || value > 5)) {
     return json({ ok: false, error: "scores" }, 400, origin);
   }
-  if (companyAnswers.length !== 7 || !Number.isFinite(average) || average < 1 || average > 5) {
+  if (![0, 7].includes(companyAnswers.length) || !Number.isFinite(average) || average < 1 || average > 5) {
     return json({ ok: false, error: "result" }, 400, origin);
   }
   const attributionSource = typeof source.attribution === "object" && source.attribution !== null
