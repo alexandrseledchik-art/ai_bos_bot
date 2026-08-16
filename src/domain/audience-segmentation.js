@@ -135,9 +135,9 @@ function detectBusinessSize(text, userMeta = {}) {
 
   return firstMatch(text, [
     { value: "group", pattern: /группа\s+компаний|холдинг|сеть\s+компаний/ },
-    { value: "large", pattern: /крупн(?:ый|ого)\s+бизнес/ },
-    { value: "medium", pattern: /средн(?:ий|его)\s+бизнес/ },
-    { value: "small", pattern: /мал(?:ый|ого)\s+бизнес/ },
+    { value: "large", pattern: /крупн(?:ый|ого|ому|ом|ая|ой|ую)(?:\s+[a-zа-я0-9-]+){0,3}\s+[a-zа-я0-9-]*бизнес[а-я]*/ },
+    { value: "medium", pattern: /средн(?:ий|его|ему|ем|яя|ей|юю)(?:\s+[a-zа-я0-9-]+){0,3}\s+[a-zа-я0-9-]*бизнес[а-я]*/ },
+    { value: "small", pattern: /мал(?:ый|ого|ому|ом|ая|ой|ую)(?:\s+[a-zа-я0-9-]+){0,3}\s+[a-zа-я0-9-]*бизнес[а-я]*/ },
     { value: "micro", pattern: /микробизнес/ },
     { value: "solo", pattern: /работаю\s+один|работаю\s+одна|соло[-\s]?бизнес|без\s+команды/ }
   ]);
@@ -151,18 +151,18 @@ function detectDevelopmentStage(text) {
     { value: "first_sales", pattern: /первые\s+продажи|перв(?:ые|ых)\s+клиент/ },
     { value: "launch", pattern: /запускаю\s+бизнес|запуск\s+бизнес|только\s+стартуем/ },
     { value: "stabilization", pattern: /стабилизац|нужно\s+стабилизировать|восстановить\s+контроль/ },
-    { value: "growth", pattern: /растущ(?:ий|его)\s+бизнес|бизнес\s+растет|стадия\s+роста/ }
+    { value: "growth", pattern: /растущ(?:ий|его)\s+бизнес|бизнес\s+растет|стади[ияе]\s+роста/ }
   ]);
 }
 
 function detectBusinessStates(text) {
   const candidates = [
     { value: "owner_operational_trap", pattern: /застрял\s+в\s+операцион|застряла\s+в\s+операцион|все\s+держится\s+на\s+мне|собственник\s+перегруж/ },
-    { value: "management_gap", pattern: /нет\s+управляемост|разрыв\s+управляемост|управляемость\s+не\s+успел|меньше\s+контрол|непонятно,?\s+кто\s+за\s+что\s+отвеч/ },
+    { value: "management_gap", pattern: /нет\s+управляемост|разрыв\s+управляемост|управляемость\s+не\s+успел|меньше\s+контрол|непонятно,?\s+кто\s+за\s+что\s+отвеч|решени[ея]\s+завис|кажд[а-я]*\s+[а-я]*\s*меня[а-я]*\s+приоритет|команда\s+.*не\s+понима[а-я]*.*решени[а-я]*\s+окончатель/ },
     { value: "profit_decline", pattern: /падает\s+прибыл|прибыль\s+падает|маржа\s+(?:упала|падает|снижается)|выручка\s+есть,?\s+а\s+прибыл/ },
     { value: "process_chaos", pattern: /хаос\s+в\s+процесс|процессы\s+не\s+держ|ручной\s+хаос|рост\s+усил.*хаос/ },
     { value: "focus_gap", pattern: /не\s+выбран\s+фокус|нет\s+фокуса|распыляемся|слишком\s+много\s+направлен/ },
-    { value: "data_gap", pattern: /нет\s+данных|не\s+знаем,?\s+каким\s+цифрам\s+верить|нет\s+единой\s+картины\s+цифр|данные\s+расходятся/ },
+    { value: "data_gap", pattern: /нет\s+данных|не\s+знаем,?\s+каким\s+цифрам\s+верить|нет\s+единой\s+(?:картины|версии)(?:\s+цифр|\s+данных)?|разн(?:ые|ая)\s+данн|данные\s+расходятся/ },
     { value: "team_growth_gap", pattern: /команда\s+не\s+держит\s+рост|команда\s+не\s+тянет\s+рост|рост\s+перегружает\s+команд/ }
   ];
   const values = candidates.filter((candidate) => candidate.pattern.test(text)).map((candidate) => candidate.value);
@@ -228,7 +228,7 @@ function detectCurrentTask(text) {
   return firstMatch(text, [
     { value: "package_methodology", pattern: /упакова(?:ть|т|ыва).*методолог|методолог.*в\s+продукт|экспертн.*продукт/ },
     { value: "restore_manageability", pattern: /вернуть\s+управляемост|собрать\s+систему\s+управлен|понять,?\s+кто\s+за\s+что\s+отвеч/ },
-    { value: "prepare_scaling", pattern: /подготов.*масштаб|масштаб.*без\s+хаос|готовност.*к\s+рост/ },
+    { value: "prepare_scaling", pattern: /подготов.*масштаб|перед\s+масштабирован|масштаб.*без\s+хаос|готовност.*к\s+рост/ },
     { value: "find_primary_constraint", pattern: /что\s+чинить\s+перв|главн.*ограничен|что\s+делать\s+перв/ },
     { value: "try_book_idea", pattern: /попробовать\s+на\s+своем\s+бизнес|открыть\s+инструмент|иде[юя]\s+из\s+книг/ }
   ]);
@@ -253,7 +253,7 @@ function buildSegmentCandidates(profile) {
   const scalingEvidence = [
     [role === "owner" || role === "ceo", "role"],
     [stage === "growth" || stage === "scaling", "stage"],
-    [states.has("process_chaos") || states.has("team_growth_gap") || states.has("management_gap"), "state"],
+    [states.has("process_chaos") || states.has("team_growth_gap") || states.has("management_gap") || states.has("focus_gap"), "state"],
     [task === "prepare_scaling", "task"]
   ];
   candidates.push(scoreSegment(PRIORITY_SEGMENTS[1], scalingEvidence));
@@ -263,20 +263,25 @@ function buildSegmentCandidates(profile) {
     [task === "package_methodology", "task"],
     [profile.industry.value === "consulting", "industry"]
   ];
-  candidates.push(scoreSegment(PRIORITY_SEGMENTS[2], expertEvidence));
+  candidates.push(scoreSegment(PRIORITY_SEGMENTS[2], expertEvidence, {
+    qualifies: (matchedAxes) => matchedAxes.includes("role") && matchedAxes.includes("task")
+  }));
 
   return candidates.sort((left, right) => right.score - left.score || left.commercialPriority - right.commercialPriority);
 }
 
-function scoreSegment(segment, evidence) {
+function scoreSegment(segment, evidence, { qualifies = null } = {}) {
   const matchedAxes = evidence.filter(([matched]) => matched).map(([, name]) => name);
   const score = Number((matchedAxes.length / evidence.length).toFixed(2));
+  const isQualified = typeof qualifies === "function"
+    ? qualifies(matchedAxes)
+    : score >= 0.75 && matchedAxes.includes("role");
   return {
     ...segment,
     score,
     matchedAxes,
     missingAxes: evidence.filter(([matched]) => !matched).map(([, name]) => name),
-    status: score >= 0.75 && matchedAxes.includes("role") ? "qualified" : score >= 0.5 ? "candidate" : "insufficient"
+    status: isQualified ? "qualified" : score >= 0.5 ? "candidate" : "insufficient"
   };
 }
 

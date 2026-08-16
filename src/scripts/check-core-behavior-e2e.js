@@ -222,6 +222,29 @@ const segmented = await service.handleUserMessage({
 assert.equal(segmented.runtime?.audienceProfile?.primarySegment?.id, "owner_medium_management_gap");
 assert.equal(segmented.runtime?.audienceProfile?.entryChannel?.value, "telegram");
 
+const raciFirst = await service.handleUserMessage({
+  telegramChatId: "core-behavior-e2e-raci",
+  text: "Я из книги. Хочу открыть инструмент RACI и разобраться с ответственностью в отделе продаж.",
+  userMeta: {
+    firstName: "Кирилл",
+    username: "core_e2e_raci"
+  }
+});
+assert.equal(raciFirst.classification?.entryMode, "specific_tool_request");
+assert.equal(raciFirst.decision?.skillSelection?.primarySkill, "tool_selection");
+
+const raciContext = await service.handleUserMessage({
+  telegramChatId: "core-behavior-e2e-raci",
+  text: "Я собственник малого бизнеса. По новым клиентам указания дают РОП и коммерческий директор, а финального владельца сделки нет.",
+  userMeta: {
+    firstName: "Кирилл",
+    username: "core_e2e_raci"
+  }
+});
+assert.equal(raciContext.classification?.entryMode, "specific_tool_request");
+assert.equal(raciContext.classification?.inferredToolFollowUp, true);
+assert.equal(raciContext.decision?.skillSelection?.primarySkill, "tool_selection");
+
 const originalReasoner = service.reasoner;
 service.reasoner = {
   async decide(context) {

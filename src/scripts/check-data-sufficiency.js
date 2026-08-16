@@ -162,6 +162,40 @@ function runCase(testCase) {
 function run() {
   const results = CASES.map(runCase);
 
+  const isolationState = emptyState();
+  const isolatedCompany = createCompany({ name: "Isolated", telegramChatId: "isolated" });
+  const isolatedThread = createThread({ telegramChatId: "isolated", companyId: isolatedCompany.id });
+  isolationState.companies.push(isolatedCompany);
+  isolationState.threads.push(isolatedThread);
+  isolationState.observations.push({
+    id: "foreign_observation",
+    caseId: "foreign_case",
+    statement: "Чужой бизнес: заказы передаются без полного ТЗ",
+    confidence: 0.9
+  });
+  isolationState.documentSnapshots = [{
+    id: "foreign_document",
+    companyId: "foreign_company",
+    title: "Чужой документ"
+  }];
+  const isolationData = new AutonomousDataCollector().collect({
+    state: isolationState,
+    context: {
+      userText: "Клиенты не возвращаются",
+      company: { id: isolatedCompany.id, name: isolatedCompany.name },
+      entryState: isolatedThread.entryState,
+      history: []
+    },
+    thread: isolatedThread,
+    company: isolatedCompany,
+    activeCase: null,
+    referenceGate: { primaryReference: { missingParts: [] } }
+  });
+  const leakedForeignFact = isolationData.foundFacts.some((fact) => /Чужой бизнес|Чужой документ/i.test(fact.text));
+  if (leakedForeignFact) {
+    throw new Error("Autonomous data collector leaked facts from another company or case.");
+  }
+
   console.log("");
   console.log("Data sufficiency checks");
   console.log("=======================");

@@ -196,7 +196,7 @@ function quantifyBusinessSignal(text) {
   const value = normalize(text).toLowerCase();
   const numbers = value.match(/\d[\d\s.,]*/g) || [];
   const hasBusinessMeasure = /%|₽|руб|дн|день|час|мин|месяц|недел|квартал|год|лид|заяв|сделк|клиент|проект|обращен|решен|продукт|сегмент|марж|конверс|выруч|прибыл|продаж|срок/.test(value);
-  const hasRelation = numbers.length >= 2 || /(?:за|из|до|с)о?\s+(?:последн|прошл|недел|месяц|квартал|год|\d)|упал|сниз|вырос|составл|дошл|зависл|ждал|задерж/.test(value);
+  const hasRelation = numbers.length >= 2 || /(?:за|из|до|с)о?\s+(?:последн|прошл|недел|месяц|квартал|год|\d)|(?:последн|прошл)[а-яё]*\s+(?:случа|недел|месяц|четверг|пятниц)|упал|сниз|вырос|составл|дошл|зависл|ждал|задерж|сдвинул/.test(value);
   return { strong: numbers.length > 0 && hasBusinessMeasure && hasRelation, numbers: numbers.length };
 }
 
@@ -263,7 +263,7 @@ function layerObservableQuestion(hypothesis, context) {
 function buildEvidenceGate(context, hypotheses) {
   const observedSignalsCount = (context.graphPacket?.observedSignals || []).filter(Boolean).length;
   const graphConfidence = Number(context.graphPacket?.graphConfidence ?? 0);
-  const quantified = quantifyBusinessSignal(context.userText);
+  const quantified = quantifyBusinessSignal(diagnosticScopeText(context));
   const quantifiedSignal = quantified.strong;
   const sufficientByChecker = context.dataSufficiency?.canMakeDecision === true;
   const canSelectConstraint = Boolean(sufficientByChecker || (quantifiedSignal && hypotheses.length >= 2));

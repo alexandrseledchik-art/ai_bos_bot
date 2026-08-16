@@ -264,7 +264,16 @@ function looksDiagnosticMetaFollowUp(text) {
 
 function hasToolFirstContext(thread) {
   return thread?.entryState?.entryMode === "tool_discovery" ||
-    thread?.entryState?.entryMode === "specific_tool_request";
+    thread?.entryState?.entryMode === "specific_tool_request" ||
+    thread?.entryState?.lastSkillSelection?.primarySkill === "tool_selection" ||
+    thread?.entryState?.activeSkillRun?.skillId === "tool_selection";
+}
+
+function hasToolFirstHistory(history = []) {
+  const lastAssistant = [...history].reverse().find((item) => item.role === "assistant");
+  return /конкретн(?:ый|ого)\s+инструмент|матриц[аы]\s+ответственност|\braci\b|\bbhag\b|\bбхаг\b/i.test(
+    String(lastAssistant?.text || "")
+  );
 }
 
 function looksToolFirstFollowUp(classification, history) {
@@ -276,7 +285,7 @@ function looksToolFirstFollowUp(classification, history) {
   }
 
   if (
-    /инструмент|шаблон|таблиц|матриц|файл|заполн|разобрат|как\s+правильно|bhag|бхаг|больш[а-яё\s-]+амбициозн[а-яё\s-]+цел|дерзк[а-яё\s-]+цел|raci|рас[иi]|роль|роли|ответствен|кто\s+.*чем|как\s+.*связан/i.test(
+    /инструмент|шаблон|таблиц|матриц|файл|заполн|разобрат|как\s+правильно|bhag|бхаг|больш[а-яё\s-]+амбициозн[а-яё\s-]+цел|дерзк[а-яё\s-]+цел|raci|рас[иi]|роль|роли|ответствен|финальн[а-яё]*\s+владел|одновременн[а-яё]*\s+.*указан|кто\s+.*чем|как\s+.*связан/i.test(
       cleanText
     )
   ) {
@@ -392,7 +401,7 @@ function contextualizeClassification(classification, thread, history) {
     return classification;
   }
 
-  if (hasToolFirstContext(thread) && looksToolFirstFollowUp(classification, history)) {
+  if ((hasToolFirstContext(thread) || hasToolFirstHistory(history)) && looksToolFirstFollowUp(classification, history)) {
     return {
       ...classification,
       type: "free_text_vague",
@@ -660,6 +669,14 @@ function shouldPromoteToDiagnosticCase(decision, activeCase, classification) {
 }
 
 function buildPersistedMemory(decision) {
+  const constraint = decision.memory.constraint || decision.entryState?.selectedConstraint || "";
+  const firstStep = decision.memory.actionWave?.firstStep || decision.response?.nextStep || decision.entryState?.nextBestStep || "";
+  const firstStepIsQuestion = /\?/.test(firstStep);
+  const inferredExecutionWave =
+    decision.decision?.action !== "clarify" &&
+    decision.orchestration?.transition === "diagnosis_to_execution" &&
+    Boolean(constraint) &&
+    Boolean(firstStep);
   return {
     goal: decision.memory.goal || decision.entryState?.claimedProblem || "",
     symptoms: uniqueStrings([
@@ -670,13 +687,13 @@ function buildPersistedMemory(decision) {
       ...(decision.memory.hypotheses || []),
       ...((decision.entryState?.candidateConstraints || []).map((item) => item.label))
     ], 5),
-    constraint: decision.memory.constraint || decision.entryState?.selectedConstraint || "",
+    constraint,
     situation: decision.memory.situation || "",
     actionWave: {
-      enabled: Boolean(decision.memory.actionWave?.enabled),
-      firstStep: decision.memory.actionWave?.firstStep || decision.entryState?.nextBestStep || "",
+      enabled: Boolean((decision.memory.actionWave?.enabled || inferredExecutionWave) && !firstStepIsQuestion),
+      firstStep,
       notNow: decision.memory.actionWave?.notNow || "",
-      whyThisFirst: decision.memory.actionWave?.whyThisFirst || decision.entryState?.whyThisStep || ""
+      whyThisFirst: decision.memory.actionWave?.whyThisFirst || decision.response?.whyItMatters || decision.entryState?.whyThisStep || ""
     },
     toolRecommendations: decision.memory.toolRecommendations || [],
     artifact: decision.memory.artifact || {
@@ -1216,6 +1233,28 @@ export class ConversationService {
         }
       }
 
+      if (context.skillExecution?.evidenceGate?.canSelectConstraint) {
+        context.dataSufficiency = {
+          ...(context.dataSufficiency || {}),
+          sufficiency: "enough_for_decision",
+          canMakeDecision: true,
+          shouldAskUser: false,
+          minimumQuestion: "",
+          reasonCodes: [
+            ...(context.dataSufficiency?.reasonCodes || []),
+            "accumulated_case_evidence_allows_working_hypothesis"
+          ]
+        };
+        context.referenceGate = {
+          ...(context.referenceGate || {}),
+          status: context.referenceGate?.status === "ready" ? "ready" : "minimum_viable",
+          shouldBlockDiagnosis: false,
+          minimumQuestion: "",
+          overriddenByAccumulatedEvidence: true
+        };
+        context.orchestration = this.modeOrchestrator.orchestrate({ context });
+      }
+
       let decision = await this.reasoner.decide(context);
       decision = this.diagnosticSkillPilot.enforce({
         packet: context.skillExecution,
@@ -1441,9 +1480,22 @@ export class ConversationService {
             alternatives: persistedMemory.hypotheses
           });
           if (proposalResult.created) {
-            if (decision._responseOrigin !== "model") {
+            const alreadyOffersConfirmation = /(?:напиши|команда|слов[оа])?\s*[«\"]?(?:фиксируем|не\s+фиксируем)/i.test(
+              decision.response.responseText
+            );
+            if (!alreadyOffersConfirmation) {
               const proposalPrompt = this.telegramDecisionCycles.buildProposalPrompt(proposalResult.proposal);
-              decision.response.responseText = `${decision.response.responseText.trim()}\n\n${proposalPrompt}`;
+              const confirmation = decision._responseOrigin === "model"
+                ? await this.reasoner.composeReply({
+                    userText: text,
+                    userMeta,
+                    history,
+                    eventType: "decision_proposal_confirmation",
+                    facts: { pendingDecision: proposalResult.proposal },
+                    draft: proposalPrompt
+                  })
+                : proposalPrompt;
+              decision.response.responseText = `${decision.response.responseText.trim()}\n\n${confirmation}`;
               assistantMessage.text = decision.response.responseText;
             }
           }

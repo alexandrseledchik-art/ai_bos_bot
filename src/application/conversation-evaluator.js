@@ -78,13 +78,6 @@ const ISSUE_TEXT = {
     description: "Ответ может быть перегружен для Telegram-диалога.",
     suggestion: "Сжимать ответ до одной мысли, одного объяснения и одного следующего шага."
   },
-  no_mini_app_invite_after_context: {
-    category: "product_flow",
-    severity: "low",
-    title: "Кабинет не предложен вовремя",
-    description: "Контекст уже собран, но бот не предлагает перейти в Кабинет AI-BOSS для профиля, диагностики или артефактов.",
-    suggestion: "После появления рабочего контекста предлагать Кабинет как место памяти и продолжения работы."
-  }
 };
 
 function text(value) {
@@ -203,6 +196,7 @@ export class ConversationEvaluator {
     const messages = detail?.messages || [];
     const userMessages = messages.filter((message) => message.role === "user");
     const assistantMessages = messages.filter((message) => message.role === "assistant");
+    const latestUser = latestMessage(messages, "user");
     const latestAssistant = latestMessage(messages, "assistant");
     const userText = allMessageText(messages, "user");
     const assistantText = allMessageText(messages, "assistant");
@@ -237,7 +231,8 @@ export class ConversationEvaluator {
       });
     }
 
-    if (latestAssistant && !hasClearNextAction(latestAssistant.text)) {
+    const isOutcomeClosure = /^результат\s*:/i.test(text(latestUser?.text));
+    if (latestAssistant && !isOutcomeClosure && !hasClearNextAction(latestAssistant.text)) {
       addIssue(issues, "missing_clear_next_action", {
         latestAssistant: compactText(latestAssistant.text, 220)
       });
@@ -266,12 +261,6 @@ export class ConversationEvaluator {
       });
     }
 
-    if (userMessages.length >= 3 && !hasMiniAppInvite) {
-      addIssue(issues, "no_mini_app_invite_after_context", {
-        userMessages: userMessages.length
-      });
-    }
-
     if (hasObservations) {
       strengths.push("Система сохраняет наблюдения, а не только текст переписки.");
     }
@@ -281,8 +270,8 @@ export class ConversationEvaluator {
     if (hasActionWave) {
       strengths.push("Диалог доведен до следующего практического шага.");
     }
-    if (hasMiniAppInvite) {
-      strengths.push("Пользователю предложен Кабинет AI-BOSS как место продолжения работы.");
+    if (isOutcomeClosure) {
+      strengths.push("Управленческий цикл закрыт фактическим результатом без искусственного нового вопроса.");
     }
     if (latestAssistant && hasClearNextAction(latestAssistant.text)) {
       strengths.push("Последний ответ содержит понятное приглашение к следующему действию.");

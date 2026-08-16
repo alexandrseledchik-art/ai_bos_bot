@@ -66,4 +66,26 @@ assert.equal(readerFollowUp.entryChannel.value, "book");
 assert.deepEqual(readerFollowUp.channelPath, ["book", "qr", "telegram"]);
 assert.equal(readerFollowUp.nurtureOnly, true);
 
+const adjectiveSize = buildAudienceProfile({
+  userText: "Я CEO среднего производственного бизнеса. У нас нет единой картины: отделы показывают разные данные.",
+  orchestration: { operatingMode: "diagnostician" }
+});
+assert.equal(adjectiveSize.businessSize.value, "medium");
+assert.equal(adjectiveSize.businessState.values.includes("data_gap"), true);
+assert.equal(adjectiveSize.primarySegment?.id, "owner_medium_management_gap");
+
+const growthInflection = buildAudienceProfile({
+  userText: "Я собственник среднего IT-бизнеса на стадии роста. Команда не держит рост.",
+  orchestration: { operatingMode: "diagnostician" }
+});
+assert.equal(growthInflection.businessSize.value, "medium");
+assert.equal(growthInflection.developmentStage.value, "growth");
+assert.equal(growthInflection.primarySegment?.id, "owner_pre_scaling_control_risk");
+
+const expertWithoutIndustry = buildAudienceProfile({
+  userText: "Я эксперт, хочу упаковать свою методологию в продукт.",
+  orchestration: { operatingMode: "methodology_expert" }
+});
+assert.equal(expertWithoutIndustry.primarySegment?.id, "expert_methodology_productization");
+
 console.log("Audience segmentation checks passed: axes stay separate and priority intersections qualify correctly.");

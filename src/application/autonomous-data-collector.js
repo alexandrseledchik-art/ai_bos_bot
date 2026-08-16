@@ -102,6 +102,14 @@ function matchesMissingPart(factText, missingPart) {
   return tokens.some((token) => text.includes(token));
 }
 
+function belongsToActiveScope(item = {}, { activeCaseId = "", companyId = "" } = {}) {
+  const itemCaseId = normalizeText(item.caseId || item.case_id);
+  const itemCompanyId = normalizeText(item.companyId || item.company_id);
+  if (activeCaseId && itemCaseId) return itemCaseId === activeCaseId;
+  if (companyId && itemCompanyId) return itemCompanyId === companyId;
+  return false;
+}
+
 function collectFactsFromState({ state = {}, context = {}, thread, company, activeCase }) {
   const facts = [];
   const activeCaseId = activeCase?.id || context.activeCase?.id || thread?.activeCaseId || "";
@@ -178,7 +186,8 @@ function collectFactsFromState({ state = {}, context = {}, thread, company, acti
     confidence: 0.52
   });
 
-  const observations = (state.observations || []).filter((item) => !activeCaseId || item.caseId === activeCaseId || item.case_id === activeCaseId);
+  const scope = { activeCaseId, companyId };
+  const observations = (state.observations || []).filter((item) => belongsToActiveScope(item, scope));
   for (const observation of observations) {
     pushFact(facts, {
       text: observation.statement || observation.normalizedSignal || observation.normalized_signal,
@@ -199,7 +208,7 @@ function collectFactsFromState({ state = {}, context = {}, thread, company, acti
     });
   }
 
-  const goals = (state.goals || []).filter((item) => !activeCaseId || item.caseId === activeCaseId || item.case_id === activeCaseId);
+  const goals = (state.goals || []).filter((item) => belongsToActiveScope(item, scope));
   for (const goal of goals) {
     pushFact(facts, {
       text: goal.statement,
@@ -210,7 +219,7 @@ function collectFactsFromState({ state = {}, context = {}, thread, company, acti
     });
   }
 
-  const symptoms = (state.symptoms || []).filter((item) => !activeCaseId || item.caseId === activeCaseId || item.case_id === activeCaseId);
+  const symptoms = (state.symptoms || []).filter((item) => belongsToActiveScope(item, scope));
   for (const symptom of symptoms) {
     pushFact(facts, {
       text: symptom.statement,
@@ -221,7 +230,7 @@ function collectFactsFromState({ state = {}, context = {}, thread, company, acti
     });
   }
 
-  const hypotheses = (state.hypotheses || []).filter((item) => !activeCaseId || item.caseId === activeCaseId || item.case_id === activeCaseId);
+  const hypotheses = (state.hypotheses || []).filter((item) => belongsToActiveScope(item, scope));
   for (const hypothesis of hypotheses) {
     pushFact(facts, {
       text: hypothesis.statement,
@@ -232,7 +241,7 @@ function collectFactsFromState({ state = {}, context = {}, thread, company, acti
     });
   }
 
-  const constraints = (state.constraints || []).filter((item) => !activeCaseId || item.caseId === activeCaseId || item.case_id === activeCaseId);
+  const constraints = (state.constraints || []).filter((item) => belongsToActiveScope(item, scope));
   for (const constraint of constraints) {
     pushFact(facts, {
       text: constraint.statement,
@@ -244,7 +253,7 @@ function collectFactsFromState({ state = {}, context = {}, thread, company, acti
   }
 
   const companyProfiles = (state.companyProfiles || state.company_profiles || []).filter(
-    (item) => !companyId || item.companyId === companyId || item.company_id === companyId
+    (item) => belongsToActiveScope(item, scope)
   );
   for (const profile of companyProfiles) {
     for (const fact of factsFromArray(
@@ -268,7 +277,7 @@ function collectFactsFromState({ state = {}, context = {}, thread, company, acti
   }
 
   const problemContexts = (state.problemContexts || state.problem_contexts || []).filter(
-    (item) => !activeCaseId || item.caseId === activeCaseId || item.case_id === activeCaseId
+    (item) => belongsToActiveScope(item, scope)
   );
   for (const problem of problemContexts) {
     pushFact(facts, {
@@ -280,7 +289,8 @@ function collectFactsFromState({ state = {}, context = {}, thread, company, acti
     });
   }
 
-  const diagnosticAnswers = state.diagnosticAnswers || state.diagnostic_answers || [];
+  const diagnosticAnswers = (state.diagnosticAnswers || state.diagnostic_answers || [])
+    .filter((item) => belongsToActiveScope(item, scope));
   for (const answer of diagnosticAnswers) {
     if (answer.status && !["confirmed", "corrected", "user_confirmed_inference"].includes(answer.status)) {
       continue;
@@ -297,7 +307,7 @@ function collectFactsFromState({ state = {}, context = {}, thread, company, acti
   const documents = [
     ...(state.documentSnapshots || state.document_snapshots || []),
     ...(state.documentSources || state.document_sources || [])
-  ];
+  ].filter((item) => belongsToActiveScope(item, scope));
   for (const document of documents) {
     pushFact(facts, {
       text: document.summary || document.title || document.url,
