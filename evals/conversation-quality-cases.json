@@ -249,6 +249,70 @@
     ]
   },
   {
+    "id": "book_navigation_gives_value_before_route",
+    "turns": [
+      "Расскажи о книге"
+    ],
+    "expectedAction": "clarify",
+    "turnChecks": [
+      {
+        "mustContain": ["Книга подходит собственнику", "реальную ситуацию", "привела вас к книге"],
+        "mustNotContain": ["купите", "тариф", "связаться с Александром", "пройдите длинную диагностику"],
+        "requireQuestion": true,
+        "maxParagraphs": 3,
+        "maxChars": 1200
+      }
+    ]
+  },
+  {
+    "id": "product_navigation_uses_one_choice_criterion",
+    "turns": [
+      "Что мне выбрать: книгу или диагностику?"
+    ],
+    "expectedAction": "clarify",
+    "turnChecks": [
+      {
+        "mustContain": ["нужный результат", "общую картину", "конкретной ситуации"],
+        "mustNotContain": ["самый дорогой", "обязательно консультация", "оставьте заявку"],
+        "requireQuestion": true,
+        "maxParagraphs": 3,
+        "maxChars": 1200
+      }
+    ]
+  },
+  {
+    "id": "alexander_handoff_builds_brief_before_contact",
+    "turns": [
+      "Хочу поговорить с Александром"
+    ],
+    "expectedAction": "clarify",
+    "turnChecks": [
+      {
+        "mustContain": ["короткий контекст", "не с повторения всей истории", "конкретный результат"],
+        "mustNotContain": ["Я Александр", "стоимость составит", "Александр точно возьмёт", "t.me/seledchikpro"],
+        "requireQuestion": true,
+        "maxParagraphs": 3,
+        "maxChars": 1200
+      }
+    ]
+  },
+  {
+    "id": "consultation_request_does_not_make_promises",
+    "turns": [
+      "Мне нужна личная консультация"
+    ],
+    "expectedAction": "clarify",
+    "turnChecks": [
+      {
+        "mustContain": ["Подключить Александра имеет смысл", "соберу короткий контекст"],
+        "mustNotContain": ["встреча назначена", "гарантирую", "цена", "срок"],
+        "requireQuestion": true,
+        "maxParagraphs": 3,
+        "maxChars": 1200
+      }
+    ]
+  },
+  {
     "id": "conversation_openers_do_not_repeat_same_rhythm",
     "turns": [
       "Хочу разобрать бизнес",

@@ -73,7 +73,7 @@ export const AI_BOSS_SKILLS_V1 = Object.freeze([
     outputs: ["primarySkill", "supportingSkills", "communicationSkill", "turnGoal", "completionCondition", "prohibitedActions"],
     memoryUpdates: ["activeSkillRun", "skillSelectionReason", "nextSkillCandidates"],
     completionCriteria: ["Выбран не более чем один основной скилл", "Определён измеримый результат хода", "Исключены опасные и нерелевантные скиллы"],
-    nextSkillCandidates: ["intent_clarification", "business_diagnostic", "architecture_navigation", "tool_facilitation", "document_analysis", "concept_explanation"],
+    nextSkillCandidates: ["intent_clarification", "business_diagnostic", "architecture_navigation", "tool_facilitation", "document_analysis", "concept_explanation", "product_navigation", "alexander_handoff"],
     currentImplementation: ["src/application/ai-boss-mode-orchestrator.js", "src/application/conversation-service.js", "src/application/classify-input.js"]
   }),
   skill({
@@ -143,6 +143,41 @@ export const AI_BOSS_SKILLS_V1 = Object.freeze([
     completionCriteria: ["Понятен требуемый пользователю результат", "Выбран следующий содержательный скилл"],
     nextSkillCandidates: ["business_diagnostic", "architecture_navigation", "tool_selection", "concept_explanation"],
     currentImplementation: ["src/application/classify-input.js", "src/application/intent-integrity-checker.js", "src/application/guardrails.js"]
+  }),
+  skill({
+    id: "product_navigation",
+    version: "1.0.0",
+    department: SKILL_DEPARTMENTS.COMMUNICATION,
+    kind: SKILL_KINDS.COMMUNICATION,
+    activation: SKILL_ACTIVATION.PRIMARY,
+    purpose: "Помочь выбрать один подходящий маршрут между книгой, диагностикой, AI-BOSS и личной работой с Александром.",
+    whenToUse: ["Пользователь сравнивает продукты", "Неясно, с какого формата начать", "Запрос относится к книге или экосистеме AI-BOSS"],
+    whenNotToUse: ["Не показывать каталог без понимания задачи", "Не вести к самому дорогому формату по умолчанию"],
+    requiredContext: ["userIntent", "audienceProfile", "availableRoutes"],
+    inputs: ["currentTask", "desiredDepth", "readinessForChange"],
+    outputs: ["recommendedRoute", "whyThisRoute", "oneNextAction"],
+    memoryUpdates: ["preferredProductRoute", "routeReason"],
+    completionCriteria: ["Рекомендован один маршрут", "Пользователь понимает, почему он подходит и что сделать дальше"],
+    nextSkillCandidates: ["concept_explanation", "maturity_assessment", "business_diagnostic", "alexander_handoff"],
+    currentImplementation: ["src/domain/alexander-decision-model.js", "src/application/prompt-builder.js", "src/application/skill-orchestrator.js"]
+  }),
+  skill({
+    id: "alexander_handoff",
+    version: "1.0.0",
+    department: SKILL_DEPARTMENTS.COMMUNICATION,
+    kind: SKILL_KINDS.COMMUNICATION,
+    activation: SKILL_ACTIVATION.PRIMARY,
+    purpose: "Проверить необходимость личного участия Александра и подготовить содержательную передачу разговора без потери контекста.",
+    whenToUse: ["Пользователь прямо просит связаться с Александром", "Нужна личная работа, партнёрство или высокорисковая развилка", "AI-BOSS достиг границы полномочий"],
+    whenNotToUse: ["Не передавать обычный вопрос без первой пользы", "Не обещать цену, срок или участие Александра без подтверждения"],
+    requiredContext: ["userIdentity", "businessContext", "currentTask", "conversationSummary"],
+    inputs: ["role", "businessScale", "situation", "urgency", "desiredOutcome", "workAlreadyDone"],
+    outputs: ["handoffReadiness", "oneMissingBriefQuestion", "handoffBrief", "contactRoute"],
+    memoryUpdates: ["handoffStatus", "handoffBrief", "handoffReason"],
+    artifactTypes: ["consultation_brief"],
+    completionCriteria: ["Понятно, зачем требуется Александр", "Собран короткий бриф или задан один недостающий вопрос", "Не даны неподтверждённые обещания"],
+    nextSkillCandidates: ["artifact_builder", "progress_navigation", "product_navigation"],
+    currentImplementation: ["src/domain/alexander-decision-model.js", "src/application/prompt-builder.js", "src/application/skill-orchestrator.js", "src/application/consultation-brief-builder.js"]
   }),
   skill({
     id: "diagnostic_interview",

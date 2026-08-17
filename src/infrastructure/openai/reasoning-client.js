@@ -2733,6 +2733,124 @@ function buildUnknownDecision(context) {
   };
 }
 
+function buildProductNavigationDecision(context) {
+  const text = normalizeText(context.userText);
+  const entryState = buildEntryState(context, "general", "weak", "", "keep_in_entry");
+  const comparesFormats = /(?:что|какой|как)\s+(?:мне\s+)?выбрать|\bили\b|сравн|отлич|разниц/i.test(text);
+  const asksAboutBook = /книг|прочитал|глав|что\s+внутри/i.test(text) && !comparesFormats;
+  const responseText = asksAboutBook
+    ? [
+        "Книга подходит собственнику, который хочет увидеть бизнес целиком, а не чинить продажи, команду, деньги и процессы по отдельности. Внутри путь от диагностики и условий игры до спроса, результата, устойчивости и выбора первого приоритета.",
+        "Её лучше использовать не только для чтения: выберите одну реальную ситуацию в компании, а AI-BOSS поможет связать её с нужной идеей и инструментом. Какая задача в бизнесе привела вас к книге сейчас?"
+      ].join("\n\n")
+    : [
+        "Здесь лучше выбирать не самый большой формат, а тот, который даст нужный результат с минимальным лишним движением. Книга помогает увидеть систему, диагностика даёт общий срез, AI-BOSS ведёт конкретный кейс, а личная работа с Александром нужна для сложной собственнической развилки.",
+        "Какой результат вам важнее получить сейчас: общую картину бизнеса или решение уже конкретной ситуации?"
+      ].join("\n\n");
+
+  return {
+    selectedMode: "clarification_mode",
+    decision: {
+      action: "clarify",
+      signalSufficiency: "weak",
+      confidence: 0.84,
+      rationale: "Нужно сначала дать полезную рамку выбора и получить один критерий, а не показывать каталог продуктов."
+    },
+    response: {
+      whatIUnderstood: asksAboutBook
+        ? "Пользователь хочет понять, подходит ли ему книга и как связать её с практикой."
+        : "Пользователь выбирает подходящий формат работы в экосистеме Александра.",
+      hypotheses: ["Маршрут нужно выбирать по требуемому результату и глубине участия."],
+      whyItMatters: "Так пользователь не попадает в лишний или преждевременно сложный формат.",
+      nextStep: asksAboutBook
+        ? "Назвать текущую задачу, чтобы связать её с идеей и инструментом книги."
+        : "Уточнить, нужна общая картина или решение конкретной ситуации.",
+      responseText
+    },
+    guardrails: {
+      knownFacts: ["Пользователь спрашивает о книге или выборе формата."],
+      observations: ["Это навигационный запрос, а не основание для диагноза бизнеса."],
+      workingHypotheses: ["Подходящий маршрут зависит от желаемого результата."],
+      canNotAssert: ["Нельзя рекомендовать личную работу или диагностику без понимания задачи."],
+      confidenceNote: "Сейчас выбирается маршрут, а не ставится диагноз."
+    },
+    graphAnalysis: buildGraphAnalysisPacket(context.graphPacket),
+    entryState: {
+      ...entryState,
+      entryMode: "product_navigation",
+      nextBestQuestion: asksAboutBook
+        ? "Какая задача в бизнесе привела пользователя к книге сейчас?"
+        : "Нужна общая картина бизнеса или решение конкретной ситуации?",
+      nextBestStep: "Выбрать один продуктовый маршрут после ответа пользователя.",
+      whyThisStep: "Один критерий позволяет избежать каталога и преждевременной продажи."
+    },
+    memory: {
+      companyName: "",
+      caseKind: "navigation_case",
+      goal: "Выбрать подходящий формат работы.",
+      symptoms: [],
+      hypotheses: ["Маршрут зависит от требуемого результата."],
+      constraint: "",
+      situation: "Пользователь выбирает книгу, диагностику, AI-BOSS или личную работу.",
+      actionWave: { enabled: false, firstStep: "", notNow: "", whyThisFirst: "" },
+      toolRecommendations: [],
+      artifact: { shouldSave: false, title: "", summary: "", kind: "snapshot" }
+    }
+  };
+}
+
+function buildAlexanderHandoffDecision(context) {
+  const entryState = buildEntryState(context, "general", "weak", "", "keep_in_entry");
+  const responseText = [
+    "Подключить Александра имеет смысл, если нужна собственническая развилка, пересборка управления, сопровождение изменений или партнёрский разговор. Я не буду просто отправлять вас по ссылке: сначала соберу короткий контекст, чтобы разговор начался не с повторения всей истории.",
+    "Какой конкретный результат вы хотите получить от разговора с Александром?"
+  ].join("\n\n");
+
+  return {
+    selectedMode: "clarification_mode",
+    decision: {
+      action: "clarify",
+      signalSufficiency: "weak",
+      confidence: 0.88,
+      rationale: "Пользователь прямо запросил Александра; нужно подготовить передачу и не давать неподтверждённых обещаний."
+    },
+    response: {
+      whatIUnderstood: "Пользователь хочет перейти к личному разговору или работе с Александром.",
+      hypotheses: ["Для качественной передачи нужно сначала понять желаемый результат разговора."],
+      whyItMatters: "Короткий бриф экономит время пользователя и Александра и сохраняет уже собранный контекст.",
+      nextStep: "Получить один факт о желаемом результате личного разговора.",
+      responseText
+    },
+    guardrails: {
+      knownFacts: ["Пользователь прямо попросил личный контакт или работу с Александром."],
+      observations: ["Требуется подготовленная передача, а не новая диагностика."],
+      workingHypotheses: ["Запрос может относиться к собственнической развилке, сопровождению или партнёрству."],
+      canNotAssert: ["Нельзя обещать участие Александра, цену, срок или формат до подтверждения."],
+      confidenceNote: "Запрос на передачу ясен, но бриф пока не собран."
+    },
+    graphAnalysis: buildGraphAnalysisPacket(context.graphPacket),
+    entryState: {
+      ...entryState,
+      entryMode: "human_handoff",
+      nextBestQuestion: "Какой конкретный результат пользователь хочет получить от разговора с Александром?",
+      nextBestStep: "Собрать короткий управленческий бриф и только затем дать маршрут связи.",
+      whyThisStep: "Так личный разговор начинается с задачи и контекста, а не с повторного знакомства."
+    },
+    memory: {
+      companyName: "",
+      caseKind: "consultation_handoff",
+      goal: "Подготовить содержательную передачу Александру.",
+      symptoms: [],
+      hypotheses: ["Пользователю может требоваться личная собственническая работа."],
+      constraint: "",
+      situation: "Пользователь запросил личное участие Александра.",
+      actionWave: { enabled: false, firstStep: "", notNow: "Не обещать формат и условия до подтверждения.", whyThisFirst: "" },
+      toolRecommendations: [],
+      artifact: { shouldSave: false, title: "", summary: "", kind: "snapshot" }
+    }
+  };
+}
+
 function buildConstraintRejectionFeedbackDecision(context) {
   const handoff = context.userMeta?.miniAppHandoff || {};
   const rejectedTitle = handoff.layerTitle || handoff.constraintTitle || "предыдущая версия";
@@ -3008,6 +3126,14 @@ function buildHeuristicDecision(context) {
 
   if (classification.type === "small_talk") {
     return buildOfflineSmallTalkDecision(context);
+  }
+
+  if (context.skillSelection?.primarySkill === "alexander_handoff") {
+    return buildAlexanderHandoffDecision(context);
+  }
+
+  if (context.skillSelection?.primarySkill === "product_navigation") {
+    return buildProductNavigationDecision(context);
   }
 
   if (classification.entryMode === "specific_tool_request" || classification.entryMode === "tool_discovery") {

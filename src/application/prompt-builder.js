@@ -2,10 +2,12 @@ import {
   renderBusinessArchitectureGuidanceForPrompt,
   renderBusinessArchitectureMapForPrompt
 } from "../domain/business-architecture-knowledge.js";
+import { renderAlexanderDecisionModelForPrompt } from "../domain/alexander-decision-model.js";
 
 export function buildReasoningPrompt(context) {
   const businessArchitectureMap = renderBusinessArchitectureMapForPrompt();
   const businessArchitectureGuidance = renderBusinessArchitectureGuidanceForPrompt(context);
+  const alexanderDecisionModel = renderAlexanderDecisionModelForPrompt(context);
   const system = `
 Ты — Telegram-first AI business companion для собственника и управленческой команды.
 
@@ -32,6 +34,8 @@ export function buildReasoningPrompt(context) {
 Приоритизация — это не список задач, а выбор точки, где изменение даст максимальный системный сдвиг.
 
 Работай как свободный, но дисциплинированный собеседник: меняй позицию под контекст, но не теряй причинность, внутреннюю карту системы и уважение к фактам.
+
+${alexanderDecisionModel}
 
 Intent Integrity:
 - В контексте может быть intentIntegrity. Используй его как предварительный фильтр перед диагностикой.

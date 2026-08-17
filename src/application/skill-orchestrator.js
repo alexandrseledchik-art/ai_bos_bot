@@ -16,7 +16,9 @@ const COMMUNICATION_SKILLS = new Set([
   "concept_explanation",
   "progress_navigation",
   "platform_support",
-  "result_interpretation"
+  "result_interpretation",
+  "product_navigation",
+  "alexander_handoff"
 ]);
 
 function normalize(value) {
@@ -91,6 +93,7 @@ function buildPrimaryCandidates({ context, decision }) {
   const routeType = classification.type || context.routeHint || "unknown";
   const integrityType = context.intentIntegrity?.integrityType || "unclear";
   const operatingMode = decision?.orchestration?.operatingMode || context.orchestration?.operatingMode || "unknown";
+  const businessStateMode = decision?.orchestration?.businessStateMode || context.orchestration?.businessStateMode || "unknown";
   const action = decision?.decision?.action || "";
   const text = lower([context.userText, classification.cleanText].filter(Boolean).join(" "));
   const currentScreen = screenId(context);
@@ -104,6 +107,42 @@ function buildPrimaryCandidates({ context, decision }) {
 
   if (routeType === "small_talk" || entryMode === "small_talk") {
     addCandidate(candidates, candidate("natural_conversation", 0.99, ["natural_dialogue"]));
+  }
+
+  if (includesAny(text, [
+    /хочу\s+(?:поговорить|созвониться|встретиться|работать)\s+с\s+александр/,
+    /связаться\s+с\s+александр/,
+    /нужна\s+(?:личная\s+)?(?:консультация|встреча|сессия)/,
+    /передай(?:те)?\s+александр/,
+    /сопровождени[ея]\s+александр/,
+    /(?:партн[её]рств|инвестиц)[а-яё]*.*с\s+александр/,
+    /обсудить.*(?:партн[её]рств|инвестиц).*александр/
+  ])) {
+    addCandidate(candidates, candidate("alexander_handoff", 1, ["explicit_alexander_handoff"]));
+  }
+
+  if (includesAny(text, [
+    /что\s+(?:мне\s+)?выбрать/,
+    /книг[а-яё]*\s+или\s+(?:диагностик|ai|работ)/,
+    /чем\s+отличается\s+(?:книг|диагностик|ai)/,
+    /с\s+чего\s+начать.*(?:книг|диагностик|ai-boss|александр)/,
+    /какой\s+формат\s+(?:мне\s+)?подойд[её]т/,
+    /расскажи\s+(?:мне\s+)?(?:о|про)\s+книг/,
+    /что\s+внутри\s+книг/,
+    /подойд[её]т\s+ли\s+(?:мне\s+)?книг/,
+    /прочитал[а-яё]*\s+(?:вашу\s+)?книг/,
+    /иде[яю]\s+из\s+книг/
+  ])) {
+    addCandidate(candidates, candidate("product_navigation", 0.98, ["product_route_question"]));
+  }
+
+  if (businessStateMode === "crisis" || includesAny(text, [
+    /кассов[а-яё]*\s+разрыв/,
+    /нечем\s+платить/,
+    /денег\s+на\s+.*дн/,
+    /угроз[а-яё]*\s+банкрот/
+  ])) {
+    addCandidate(candidates, candidate("business_diagnostic", 0.97, ["crisis_requires_fast_diagnostic"]));
   }
 
   if (currentTool || context.toolContinuation === true) {
@@ -223,6 +262,8 @@ function chooseSupportingSkills(primarySkill, { context, decision }) {
   if (primarySkill === "next_step_selection") supporting.push("artifact_builder");
   if (primarySkill === "execution_coordination") supporting.push("progress_navigation", "artifact_builder");
   if (primarySkill === "onboarding_conversation") supporting.push("concept_explanation");
+  if (primarySkill === "product_navigation") supporting.push("concept_explanation", "progress_navigation");
+  if (primarySkill === "alexander_handoff") supporting.push("progress_navigation", "artifact_builder");
 
   return unique(supporting.filter((skillId) => skillId !== primarySkill && !ALWAYS_ON_SKILLS.includes(skillId)), 3);
 }
@@ -254,7 +295,9 @@ function selectionGoal(primarySkill, context) {
     tool_facilitation: "Продвинуть активный инструмент на один завершённый шаг.",
     document_analysis: "Извлечь из документа факты, сигналы и открытые вопросы.",
     website_screening: "Разделить внешние факты о сайте, наблюдения и то, чего по URL утверждать нельзя.",
-    execution_coordination: "Закрепить принятое действие ответственностью, результатом и моментом проверки."
+    execution_coordination: "Закрепить принятое действие ответственностью, результатом и моментом проверки.",
+    product_navigation: "Выбрать один подходящий маршрут и объяснить, почему он соответствует текущей задаче.",
+    alexander_handoff: "Подготовить содержательную передачу Александру без потери контекста и неподтверждённых обещаний."
   };
   return goals[primarySkill] || `Получить законченный результат скилла ${primarySkill} для запроса: ${normalize(context.userText)}`;
 }
@@ -270,7 +313,9 @@ function prohibitedActions(primarySkill) {
     maturity_assessment: ["не считать минимальный балл главным ограничением"],
     constraint_prioritization: ["не выбирать ограничение только по минимальной оценке"],
     document_analysis: ["не считать документ автоматически подтверждённой истиной"],
-    execution_coordination: ["не назначать людей без подтверждённых полномочий"]
+    execution_coordination: ["не назначать людей без подтверждённых полномочий"],
+    product_navigation: ["не показывать каталог продуктов вместо одного маршрута", "не продавать до первой пользы"],
+    alexander_handoff: ["не изображать Александра", "не обещать участие, цену или срок без подтверждения", "не ограничиваться голой ссылкой"]
   };
   return unique([...common, ...(bySkill[primarySkill] || [])]);
 }

@@ -1,0 +1,37 @@
+[
+  { "id": "natural_hello", "text": "Привет", "expectedPrimary": "natural_conversation", "expectedPlaybook": "natural_dialogue" },
+  { "id": "natural_how_are_you", "text": "Ты как?", "expectedPrimary": "natural_conversation", "expectedPlaybook": "natural_dialogue" },
+  { "id": "identity_question", "text": "Кто ты и чем можешь помочь?", "expectedPrimary": "concept_explanation", "expectedPlaybook": "concept_explanation" },
+  { "id": "concept_icp", "text": "Что такое ICP?", "operatingMode": "methodology_expert", "expectedPrimary": "concept_explanation", "expectedPlaybook": "concept_explanation" },
+  { "id": "vague_entry", "text": "Хочу разобраться с бизнесом", "expectedPrimary": "intent_clarification", "expectedPlaybook": "entry_clarification" },
+
+  { "id": "book_overview", "text": "Расскажи о книге", "expectedPrimary": "product_navigation", "expectedPlaybook": "book_navigation" },
+  { "id": "book_fit", "text": "Подойдёт ли мне книга?", "expectedPrimary": "product_navigation", "expectedPlaybook": "book_navigation" },
+  { "id": "book_apply", "text": "Прочитал вашу книгу и хочу применить идею к своей компании", "expectedPrimary": "product_navigation", "expectedPlaybook": "book_navigation" },
+  { "id": "product_choice", "text": "Что мне выбрать: книгу или диагностику?", "expectedPrimary": "product_navigation", "expectedPlaybook": "product_navigation" },
+  { "id": "diagnostic_vs_ai_boss", "text": "Чем отличается диагностика от AI-BOSS?", "expectedPrimary": "product_navigation", "expectedPlaybook": "product_navigation" },
+  { "id": "format_choice", "text": "Какой формат мне подойдёт и с чего начать с AI-BOSS?", "expectedPrimary": "product_navigation", "expectedPlaybook": "product_navigation" },
+
+  { "id": "handoff_talk", "text": "Хочу поговорить с Александром", "expectedPrimary": "alexander_handoff", "expectedPlaybook": "human_handoff" },
+  { "id": "handoff_consultation", "text": "Мне нужна личная консультация", "expectedPrimary": "alexander_handoff", "expectedPlaybook": "human_handoff" },
+  { "id": "handoff_partnership", "text": "Хочу обсудить партнёрство с Александром", "expectedPrimary": "alexander_handoff", "expectedPlaybook": "human_handoff" },
+  { "id": "handoff_pass_message", "text": "Передайте Александру, что хочу обсудить сопровождение", "expectedPrimary": "alexander_handoff", "expectedPlaybook": "human_handoff" },
+
+  { "id": "sales_drop", "text": "Продажи падают, хотя заявок стало больше", "expectedPrimary": "business_diagnostic", "expectedPlaybook": "diagnostic_reasoning" },
+  { "id": "margin_drop", "text": "Маржа упала с 25 до 12 процентов", "expectedPrimary": "business_diagnostic", "expectedPlaybook": "diagnostic_reasoning" },
+  { "id": "owner_bottleneck", "text": "Все решения замыкаются на мне, команда ждёт", "expectedPrimary": "business_diagnostic", "expectedPlaybook": "diagnostic_reasoning" },
+  { "id": "process_chaos", "text": "Компания растёт, а процессы превратились в хаос", "expectedPrimary": "business_diagnostic", "expectedPlaybook": "diagnostic_reasoning" },
+  { "id": "data_conflict", "text": "Отделы показывают разные цифры и непонятно каким данным верить", "expectedPrimary": "business_diagnostic", "expectedPlaybook": "diagnostic_reasoning" },
+  { "id": "scaling_risk", "text": "Хочу масштабироваться, но боюсь, что рост усилит хаос", "expectedPrimary": "business_diagnostic", "expectedPlaybook": "diagnostic_reasoning" },
+  { "id": "cash_gap", "text": "У нас повторяется кассовый разрыв", "businessStateMode": "crisis", "expectedPrimary": "business_diagnostic", "expectedPlaybook": "crisis_stabilization" },
+  { "id": "cannot_pay", "text": "Через десять дней нечем платить поставщикам", "businessStateMode": "crisis", "expectedPrimary": "business_diagnostic", "expectedPlaybook": "crisis_stabilization" },
+
+  { "id": "raci_request", "text": "Мне нужна RACI для распределения ролей", "expectedPrimary": "tool_selection", "expectedPlaybook": "tool_application" },
+  { "id": "tool_discovery", "text": "Подбери инструмент, чтобы понять кто за что отвечает", "expectedPrimary": "tool_selection", "expectedPlaybook": "tool_application" },
+  { "id": "active_tool", "text": "Продолжим заполнение инструмента", "activeTool": true, "expectedPrimary": "tool_facilitation", "expectedPlaybook": "tool_application" },
+
+  { "id": "website_screening", "text": "https://example.com", "expectedPrimary": "website_screening", "expectedPlaybook": "external_screening" },
+  { "id": "document_analysis", "text": "Посмотри этот документ", "inputKind": "document", "expectedPrimary": "document_analysis", "expectedPlaybook": "external_screening" },
+  { "id": "accepted_action", "text": "Начинаем делать, зафиксируй следующий шаг", "acceptedNextStep": true, "expectedPrimary": "execution_coordination", "expectedPlaybook": "execution_closure" },
+  { "id": "execution_control", "text": "Кто отвечает и когда проверяем результат?", "operatingMode": "execution_coordinator", "expectedPrimary": "execution_coordination", "expectedPlaybook": "execution_closure" }
+]

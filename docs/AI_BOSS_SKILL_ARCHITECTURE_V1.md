@@ -111,7 +111,9 @@ AI-BOSS — единая управляющая функция бизнеса, �
     │   ├── diagnostic_interview
     │   ├── concept_explanation
     │   ├── progress_navigation
-    │   └── platform_support
+    │   ├── platform_support
+    │   ├── product_navigation
+    │   └── alexander_handoff
     ├── Диагностика
     │   ├── business_diagnostic
     │   ├── maturity_assessment

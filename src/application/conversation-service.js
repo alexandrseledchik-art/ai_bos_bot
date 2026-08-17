@@ -35,6 +35,7 @@ import { SkillOrchestrator } from "./skill-orchestrator.js";
 import { SkillRunManager } from "./skill-run-manager.js";
 import { TelegramDecisionCycleManager } from "./telegram-decision-cycle-manager.js";
 import { buildAudienceProfile } from "../domain/audience-segmentation.js";
+import { assessAlexanderModelAlignment } from "./alexander-model-assessor.js";
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
@@ -376,9 +377,7 @@ function buildPlatformWelcomeMessage(userMeta = {}, { returning = false } = {}) 
     : "Чтобы начать, опишите одну ситуацию, которая сейчас больше всего мешает бизнесу.";
 
   return [
-    accessLine,
-    "",
-    greeting,
+    `${accessLine} ${greeting}`,
     "",
     "AI-BOSS — ваш цифровой управленческий партнёр. Он помогает собрать картину бизнеса, отделить симптом от причины, найти главное ограничение и понять, что делать первым.",
     "",
@@ -1258,6 +1257,7 @@ export class ConversationService {
         context
       });
       decision = applyGuardrails(decision, context);
+      decision.alexanderModelAlignment = assessAlexanderModelAlignment({ context, decision });
       decision.diagnosticQuality = assessChatDiagnosticExcellence({ decision, context });
       decision.orchestration = this.modeOrchestrator.orchestrate({
         context,
@@ -1323,6 +1323,7 @@ export class ConversationService {
       }
       thread.entryState.lastSkillSelection = decision.skillSelection || null;
       thread.entryState.lastSkillExecution = decision.skillExecution || null;
+      thread.entryState.lastAlexanderModelAlignment = decision.alexanderModelAlignment || null;
       thread.entryState = this.skillRunManager.applyToEntryState(thread.entryState, skillRunState);
       thread.updatedAt = nowIso();
 
@@ -1574,6 +1575,7 @@ export class ConversationService {
         decisionObject: decision.decisionObject || null,
         skillSelection: decision.skillSelection || null,
         skillExecution: decision.skillExecution || null,
+        alexanderModelAlignment: decision.alexanderModelAlignment || null,
         managementCycle: this.telegramDecisionCycles.getContext({ state, thread }),
         audienceProfile: decision.audienceProfile || context.audienceProfile || null,
         skillRun: thread.entryState.activeSkillRun || (
