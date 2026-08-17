@@ -312,7 +312,7 @@ export function buildAudienceProfile({
   profile.segmentCandidates = buildSegmentCandidates(profile);
   profile.primarySegment = profile.segmentCandidates.find((segment) => segment.status === "qualified") || null;
   profile.segmentationRule = "segment_is_intersection_not_single_axis";
-  profile.nurtureOnly = profile.humanRole.value === "book_reader" || profile.entryChannel.value === "book";
+  profile.nurtureOnly = profile.humanRole.value === "book_reader";
 
   return profile;
 }

@@ -1,8 +1,8 @@
 import { PlatformApiClient } from "./api-client.js";
+import { buildTelegramChatUrl } from "./entry-attribution.js";
 
 const root = document.getElementById("app");
 const api = new PlatformApiClient();
-const TELEGRAM_CHAT_URL = "https://t.me/ai_bos_bot";
 const PLATFORM_TOUR_STORAGE_KEY = "ai-boss-platform-tour-v1";
 const SCREEN_TOUR_STORAGE_PREFIX = "ai-boss-screen-tour-v1";
 const state = {
@@ -30,6 +30,14 @@ let platformTourAutoStarted = false;
 let activeTourSteps = [];
 let activeTourStorageKey = PLATFORM_TOUR_STORAGE_KEY;
 let activeTourLabel = "Знакомство с платформой";
+
+function telegramChatUrl(startPayload = "") {
+  return buildTelegramChatUrl({
+    search: window.location.search,
+    storage: window.sessionStorage,
+    startPayload
+  });
+}
 
 const PLATFORM_TOUR_STEPS = [
   {
@@ -264,7 +272,7 @@ function renderLogin() {
           <div><b>2</b><span>Нажми «Открыть в браузере» под сообщением</span></div>
           <div><b>3</b><span>Кабинет запомнит вход на этом устройстве</span></div>
         </div>
-        <a class="primary-action login-action" href="${TELEGRAM_CHAT_URL}" target="_blank" rel="noopener">Открыть AI-BOSS в Telegram <span>→</span></a>
+        <a class="primary-action login-action" href="${telegramChatUrl()}" target="_blank" rel="noopener">Открыть AI-BOSS в Telegram <span>→</span></a>
         <p class="privacy-note">Пароль не нужен. Вход подписан Telegram-профилем, а доступ можно отозвать в любой момент.</p>
       </section>
     </main>`;
@@ -316,7 +324,7 @@ function renderShell(content) {
         ${state.notice ? `<div class="notice" role="status">${escapeHtml(state.notice)}</div>` : ""}
         ${content}
       </main>
-      <a class="ai-assistant" href="${TELEGRAM_CHAT_URL}" target="_blank" rel="noopener" aria-label="Спросить AI-BOSS" title="Спросить AI-BOSS"><span>AI</span><b>Спросить AI-BOSS</b></a>
+      <a class="ai-assistant" href="${telegramChatUrl()}" target="_blank" rel="noopener" aria-label="Спросить AI-BOSS" title="Спросить AI-BOSS"><span>AI</span><b>Спросить AI-BOSS</b></a>
     </div>`;
 }
 
@@ -413,7 +421,7 @@ function renderWelcomeDashboard(data) {
       <p class="welcome-choice-note">Выбор определяет только начало работы. Разбор задачи всё равно учитывает бизнес целиком, а общая сборка помогает решать конкретные задачи.</p>
     </section>
     ${systemFlow()}
-    <section class="work-formats panel"><div><span class="eyebrow">Работайте удобным способом</span><h2>Разговор становится частью системы</h2><p>Можно отвечать текстом или голосом, проходить диагностику, заполнять инструменты вместе с AI-BOSS и подключать рабочие документы. Результаты сохраняются в контексте компании.</p></div><a class="primary-action" href="${TELEGRAM_CHAT_URL}" target="_blank" rel="noopener">Открыть AI-BOSS <span>→</span></a></section>
+    <section class="work-formats panel"><div><span class="eyebrow">Работайте удобным способом</span><h2>Разговор становится частью системы</h2><p>Можно отвечать текстом или голосом, проходить диагностику, заполнять инструменты вместе с AI-BOSS и подключать рабочие документы. Результаты сохраняются в контексте компании.</p></div><a class="primary-action" href="${telegramChatUrl()}" target="_blank" rel="noopener">Открыть AI-BOSS <span>→</span></a></section>
     ${experienceCases()}`);
 }
 
@@ -424,7 +432,7 @@ function renderReadyDashboard(data, workspace) {
     <section class="request-banner"><div><span>Текущий запрос</span><strong>${escapeHtml(request)}</strong></div><a href="/app/profile" data-link>Уточнить</a></section>
     <section class="ready-entry-grid">
       <article class="ready-entry"><span class="panel-icon">◇</span><div><p class="eyebrow">Общая сборка</p><h2>Увидеть бизнес как систему</h2><p>Начните с общей картины. Диагностика покажет состояние ключевых частей бизнеса, а архитектура поможет последовательно собирать пробелы.</p></div><a class="primary-action" href="/app/diagnostics/express" data-diagnostic-start="express">Получить общую картину <span>→</span></a></article>
-      <article class="ready-entry dark"><span class="panel-icon orange">AI</span><div><p class="eyebrow">Текущая задача</p><h2>Разобрать запрос с AI-BOSS</h2><p>Опишите ситуацию своими словами. AI-BOSS соберёт версии, запросит необходимые факты и поможет определить первый следующий шаг.</p></div><a class="primary-action orange-action" href="${TELEGRAM_CHAT_URL}" target="_blank" rel="noopener">Перейти к разбору <span>→</span></a></article>
+      <article class="ready-entry dark"><span class="panel-icon orange">AI</span><div><p class="eyebrow">Текущая задача</p><h2>Разобрать запрос с AI-BOSS</h2><p>Опишите ситуацию своими словами. AI-BOSS соберёт версии, запросит необходимые факты и поможет определить первый следующий шаг.</p></div><a class="primary-action orange-action" href="${telegramChatUrl()}" target="_blank" rel="noopener">Перейти к разбору <span>→</span></a></article>
     </section>
     ${systemFlow({ compact: true })}
     ${experienceCases()}`);
@@ -774,7 +782,7 @@ function renderDiagnosticLevel(level) {
     ${selectors}
     <section class="diagnostic-question-list" data-screen-tour="diagnostic-questions">${visibleItems.map((item) => renderDiagnosticQuestion(item, answers[item.subjectKey], level)).join("")}</section>
     ${percent(data.progress?.percent) === 100 ? `<section class="diagnostic-complete panel"><div><span class="eyebrow orange-text">Этот этап завершён</span><h2>Оценки собраны — теперь используйте их как карту поиска</h2><p>Низкий балл ещё не равен главной причине. Посмотрите общую картину или выберите участок для более глубокого разбора.</p></div><div><a class="primary-action" href="/app/diagnostics" data-link>Посмотреть результаты <span>→</span></a><a class="quiet-link" href="/app/architecture" data-link>Открыть архитектуру</a></div></section>` : ""}
-    <section class="diagnostic-help panel" data-screen-tour="diagnostic-help"><div><span class="eyebrow">Сложно выбрать описание?</span><h2>Попросите AI-BOSS разобрать факты</h2><p>Опишите ситуацию своими словами. Бот поможет сопоставить факты с уровнями, но не будет выбирать ответ за вас.</p></div><a class="primary-action" href="${TELEGRAM_CHAT_URL}" target="_blank" rel="noopener">Спросить AI-BOSS <span>→</span></a></section>`);
+    <section class="diagnostic-help panel" data-screen-tour="diagnostic-help"><div><span class="eyebrow">Сложно выбрать описание?</span><h2>Попросите AI-BOSS разобрать факты</h2><p>Опишите ситуацию своими словами. Бот поможет сопоставить факты с уровнями, но не будет выбирать ответ за вас.</p></div><a class="primary-action" href="${telegramChatUrl()}" target="_blank" rel="noopener">Спросить AI-BOSS <span>→</span></a></section>`);
 }
 
 function renderDiagnostics() {
@@ -1037,8 +1045,8 @@ function renderToolDetail() {
   const answers = context?.answers || [];
   const masterUrl = safeUrl(tool.templateUrl || tool.template_url);
   const chatUrl = instance?.telegram_start_token
-    ? `${TELEGRAM_CHAT_URL}?start=tool_${instance.telegram_start_token}`
-    : TELEGRAM_CHAT_URL;
+    ? telegramChatUrl(`tool_${instance.telegram_start_token}`)
+    : telegramChatUrl();
   renderShell(`
     ${sectionHero("Инструмент архитектуры", toolDisplayTitle(tool), humanizeBusinessText(tool.short_description || "AI-BOSS проведёт по инструменту, сохранит ответы и добавит результат в память компании."))}
     <section class="tool-workspace-grid">
@@ -1062,7 +1070,7 @@ function renderDocuments() {
     <section class="document-list" data-screen-tour="document-list">${documents.length ? documents.map((doc) => {
       const url = safeUrl(doc.url);
       return `<article class="document-row"><span class="document-icon">▱</span><div><h3>${escapeHtml(doc.title || "Документ компании")}</h3><p>${escapeHtml(doc.latestSnapshot?.summary || (doc.status === "analyzed" ? "Документ проанализирован" : "Ссылка сохранена, анализ ещё не выполнен"))}</p><small>${escapeHtml(formatDate(doc.last_analyzed_at || doc.updated_at))}</small></div><span class="status-pill ${escapeHtml(doc.status)}">${escapeHtml(doc.status === "analyzed" ? "проанализирован" : "сохранён")}</span>${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">Открыть ↗</a>` : ""}</article>`;
-    }).join("") : `<div class="empty-state"><h2>Документов пока нет</h2><p>Пришлите AI-BOSS ссылку или файл в Telegram. Он сохранит материал в кейсе и поможет разобрать его содержание.</p><a class="primary-action" href="${TELEGRAM_CHAT_URL}" target="_blank" rel="noopener">Отправить документ <span>→</span></a></div>`}</section>
+    }).join("") : `<div class="empty-state"><h2>Документов пока нет</h2><p>Пришлите AI-BOSS ссылку или файл в Telegram. Он сохранит материал в кейсе и поможет разобрать его содержание.</p><a class="primary-action" href="${telegramChatUrl()}" target="_blank" rel="noopener">Отправить документ <span>→</span></a></div>`}</section>
     ${artifacts.length ? `<section class="artifact-section"><div class="tools-section-head"><div><span class="eyebrow">Сохранённые результаты</span><h2>Артефакты компании</h2><p>Выводы и рабочие результаты, которые уже стали частью контекста AI-BOSS.</p></div><b>${artifacts.length}</b></div><div class="artifact-list">${artifacts.map((artifact) => `<article class="artifact-row"><span class="document-icon">✓</span><div><h3>${escapeHtml(artifact.title || artifact.name || "Рабочий результат")}</h3><p>${escapeHtml(humanizeBusinessText(artifact.summary || artifact.content || artifact.description || "Результат сохранён в памяти компании."))}</p><small>${escapeHtml(formatDate(artifact.updated_at || artifact.created_at))}</small></div><span class="status-pill ready">сохранён</span></article>`).join("")}</div></section>` : ""}`);
 }
 
@@ -1412,7 +1420,7 @@ document.addEventListener("submit", async (event) => {
       return;
     }
     if (wasFirstSetup && mode === "problem") {
-      window.location.assign(TELEGRAM_CHAT_URL);
+      window.location.assign(telegramChatUrl());
       return;
     }
     if (wasFirstSetup) navigate("/app");

@@ -365,20 +365,19 @@ function applyStartAttribution({ thread, company, userMeta = {}, startCommand, t
   return attribution;
 }
 
-function buildPlatformWelcomeMessage(userMeta = {}, { returning = false, entryChannel = "telegram" } = {}) {
+function buildPlatformWelcomeMessage(userMeta = {}, { returning = false } = {}) {
   const name = String(userMeta.firstName || userMeta.first_name || "").trim();
   const greeting = returning
     ? (name ? `${name}, с возвращением в AI-BOSS.` : "С возвращением в AI-BOSS.")
     : (name ? `${name}, добро пожаловать в AI-BOSS.` : "Добро пожаловать в AI-BOSS.");
-  const accessLine = ["book", "qr"].includes(entryChannel)
-    ? "Доступ к инструментам AI-BOSS открыт."
-    : "";
+  const accessLine = "Доступ к AI-BOSS открыт.";
   const startLine = returning
     ? "Можно продолжить предыдущий разговор или начать с новой ситуации."
     : "Чтобы начать, опишите одну ситуацию, которая сейчас больше всего мешает бизнесу.";
 
   return [
-    ...(accessLine ? [accessLine, ""] : []),
+    accessLine,
+    "",
     greeting,
     "",
     "AI-BOSS — управленческий помощник для собственника. Он помогает собрать картину бизнеса, отделить симптом от причины, найти главное ограничение и понять, что делать первым.",
@@ -936,10 +935,7 @@ export class ConversationService {
           startRunState
         );
         const returning = state.messages.some((message) => message.threadId === thread.id && message.role === "user" && !looksStartCommand(message.text));
-        const reply = buildPlatformWelcomeMessage(userMeta, {
-          returning,
-          entryChannel: entryAttribution?.entryChannel || "telegram"
-        });
+        const reply = buildPlatformWelcomeMessage(userMeta, { returning });
         state.messages.push(
           createMessage({ threadId: thread.id, role: "user", text }),
           createMessage({ threadId: thread.id, role: "assistant", text: reply })

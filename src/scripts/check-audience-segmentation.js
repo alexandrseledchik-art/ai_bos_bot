@@ -37,6 +37,14 @@ assert.deepEqual(reader.channelPath, ["book", "qr", "telegram"]);
 assert.equal(reader.nurtureOnly, true);
 assert.equal(reader.primarySegment, null);
 
+const bookChannelOnly = buildAudienceProfile({
+  userText: "",
+  userMeta: { entryChannel: "book" },
+  orchestration: { operatingMode: "diagnostician" }
+});
+assert.equal(bookChannelOnly.entryChannel.value, "book");
+assert.equal(bookChannelOnly.nurtureOnly, false);
+
 const noPrematureSegment = buildAudienceProfile({
   userText: "Хочу разобраться с бизнесом.",
   orchestration: { operatingMode: "diagnostician" }
