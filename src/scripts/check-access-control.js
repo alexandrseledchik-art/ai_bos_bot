@@ -215,6 +215,7 @@ async function main() {
   assert.equal(approvalNotifications[0].context.command, "/approve");
   assert.match(buildAccessApprovedUserMessage({ first_name: "Сергей" }), /Сергей, добро пожаловать в AI-BOSS/);
   assert.match(buildAccessApprovedUserMessage(), /«Платформа AI-BOSS» в меню бота/i);
+  assert.match(buildAccessApprovedUserMessage(), /AI-BOSS — ваш цифровой управленческий партнёр/i);
   assert.deepEqual(buildAccessApprovedMiniAppInvite(), {
     route: "/app",
     label: "Создать кабинет компании",

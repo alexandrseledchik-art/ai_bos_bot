@@ -6,7 +6,7 @@
     "expectedMode": "clarification_mode",
     "expectedAction": "clarify",
     "artifactExpected": false,
-    "mustContain": ["Добро пожаловать в AI-BOSS", "управленческий помощник", "в Telegram", "На платформе"],
+    "mustContain": ["Добро пожаловать в AI-BOSS", "цифровой управленческий партнёр", "в Telegram", "На платформе"],
     "mustContainAny": ["главное ограничение", "отделить симптом от причины"],
     "mustNotContain": ["просто открыл чат", "чтобы не гадать", "Ты попал в бизнес-диагноста", "Я бизнес-диагност", "11 слоёв", "11 слоев", "A-D"]
   },

@@ -259,7 +259,7 @@ function renderLogin() {
     <main class="login-shell">
       <section class="login-copy">
         <a class="wordmark" href="/app"><span class="brand-mark">A</span><span>AI-BOSS</span></a>
-        <p class="kicker">Управленческий контур бизнеса</p>
+        <p class="kicker">Ваш цифровой управленческий партнёр</p>
         <h1>Бизнес не должен храниться только в голове.</h1>
         <p class="lead">AI-BOSS собирает контекст компании, ведёт по архитектуре и инструментам, помогает отделять симптомы от причин и удерживает следующий шаг.</p>
         <div class="value-list"><span>11 слоёв бизнеса</span><span>Единая память компании</span><span>Живое сопровождение</span></div>
@@ -311,7 +311,7 @@ function renderShell(content) {
       <aside class="sidebar" aria-label="Основная навигация">
         <button class="sidebar-close" type="button" data-menu-close aria-label="Закрыть меню">×</button>
         <a class="wordmark inverse" href="/app" data-link><span class="brand-mark light">A</span><span>AI-BOSS</span></a>
-        <p class="sidebar-caption">Операционный слой мышления над бизнесом</p>
+        <p class="sidebar-caption">Ваш цифровой управленческий партнёр</p>
         <nav>${navigation(activePath)}</nav>
         <div class="sidebar-foot"><p>Текущая компания</p><strong>${escapeHtml(company)}</strong><button type="button" data-logout>Выйти из кабинета</button></div>
       </aside>

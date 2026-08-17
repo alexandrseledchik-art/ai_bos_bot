@@ -57,6 +57,7 @@ const bookStart = await service.handleUserMessage({
   }
 });
 assert.match(bookStart.reply, /Доступ к AI-BOSS открыт/i);
+assert.match(bookStart.reply, /AI-BOSS — ваш цифровой управленческий партнёр/i);
 assert.equal(bookStart.runtime?.entryAttribution?.entryChannel, "book");
 assert.deepEqual(bookStart.runtime?.entryAttribution?.channelPath, ["book", "qr", "web_cabinet", "telegram"]);
 const bookStartState = await store.readState();
