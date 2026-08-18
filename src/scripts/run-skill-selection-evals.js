@@ -26,6 +26,7 @@ for (const item of cases) {
     inputKind: item.inputKind || "",
     screenId: item.screenId || "",
     activeTool: item.activeTool ? { id: "eval-tool" } : null,
+    toolContinuation: Boolean(item.toolContinuation),
     activeResult: item.activeResult ? { id: "eval-result" } : null,
     acceptedNextStep: item.acceptedNextStep ? { id: "eval-next-step" } : null,
     documentSource: item.documentSource ? { id: "eval-document" } : null,

@@ -255,7 +255,9 @@ const raciContext = await service.handleUserMessage({
 });
 assert.equal(raciContext.classification?.entryMode, "specific_tool_request");
 assert.equal(raciContext.classification?.inferredToolFollowUp, true);
-assert.equal(raciContext.decision?.skillSelection?.primarySkill, "tool_selection");
+assert.equal(raciContext.decision?.skillSelection?.primarySkill, "tool_facilitation");
+assert.equal((raciContext.reply.match(/\?/g) || []).length, 1);
+assert.match(raciContext.reply, /финальн|последн(?:ее|его)\s+слов|прав[оа]\s+решени/i);
 
 const originalReasoner = service.reasoner;
 service.reasoner = {

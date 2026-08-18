@@ -85,6 +85,35 @@ const checkerReadyPacket = pilot.build({
 });
 assert.equal(checkerReadyPacket.evidenceGate.canSelectConstraint, true);
 
+const historyReadyContext = diagnosticContext({
+  userText: "Право на возврат заказа существует только устно и им не пользуются.",
+  history: [
+    { role: "user", text: "Из 18 заказов 7 передали без полного ТЗ, 5 ушли позже срока." },
+    { role: "assistant", text: "Где ломается передача?" }
+  ]
+});
+const historyReadyPacket = pilot.build({ context: historyReadyContext, selection });
+assert.equal(historyReadyPacket.evidenceGate.quantifiedSignal, true);
+assert.equal(historyReadyPacket.evidenceGate.canSelectConstraint, true);
+
+const lingeringClarification = {
+  decision: { action: "clarify", signalSufficiency: "partial", confidence: 0.62 },
+  entryState: { selectedConstraint: "", promotionReadiness: "keep_in_entry" },
+  memory: { constraint: "", actionWave: { enabled: false } },
+  response: { responseText: "Где закреплено это право?", nextStep: "Где закреплено это право?" }
+};
+const promoted = pilot.enforce({
+  packet: historyReadyPacket,
+  decision: lingeringClarification,
+  context: historyReadyContext
+});
+assert.equal(promoted.decision.action, "answer");
+assert.equal(promoted.decision.signalSufficiency, "enough");
+assert.ok(promoted.entryState.selectedConstraint);
+assert.equal(promoted.memory.actionWave.enabled, true);
+assert.match(promoted.response.responseText, /рабочая гипотеза/i);
+assert.match(promoted.response.responseText, /фиксируем/i);
+
 assert.equal(pilot.build({
   context: diagnosticContext(),
   selection: { ...selection, primarySkill: "tool_selection" }

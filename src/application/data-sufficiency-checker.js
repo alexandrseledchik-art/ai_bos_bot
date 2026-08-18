@@ -96,6 +96,10 @@ export class DataSufficiencyChecker {
     );
     const hardSignal = hasHardSignal([
       context.userText,
+      ...((context.history || [])
+        .filter((item) => item?.role === "user")
+        .slice(-8)
+        .map((item) => item?.text)),
       ...(reliableFacts || []).map((item) => item.text)
     ].join(" "));
     const missingFacts = missingFactsFrom(referenceGate, autonomousData);

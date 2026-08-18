@@ -36,9 +36,32 @@ import { SkillRunManager } from "./skill-run-manager.js";
 import { TelegramDecisionCycleManager } from "./telegram-decision-cycle-manager.js";
 import { buildAudienceProfile } from "../domain/audience-segmentation.js";
 import { assessAlexanderModelAlignment } from "./alexander-model-assessor.js";
+import { enforceResponseQuality } from "./response-quality-guard.js";
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function repeatsToolScopeQuestion(value) {
+  return /(?:с\s+какого\s+шага\s+начинаем|что\s+разбираем\s+первым|для\s+какой\s+(?:зоны|области|процесса)|лиды.{0,80}квалификац.{0,80}(?:встреч|кп|закрыт))/is.test(
+    String(value || "")
+  );
+}
+
+function hasExplicitNextMove(value) {
+  return /\?|(?:^|[\s.!])(?:назов(?:и|ите)|выбер(?:и|ите)|пришл(?:и|ите)|отправ(?:ь|ьте)|покаж(?:и|ите)|напиш(?:и|ите)|зафиксиру(?:й|йте))\b/iu.test(
+    String(value || "")
+  );
+}
+
+function appendMissingClarificationMove(responseText, nextStep) {
+  const reply = String(responseText || "").trim();
+  const step = String(nextStep || "").trim();
+  if (!reply || hasExplicitNextMove(reply) || !step) return reply;
+  const visibleStep = /\?$/.test(step) || /^(?:кто|что|где|когда|как|какой|какая|какие|сколько|чей|почему)\b/iu.test(step)
+    ? `${step.replace(/[.!?…]+$/u, "")}?`
+    : step;
+  return `${reply}\n\n${visibleStep}`;
 }
 
 function uniqueStrings(items, maxItems = 10) {
@@ -1145,7 +1168,8 @@ export class ConversationService {
         memorySummary,
         managementCycle,
         entryState: thread.entryState || emptyEntryState(),
-        history
+        history,
+        toolContinuation: Boolean(classification.inferredToolFollowUp || hasToolFirstContext(thread))
       };
 
       const extracted = extractObservations({
@@ -1257,6 +1281,58 @@ export class ConversationService {
         context
       });
       decision = applyGuardrails(decision, context);
+      if (decision._responseOrigin === "model" && decision._forcedEvidencePromotion) {
+        try {
+          decision.response.responseText = await this.reasoner.composeReply({
+            userText: text,
+            userMeta,
+            history,
+            eventType: "evidence_ready_decision",
+            facts: {
+              workingHypothesis: decision.memory?.constraint || decision.entryState?.selectedConstraint,
+              nextStep: decision.memory?.actionWave?.firstStep || decision.response?.nextStep,
+              confirmationCommands: ["фиксируем", "не фиксируем"]
+            },
+            draft: decision.response.responseText
+          });
+        } catch {
+          // The deterministic decision remains a safe fallback if natural composition is unavailable.
+        }
+      }
+      if (
+        decision._responseOrigin === "model" &&
+        context.toolContinuation &&
+        (repeatsToolScopeQuestion(decision.response?.responseText) || !hasExplicitNextMove(decision.response?.responseText))
+      ) {
+        try {
+          decision.response.responseText = await this.reasoner.composeReply({
+            userText: text,
+            userMeta,
+            history,
+            eventType: "tool_context_continuation",
+            facts: {
+              alreadyProvidedContext: text,
+              requiredBehavior: "Использовать уже названную зону и конфликт ролей; не повторять меню процессов; продвинуть применение инструмента на один шаг; завершить ровно одним явным вопросом со знаком вопроса."
+            },
+            draft: decision.response.responseText
+          });
+        } catch {
+          // Keep the original live answer; the surface guard still enforces language and one question.
+        }
+      }
+      const initialResponseQuality = enforceResponseQuality({
+        text: decision.response?.responseText,
+        context,
+        maxQuestions: classification.type === "small_talk" ? null : 1
+      });
+      decision.response.responseText = initialResponseQuality.text;
+      if (decision.decision?.action === "clarify") {
+        decision.response.responseText = appendMissingClarificationMove(
+          decision.response.responseText,
+          decision.response?.nextStep || decision.entryState?.nextBestQuestion
+        );
+      }
+      decision.responseQuality = initialResponseQuality;
       decision.alexanderModelAlignment = assessAlexanderModelAlignment({ context, decision });
       decision.diagnosticQuality = assessChatDiagnosticExcellence({ decision, context });
       decision.orchestration = this.modeOrchestrator.orchestrate({
@@ -1562,6 +1638,21 @@ export class ConversationService {
           state.artifacts.push(previewArtifact);
         }
       }
+
+      const finalResponseQuality = enforceResponseQuality({
+        text: decision.response.responseText,
+        context,
+        maxQuestions: classification.type === "small_talk" ? null : 1
+      });
+      decision.response.responseText = finalResponseQuality.text;
+      decision.responseQuality = {
+        changed: Boolean(decision.responseQuality?.changed || finalResponseQuality.changed),
+        issues: [...new Set([
+          ...(decision.responseQuality?.issues || []),
+          ...finalResponseQuality.issues
+        ])]
+      };
+      assistantMessage.text = decision.response.responseText;
 
       const runtime = {
         threadId: thread.id,

@@ -71,6 +71,13 @@ const ISSUE_TEXT = {
     description: "В ответе видны внутренние названия полей, движков или структур.",
     suggestion: "Добавить фильтр ответа перед отправкой: технические поля и названия внутренних модулей не должны попадать пользователю."
   },
+  foreign_script_leak: {
+    category: "language",
+    severity: "high",
+    title: "В ответ попал фрагмент на другом языке",
+    description: "Русский диалог содержит слово или фрагмент из посторонней письменности.",
+    suggestion: "Перед отправкой проверять письменность ответа и очищать случайные языковые вставки."
+  },
   answer_too_long: {
     category: "language",
     severity: "low",
@@ -121,6 +128,12 @@ function userAskedAboutLayers(userText) {
 function hasInternalStateLeak(assistantText) {
   return /knownFacts|workingHypotheses|entryState|graphPacket|systemLayers|candidateConstraints|Diagnostic Engine|Decision Engine|Action Engine|ObservationExtractor/i.test(
     assistantText
+  );
+}
+
+function hasForeignScriptLeak(value) {
+  return /[\u0530-\u058f\u0590-\u05ff\u0600-\u06ff\u0900-\u097f\u10a0-\u10ff\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/u.test(
+    text(value)
   );
 }
 
@@ -218,14 +231,21 @@ export class ConversationEvaluator {
     const hasSnapshots = (detail?.snapshots || []).length > 0;
     const hasMiniAppEval = (detail?.miniAppEvalLogs || []).length > 0;
     const hasMiniAppInvite = /кабинет|mini app|мини-?апп|mini-app/i.test(assistantText);
+    const primarySkill = text(detail?.thread?.entryState?.lastSkillSelection?.primarySkill);
+    const isDiagnosticRoute = !primarySkill || [
+      "business_diagnostic",
+      "diagnostic_interview",
+      "constraint_prioritization",
+      "maturity_assessment"
+    ].includes(primarySkill);
 
-    if (userMessages.length >= 2 && !hasObservations) {
+    if (isDiagnosticRoute && userMessages.length >= 2 && !hasObservations) {
       addIssue(issues, "no_observations_after_context", {
         userMessages: userMessages.length
       });
     }
 
-    if (userMessages.length >= 3 && !hasHypotheses && !hasConstraints && !hasActionWave && !hasSnapshots && !hasMiniAppEval) {
+    if (isDiagnosticRoute && userMessages.length >= 3 && !hasHypotheses && !hasConstraints && !hasActionWave && !hasSnapshots && !hasMiniAppEval) {
       addIssue(issues, "weak_diagnostic_artifacts", {
         userMessages: userMessages.length
       });
@@ -238,11 +258,11 @@ export class ConversationEvaluator {
       });
     }
 
-    if ((hasConstraints || /ограничени|гипотез|главн/i.test(assistantText)) && !hasHumanWhy(assistantText)) {
+    if (isDiagnosticRoute && (hasConstraints || /ограничени|гипотез|главн/i.test(assistantText)) && !hasHumanWhy(assistantText)) {
       addIssue(issues, "weak_constraint_explanation");
     }
 
-    if (/главн[а-я\s]+ограничени|финальн[а-я\s]+диагноз|точно\s+причина/i.test(assistantText) && !/гипотез|верси|провер/i.test(assistantText)) {
+    if (/(?:главн(?:ое|ый)\s+ограничени[ея]\s*(?:—|:|это)|финальн[а-я\s]+диагноз|точно\s+причина)/i.test(assistantText) && !/гипотез|верси|провер/i.test(assistantText)) {
       addIssue(issues, "premature_certainty");
     }
 
@@ -252,6 +272,10 @@ export class ConversationEvaluator {
 
     if (hasInternalStateLeak(assistantText)) {
       addIssue(issues, "internal_state_leak");
+    }
+
+    if (/[А-Яа-яЁё]/.test(userText) && hasForeignScriptLeak(assistantText)) {
+      addIssue(issues, "foreign_script_leak");
     }
 
     const longestAssistant = Math.max(0, ...assistantMessages.map((message) => text(message.text).length));

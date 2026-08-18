@@ -74,6 +74,10 @@ function spreadAcrossLayers(items, maxItems = 4) {
 function diagnosticScopeText(context) {
   return [
     context.userText,
+    ...((context.history || [])
+      .filter((item) => item?.role === "user")
+      .slice(-8)
+      .map((item) => item?.text)),
     context.entryState?.claimedProblem,
     ...(context.entryState?.symptoms || [])
   ].map(normalize).filter(Boolean).join(" ").toLowerCase();
@@ -343,7 +347,56 @@ export class DiagnosticSkillPilot {
       return decision;
     };
 
-    if (!packet.mustAskForSignal && decision.decision?.action === "answer") {
+    if (!packet.mustAskForSignal && !["answer", "diagnose"].includes(decision.decision?.action)) {
+      const primary = packet.hypotheses[0];
+      const alternative = packet.hypotheses[1];
+      if (primary) {
+        const nextCheck = nextCheckForHypothesis(primary, context);
+        decision.selectedMode = "diagnostic_mode";
+        decision.decision = {
+          ...(decision.decision || {}),
+          action: "answer",
+          signalSufficiency: "enough",
+          confidence: Math.max(0.7, Math.min(0.84, Number(primary.score || 0.72))),
+          rationale: "Накопленных фактов достаточно для рабочей гипотезы и одного проверочного шага."
+        };
+        decision.entryState = {
+          ...(decision.entryState || {}),
+          selectedConstraint: primary.label,
+          signalSufficiency: "enough",
+          promotionReadiness: "ready_for_diagnostic_case",
+          nextBestStep: nextCheck,
+          whyThisStep: "Шаг проверяет ведущую гипотезу на реальных случаях и не требует необратимого решения."
+        };
+        decision.memory = {
+          ...(decision.memory || {}),
+          constraint: primary.label,
+          hypotheses: [primary.label, alternative?.label].filter(Boolean),
+          actionWave: {
+            enabled: true,
+            firstStep: nextCheck,
+            notNow: "Не масштабировать решение до проверки ведущей гипотезы.",
+            whyThisFirst: "Сначала подтверждаем конструкцию на фактах, затем меняем систему."
+          }
+        };
+        decision.response = {
+          ...(decision.response || {}),
+          whatIUnderstood: "Фактов уже достаточно, чтобы перейти от уточнений к рабочей гипотезе.",
+          hypotheses: [primary.label, alternative?.label].filter(Boolean),
+          whyItMatters: "Дальнейшие вопросы уже дадут меньше пользы, чем короткая проверка на реальных случаях.",
+          nextStep: nextCheck,
+          responseText: [
+            `Фактов уже достаточно. Рабочая гипотеза — ${primary.label.toLowerCase()}. Это пока не окончательный диагноз, а версия для проверки.`,
+            `Первый ход: ${nextCheck}`,
+            "Если берём эту версию и шаг в работу, напишите «фиксируем». Если нет — «не фиксируем»."
+          ].join("\n\n")
+        };
+        decision._forcedEvidencePromotion = true;
+      }
+      return decision;
+    }
+
+    if (!packet.mustAskForSignal && ["answer", "diagnose"].includes(decision.decision?.action)) {
       const selectedConstraint = normalize(decision.entryState?.selectedConstraint || decision.memory?.constraint);
       const supportedIndex = packet.hypotheses.findIndex((item) => item.label === selectedConstraint);
       const scoreGap = supportedIndex > 0

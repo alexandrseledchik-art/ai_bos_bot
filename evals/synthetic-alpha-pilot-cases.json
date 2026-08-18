@@ -230,7 +230,7 @@
       "Я собственник малого бизнеса, в отделе 9 человек. По новым клиентам одновременно дают указания РОП и коммерческий директор, а финального владельца сделки нет."
     ],
     "expectedChannel": "book",
-    "expectedPrimary": "tool_selection",
+    "expectedPrimary": "tool_facilitation",
     "targetCycle": false
   },
   {

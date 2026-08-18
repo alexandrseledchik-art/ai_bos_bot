@@ -1934,10 +1934,19 @@ function buildToolFollowUpDecision(context, requestedTool, entryState) {
   const zone = detectToolZoneFromContext(context);
   const asksConnection = /как\s+.*связан|прич[её]м|зачем|почему/i.test(text);
   const isSales = zone === "продажи";
-  const nextStep = isSales
+  const hasDecisionOwnershipConflict = requestedTool.name === "RACI" && /финальн[а-яё]*\s+владел|одновременн[а-яё]*\s+.*указан|роп.{0,80}коммерческ|коммерческ.{0,80}роп/i.test(text);
+  const nextStep = hasDecisionOwnershipConflict
+    ? "Кто должен иметь финальное право решения по новой сделке: РОП, коммерческий директор или другая роль?"
+    : isSales
     ? "Это один сквозной процесс от лида до сделки или несколько ролей на разных этапах?"
     : "Это один процесс с одним ответственным или несколько ролей по этапам?";
-  const responseText = asksConnection
+  const responseText = hasDecisionOwnershipConflict
+    ? [
+        "Контекст уже понятен: для RACI берём не весь отдел продаж, а право финального решения по новой сделке. Сейчас указания дают две роли, а единого владельца результата нет.",
+        "Сначала нужно выбрать одну роль с окончательной ответственностью; остальные роли затем раскладываются как исполнители, согласующие или консультируемые.",
+        nextStep
+      ].join("\n\n")
+    : asksConnection
     ? [
         `Связано напрямую: я бы подсветил здесь ${requestedTool.name === "RACI" ? "матрицу ответственности (RACI), то есть карту кто за что отвечает" : "инструмент для разложения ответственности"}, потому что вопрос не только в продажах, а в том, как работа проходит между людьми.`,
         isSales

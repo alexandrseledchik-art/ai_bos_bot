@@ -28,6 +28,7 @@
   { "id": "result-explain", "text": "Как мне понять этот результат?", "activeResult": true, "expectedPrimary": "result_interpretation" },
   { "id": "document-result", "text": "Что следует из этого результата?", "screenId": "documents-result", "activeResult": true, "expectedPrimary": "result_interpretation" },
   { "id": "active-raci", "text": "Хочу заполнить RACI", "activeTool": true, "expectedPrimary": "tool_facilitation" },
+  { "id": "raci-context-continuation", "text": "РОП и коммерческий директор дают разные указания, финального владельца сделки нет", "toolContinuation": true, "expectedPrimary": "tool_facilitation" },
   { "id": "unknown", "text": "Не знаю", "expectedPrimary": "intent_clarification" },
   { "id": "product-choice", "text": "Что мне выбрать: книгу или диагностику?", "expectedPrimary": "product_navigation" },
   { "id": "book-overview", "text": "Расскажи о книге", "expectedPrimary": "product_navigation" },
