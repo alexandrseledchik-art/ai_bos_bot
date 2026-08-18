@@ -17,6 +17,7 @@
     "tools:sync:check": "node src/scripts/check-tools-catalog-sync.js",
     "telegram:webhook": "node src/scripts/register-telegram-webhook.js",
     "telegram:profile": "node src/scripts/register-telegram-profile.js",
+    "telegram:avatar": "node src/scripts/register-telegram-avatar.js",
     "telegram:miniapp": "node src/scripts/register-telegram-mini-app.js",
     "telegram:menu:reset": "node src/scripts/register-telegram-mini-app.js",
     "workspace:membership": "node src/scripts/workspace-membership.js",
