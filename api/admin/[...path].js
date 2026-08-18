@@ -9,7 +9,6 @@ import {
 import { answerWorkspaceQuestion } from "../../src/application/workspace-chat-service.js";
 import { getServices } from "../../src/create-services.js";
 import {
-  buildPersistentPlatformMenuButton,
   buildPersistentPlatformReplyMarkup
 } from "../../src/infrastructure/telegram/mini-app-webapp.js";
 import { TelegramApiClient } from "../../src/infrastructure/telegram/telegram-api.js";
@@ -134,18 +133,10 @@ async function dispatchAdminRoute(request) {
               token: config.telegramToken,
               apiBaseUrl: config.telegramApiBaseUrl
             });
-            const menuButton = buildPersistentPlatformMenuButton({
-              appBaseUrl: config.appBaseUrl,
-              telegramUser: user,
-              webSessionSecret: config.webSessionSecret,
-              webLoginTtlSeconds: config.webLoginTtlSeconds
+            await telegramApi.setChatMenuButton({
+              chatId: user.telegram_user_id,
+              menuButton: { type: "default" }
             });
-            if (menuButton) {
-              await telegramApi.setChatMenuButton({
-                chatId: user.telegram_user_id,
-                menuButton
-              });
-            }
             await telegramApi.sendMessage(user.telegram_user_id, buildAccessApprovedUserMessage(user), {
               replyMarkup: buildPersistentPlatformReplyMarkup({
                 appBaseUrl: config.appBaseUrl,

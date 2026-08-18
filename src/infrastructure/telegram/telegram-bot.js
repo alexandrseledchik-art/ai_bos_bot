@@ -9,8 +9,9 @@ import {
 } from "../../application/access-admin-commands.js";
 import { extractTelegramMessagePayload, TelegramApiClient } from "./telegram-api.js";
 import {
-  buildPersistentPlatformMenuButton,
-  buildPersistentPlatformReplyMarkup
+  buildPersistentPlatformReplyMarkup,
+  buildPlatformCommandMessage,
+  looksLikePlatformCommand
 } from "./mini-app-webapp.js";
 import {
   describeTelegramPayloadForLog
@@ -77,19 +78,11 @@ export class TelegramBotRunner {
     await this.sendMessage(payload.chatId, reply, options);
   }
 
-  async refreshPlatformMenuButton(chatId, telegramUser) {
-    const menuButton = buildPersistentPlatformMenuButton({
-      appBaseUrl: this.appBaseUrl,
-      telegramUser,
-      webSessionSecret: this.webSessionSecret,
-      webLoginTtlSeconds: this.webLoginTtlSeconds
-    });
-    if (!menuButton) return;
-
+  async resetPlatformMenuButton(chatId) {
     try {
-      await this.api.setChatMenuButton({ chatId, menuButton });
+      await this.api.setChatMenuButton({ chatId, menuButton: { type: "default" } });
     } catch (error) {
-      console.warn("Telegram platform menu button refresh skipped:", error.message);
+      console.warn("Telegram platform menu button reset skipped:", error.message);
     }
   }
 
@@ -112,7 +105,7 @@ export class TelegramBotRunner {
               fromTelegramUserId: payload.userMeta?.telegramUserId || payload.userMeta?.id || payload.chatId,
               accessControl: this.accessControl,
               onUserApproved: async (user) => {
-                await this.refreshPlatformMenuButton(user.telegram_user_id, user);
+                await this.resetPlatformMenuButton(user.telegram_user_id);
                 await this.sendMessage(user.telegram_user_id, buildAccessApprovedUserMessage(user), {
                   replyMarkup: buildPersistentPlatformReplyMarkup({
                     appBaseUrl: this.appBaseUrl,
@@ -153,7 +146,22 @@ export class TelegramBotRunner {
             }
           }
 
-          await this.refreshPlatformMenuButton(payload.chatId, payload.userMeta);
+          await this.resetPlatformMenuButton(payload.chatId);
+
+          if (payload.kind === "text" && looksLikePlatformCommand(payload.text)) {
+            await this.sendMessage(payload.chatId, buildPlatformCommandMessage(), {
+              replyMarkup: buildPersistentPlatformReplyMarkup({
+                appBaseUrl: this.appBaseUrl,
+                telegramUser: {
+                  ...payload.userMeta,
+                  id: payload.userMeta?.telegramUserId || payload.userMeta?.id || payload.chatId
+                },
+                webSessionSecret: this.webSessionSecret,
+                webLoginTtlSeconds: this.webLoginTtlSeconds
+              })
+            });
+            continue;
+          }
 
           const stopTyping = this.api.startTyping(payload.chatId);
           let result;

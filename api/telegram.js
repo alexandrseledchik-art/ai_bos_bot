@@ -14,8 +14,9 @@ import { ToolWorkflowService } from "../src/application/tool-workflow-service.js
 import { MiniAppCompatSyncClient } from "../src/infrastructure/storage/mini-app-compat-sync.js";
 import { extractTelegramMessagePayload } from "../src/infrastructure/telegram/telegram-api.js";
 import {
-  buildPersistentPlatformMenuButton,
-  buildPersistentPlatformReplyMarkup
+  buildPersistentPlatformReplyMarkup,
+  buildPlatformCommandMessage,
+  looksLikePlatformCommand
 } from "../src/infrastructure/telegram/mini-app-webapp.js";
 import {
   describeTelegramPayloadForLog
@@ -39,19 +40,11 @@ function validateWebhookSecret(request, expectedSecret) {
   return request.headers.get("x-telegram-bot-api-secret-token") === expectedSecret;
 }
 
-async function refreshPlatformMenuButton({ telegramApi, config, chatId, telegramUser }) {
-  const menuButton = buildPersistentPlatformMenuButton({
-    appBaseUrl: config.appBaseUrl,
-    telegramUser,
-    webSessionSecret: config.webSessionSecret,
-    webLoginTtlSeconds: config.webLoginTtlSeconds
-  });
-  if (!menuButton) return;
-
+async function resetPlatformMenuButton({ telegramApi, chatId }) {
   try {
-    await telegramApi.setChatMenuButton({ chatId, menuButton });
+    await telegramApi.setChatMenuButton({ chatId, menuButton: { type: "default" } });
   } catch (error) {
-    console.warn("Telegram platform menu button refresh skipped:", error.message);
+    console.warn("Telegram platform menu button reset skipped:", error.message);
   }
 }
 
@@ -184,11 +177,9 @@ async function handleTelegramWebhook(request) {
       fromTelegramUserId: payload.userMeta?.telegramUserId || payload.userMeta?.id || payload.chatId,
       accessControl,
       onUserApproved: async (user) => {
-        await refreshPlatformMenuButton({
+        await resetPlatformMenuButton({
           telegramApi,
-          config,
-          chatId: user.telegram_user_id,
-          telegramUser: user
+          chatId: user.telegram_user_id
         });
         await telegramApi.sendMessage(user.telegram_user_id, buildAccessApprovedUserMessage(user), {
           replyMarkup: buildPersistentPlatformReplyMarkup({
@@ -229,12 +220,25 @@ async function handleTelegramWebhook(request) {
     return json({ ok: true, handled: "access-denied", accessStatus: accessDecision.status });
   }
 
-  await refreshPlatformMenuButton({
+  await resetPlatformMenuButton({
     telegramApi,
-    config,
-    chatId: payload.chatId,
-    telegramUser: payload.userMeta
+    chatId: payload.chatId
   });
+
+  if (payload.kind === "text" && looksLikePlatformCommand(payload.text)) {
+    await telegramApi.sendMessage(payload.chatId, buildPlatformCommandMessage(), {
+      replyMarkup: buildPersistentPlatformReplyMarkup({
+        appBaseUrl: config.appBaseUrl,
+        telegramUser: {
+          ...payload.userMeta,
+          id: payload.userMeta?.telegramUserId || payload.userMeta?.id || payload.chatId
+        },
+        webSessionSecret: config.webSessionSecret,
+        webLoginTtlSeconds: config.webLoginTtlSeconds
+      })
+    });
+    return json({ ok: true, handled: "platform-command" });
+  }
 
   const stopTyping = telegramApi.startTyping(payload.chatId);
   let result;

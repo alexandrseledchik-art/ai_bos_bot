@@ -19,11 +19,18 @@ async function main() {
 
   await telegramApi.api("setMyDescription", { description });
   await telegramApi.api("setMyShortDescription", { short_description: shortDescription });
+  await telegramApi.api("setMyCommands", {
+    commands: [
+      { command: "start", description: "Начать работу с AI-BOSS" },
+      { command: "platform", description: "Открыть платформу AI-BOSS" }
+    ]
+  });
 
   console.log(JSON.stringify({
     ok: true,
     description,
-    shortDescription
+    shortDescription,
+    commands: ["/start", "/platform"]
   }, null, 2));
 }
 

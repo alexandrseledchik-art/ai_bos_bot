@@ -1,27 +1,35 @@
-import { loadConfig } from "../config.js";
-import { TelegramApiClient } from "../infrastructure/telegram/telegram-api.js";
+import { getServices } from "../create-services.js";
 
 async function main() {
-  const config = loadConfig();
+  const { config, telegramApi, accessControl } = getServices();
 
   if (!config.telegramToken) {
     throw new Error("TELEGRAM_BOT_TOKEN is missing.");
   }
 
   const menuButton = { type: "default" };
-
-  const telegramApi = new TelegramApiClient({
-    token: config.telegramToken,
-    apiBaseUrl: config.telegramApiBaseUrl
-  });
-
   await telegramApi.setChatMenuButton({ menuButton });
+
+  const users = accessControl?.enabled
+    ? await accessControl.listUsers({ limit: 1000 })
+    : [];
+  let resetUserCount = 0;
+
+  for (const user of users) {
+    if (!user?.telegram_user_id) continue;
+    await telegramApi.setChatMenuButton({
+      chatId: user.telegram_user_id,
+      menuButton
+    });
+    resetUserCount += 1;
+  }
 
   console.log(JSON.stringify({
     ok: true,
     action: "setChatMenuButton",
     type: menuButton.type,
-    note: "Telegram Web App menu button removed; cabinet opens from signed message links."
+    resetUserCount,
+    note: "Telegram Web App menu buttons removed; the platform opens from /platform as a normal signed URL."
   }, null, 2));
 }
 

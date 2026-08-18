@@ -200,11 +200,16 @@ async function main() {
   const conversationService = fs.readFileSync("src/application/conversation-service.js", "utf8");
   const telegramWebhook = fs.readFileSync("api/telegram.js", "utf8");
   const adminApi = fs.readFileSync("api/admin/[...path].js", "utf8");
+  const telegramProfile = fs.readFileSync("src/scripts/register-telegram-profile.js", "utf8");
   assert.match(conversationService, /buildPlatformWelcomeMessage/);
   assert.match(conversationService, /looksStartCommand\(text\)/);
   assert.doesNotMatch(telegramWebhook, /buildMiniAppReplyMarkup/);
-  assert.match(telegramWebhook, /buildPersistentPlatformMenuButton/);
+  assert.doesNotMatch(telegramWebhook, /buildPersistentPlatformMenuButton/);
+  assert.match(telegramWebhook, /looksLikePlatformCommand/);
+  assert.match(telegramWebhook, /menuButton: \{ type: "default" \}/);
   assert.match(telegramWebhook, /replyMarkup: isStart/);
+  assert.match(telegramProfile, /setMyCommands/);
+  assert.match(telegramProfile, /command: "platform"/);
   assert.match(adminApi, /telegram\/miniapp-menu/);
   assert.match(adminApi, /setChatMenuButton/);
 

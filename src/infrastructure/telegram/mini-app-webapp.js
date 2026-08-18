@@ -98,29 +98,12 @@ export function buildPersistentPlatformReplyMarkup({
   };
 }
 
-export function buildPersistentPlatformMenuButton({
-  appBaseUrl,
-  telegramUser = null,
-  webSessionSecret = "",
-  webLoginTtlSeconds = DEFAULT_WEB_ACCESS_TTL_SECONDS,
-  text = "Платформа AI-BOSS"
-} = {}) {
-  const markup = buildPersistentPlatformReplyMarkup({
-    appBaseUrl,
-    telegramUser,
-    webSessionSecret,
-    webLoginTtlSeconds
-  });
-  const url = markup?.inline_keyboard?.[0]?.[0]?.url || "";
-  if (!url) {
-    return null;
-  }
+export function looksLikePlatformCommand(text = "") {
+  return /^\/platform(?:@\w+)?(?:\s|$)/i.test(String(text).trim());
+}
 
-  return {
-    type: "web_app",
-    text,
-    web_app: { url }
-  };
+export function buildPlatformCommandMessage() {
+  return "Открываю платформу AI-BOSS. Нажмите кнопку ниже — платформа откроется как обычный сайт.";
 }
 
 export function buildMiniAppMenuButton(appBaseUrl, { route = "/mini-app", text = "Кабинет" } = {}) {
